@@ -1,0 +1,5 @@
+# Global gitignore patterns
+# This file is installed to ~/.config/git/ignore by shell-configs
+
+# Ignore PLAN__*.md files created by Claude Code /dev-docs slash command
+PLAN__*.md

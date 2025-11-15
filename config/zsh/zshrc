@@ -1,0 +1,28 @@
+# Zsh-Specific Configuration
+# Common settings are in shared.sh and will be included automatically
+
+# Zsh history settings
+HISTSIZE=10000
+SAVEHIST=20000
+HISTFILE=~/.zsh_history
+setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_REDUCE_BLANKS
+setopt HIST_SAVE_NO_DUPS
+setopt SHARE_HISTORY
+
+# Enable zsh completion
+autoload -Uz compinit
+compinit
+
+# Zsh-specific prompt with git integration
+if [ -f ~/.zsh/git-prompt.sh ]; then
+    source ~/.zsh/git-prompt.sh
+    setopt prompt_subst
+    PROMPT='%F{251}%~%F{reset}%B%F{cyan}$(__git_ps1 " %s")%F{reset}%b '
+fi
+
+unlock_file() {
+    local file=$1
+    sudo xattr -r -d com.apple.quarantine "$file"
+}

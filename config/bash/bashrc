@@ -1,0 +1,14 @@
+# Bash-Specific Configuration
+# Common settings are in shared.sh and will be included automatically
+
+# Bash history settings
+export HISTSIZE=10000
+export HISTFILESIZE=20000
+export HISTCONTROL=ignoredups:erasedups
+shopt -s histappend
+
+# Bash-specific prompt with git integration
+if [ -f ~/.bash/git-prompt.sh ]; then
+    source ~/.bash/git-prompt.sh
+    export PS1='\u@\h:\w\[\033[1;36m\]$(__git_ps1 " %s")\[\033[0m\] \$ '
+fi
