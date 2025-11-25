@@ -1,16 +1,98 @@
 # Shared Shell Configuration
 # This file contains configurations that work across bash, zsh, and other POSIX-compatible shells
 
-alias ll='ls -la'
+### Environment ###
+export EDITOR=vim
+export VISUAL=vim
+export PAGER=less
+
+### Git - Aliases ###
 alias gs='git status'
 alias ga='git add'
 alias gc='git commit'
 alias gp='git push'
 alias gl='git log --oneline --graph --decorate'
+alias recent_commits="git for-each-ref --sort=-committerdate refs/heads/ --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(color:red)%(objectname:short)%(color:reset) - %(contents:subject) - %(authorname) (%(color:green)%(committerdate:relative)%(color:reset))'"
+alias safepull='git fetch origin $(git rev-parse --abbrev-ref HEAD) && git merge FETCH_HEAD'
+alias yeet="git commit -a --amend --no-edit"
+alias yeet_to_github="git commit -a --amend --no-edit && git push --force-with-lease"
+alias sync-fork="git checkout && git fetch upstream && git merge upstream/main"
 
-export EDITOR=vim
-export VISUAL=vim
-export PAGER=less
+### Git - Configuration ###
+export GIT_PS1_SHOWDIRTYSTATE=true
+export GIT_PS1_SHOWSTASHSTATE=true
+export GIT_PS1_SHOWUNTRACKEDFILES=true
+export GIT_PS1_SHOWUPSTREAM="auto"
+GPG_TTY=$(tty)
+export GPG_TTY
+
+### Git - Functions ###
+git() {
+    if [[ "$1" == "checkout" && "$2" == "$master" ]]; then
+        master_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+        if [[ -n "$master_branch" ]]; then
+            command git checkout "$master_branch"
+        else
+            echo "Error: Could not determine default branch (main/master)."
+            return 1
+        fi
+    else
+        command git "$@"
+    fi
+}
+
+### Python ###
+pytest_coverage() {
+    uv run pytest --cov=src --cov-report=term-missing "$@"
+}
+
+python_package_versions() {
+    uvx pip index versions "$@"
+}
+
+### Node/NPM ###
+npm_package_versions() {
+    npm view "@block/$@" versions --json
+}
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
+### Docker ###
+alias docker_cleanup="docker builder prune -af && docker system prune -af"
+
+### AI Tools - Aliases ###
+alias ccusage="npx -y ccusage@latest"
+alias ccviewer="uvx --from claude-code-viewer claude-viewer"
+
+### AI Tools - Configuration ###
+export GOOSE_ALLOWLIST_BYPASS=true
+export GOOSE_AUTO_COMPACT_THRESHOLD=0.0
+export CLAUDE_CODE_STATUSLINE_DEBUG=1
+
+### AI Tools - Functions ###
+run_goose_recipe() {
+    goose run --recipe "$@" --interactive
+}
+
+query_goose_database() {
+    sqlite3 ~/.local/share/goose/sessions/sessions.db "$@"
+}
+
+mcp_inspector() {
+    npx -y @modelcontextprotocol/inspector "$@"
+}
+
+### Shell Completions ###
+_pipenv_run_complete() {
+    _arguments '1: :_files' '*:: :_default'
+}
+
+compdef _pipenv_run_complete pipenv
+
+### Utilities ###
+alias ll='ls -la'
 
 extract() {
     if [ -f "$1" ]; then
@@ -28,80 +110,5 @@ extract() {
         echo "'$1' is not a valid file"
     fi
 }
-
-export GIT_PS1_SHOWDIRTYSTATE=true
-export GIT_PS1_SHOWSTASHSTATE=true       # Show $ if something is stashed
-export GIT_PS1_SHOWUNTRACKEDFILES=true   # Show % if there are untracked files
-export GIT_PS1_SHOWUPSTREAM="auto"       # Show <>=  for upstream status
-
-GPG_TTY=$(tty)
-export GPG_TTY
-
-git() {
-    if [[ "$1" == "checkout" && "$2" == "$master" ]]; then
-        master_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
-        if [[ -n "$master_branch" ]]; then
-            command git checkout "$master_branch"
-        else
-            echo "Error: Could not determine default branch (main/master)."
-            return 1
-        fi
-    else
-        command git "$@"
-    fi
-}
-
-pytest_coverage() {
-    uv run pytest --cov=src --cov-report=term-missing "$@"
-}
-
-python_package_versions() {
-    uvx pip index versions "$@"
-}
-
-npm_package_versions() {
-    npm view "@block/$@" versions --json
-}
-
-_pipenv_run_complete() {
-    _arguments '1: :_files' '*:: :_default'
-}
-
-compdef _pipenv_run_complete pipenv
-
-alias recent_commits="git for-each-ref --sort=-committerdate refs/heads/ --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(color:red)%(objectname:short)%(color:reset) - %(contents:subject) - %(authorname) (%(color:green)%(committerdate:relative)%(color:reset))'"
-alias safepull='git fetch origin $(git rev-parse --abbrev-ref HEAD) && git merge FETCH_HEAD'
-
-alias yeet="git commit -a --amend --no-edit"
-alias yeet_to_github="git commit -a --amend --no-edit && git push --force-with-lease"
-
-alias docker_cleanup="docker builder prune -af && docker system prune -af"
-
-alias sync-fork="git checkout && git fetch upstream && git merge upstream/main" # requires upstream to be set up first with: git remote add upstream <upstream-repo-url>
-
-export GOOSE_ALLOWLIST_BYPASS=true
-export GOOSE_AUTO_COMPACT_THRESHOLD=0.0
-
-
-run_goose_recipe() {
-    goose run --recipe "$@" --interactive
-}
-
-query_goose_database() {
-    sqlite3 ~/.local/share/goose/sessions/sessions.db "$@"
-}
-
-mcp_inspector() {
-    npx -y @modelcontextprotocol/inspector "$@"
-}
-
-alias ccusage="npx -y ccusage@latest"
-alias ccviewer="uvx --from claude-code-viewer claude-viewer"
-
-export CLAUDE_CODE_STATUSLINE_DEBUG=1
-
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 [ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env"

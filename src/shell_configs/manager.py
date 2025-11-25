@@ -33,7 +33,9 @@ class ConfigManager:
     """Manages configuration sections in shell config files."""
 
     START_MARKER = "##### shell-configs Managed Config #####"
+    START_DECORATION = "########################################"
     END_MARKER = "##### End shell-configs Managed Config #####"
+    END_DECORATION = "########################################"
     SHARED_SECTION_MARKER = "### Shared Config ###"
     SHELL_SPECIFIC_MARKER = "### Shell-Specific Config ###"
 
@@ -86,7 +88,15 @@ class ConfigManager:
         if start_idx is None or end_idx is None:
             return None
 
-        content_lines = lines[start_idx + 1 : end_idx]
+        content_start = start_idx + 1
+        if content_start < len(lines) and self.START_DECORATION in lines[content_start]:
+            content_start += 1
+
+        content_end = end_idx
+        if content_end > 0 and self.END_DECORATION in lines[content_end - 1]:
+            content_end -= 1
+
+        content_lines = lines[content_start:content_end]
         content = "".join(content_lines).rstrip("\n")
 
         return ManagedSection(content=content, start_line=start_idx, end_line=end_idx)
@@ -220,7 +230,7 @@ class ConfigManager:
         else:
             existing_content = ""
 
-        new_content = f"{existing_content}\n{self.START_MARKER}\n{content}\n{self.END_MARKER}\n"
+        new_content = f"{existing_content}\n{self.START_DECORATION}\n{self.START_MARKER}\n{self.START_DECORATION}\n{content}\n{self.END_DECORATION}\n{self.END_MARKER}\n{self.END_DECORATION}\n"
 
         self._atomic_write(config_file, new_content)
 
@@ -245,13 +255,25 @@ class ConfigManager:
         if start_idx is None or end_idx is None:
             raise ValueError("Managed section markers not found")
 
+        start_boundary = start_idx
+        if start_idx > 0 and self.START_DECORATION in lines[start_idx - 1]:
+            start_boundary = start_idx - 1
+
+        end_boundary = end_idx
+        if end_idx < len(lines) - 1 and self.END_DECORATION in lines[end_idx + 1]:
+            end_boundary = end_idx + 1
+
         new_section = [
-            lines[start_idx],
+            f"{self.START_DECORATION}\n",
+            f"{self.START_MARKER}\n",
+            f"{self.START_DECORATION}\n",
             f"{content}\n",
-            lines[end_idx],
+            f"{self.END_DECORATION}\n",
+            f"{self.END_MARKER}\n",
+            f"{self.END_DECORATION}\n",
         ]
 
-        new_lines = lines[:start_idx] + new_section + lines[end_idx + 1 :]
+        new_lines = lines[:start_boundary] + new_section + lines[end_boundary + 1 :]
         new_content = "".join(new_lines)
 
         self._atomic_write(config_file, new_content)
