@@ -30,9 +30,9 @@ extract() {
 }
 
 export GIT_PS1_SHOWDIRTYSTATE=true
-# export GIT_PS1_SHOWSTASHSTATE=true       # Show $ if something is stashed
-# export GIT_PS1_SHOWUNTRACKEDFILES=true   # Show % if there are untracked files
-# export GIT_PS1_SHOWUPSTREAM="auto"       # Show <>=  for upstream status
+export GIT_PS1_SHOWSTASHSTATE=true       # Show $ if something is stashed
+export GIT_PS1_SHOWUNTRACKEDFILES=true   # Show % if there are untracked files
+export GIT_PS1_SHOWUPSTREAM="auto"       # Show <>=  for upstream status
 
 GPG_TTY=$(tty)
 export GPG_TTY
