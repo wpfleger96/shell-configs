@@ -23,7 +23,7 @@ def mock_home(temp_dir, monkeypatch):
 
 @pytest.fixture
 def test_repo(temp_dir):
-    repo = temp_dir / "repo"
+    repo = (temp_dir / "repo").resolve()
     repo.mkdir()
 
     config_dir = repo / "config"
@@ -48,4 +48,4 @@ def test_repo(temp_dir):
 
 @pytest.fixture
 def cli_runner():
-    return CliRunner()
+    return CliRunner(env={"COLUMNS": "200"})

@@ -63,12 +63,21 @@ npm_package_versions() {
     npm view "@block/$@" versions --json
 }
 
+_pipenv_run_complete() {
+    _arguments '1: :_files' '*:: :_default'
+}
+
+compdef _pipenv_run_complete pipenv
+
 alias recent_commits="git for-each-ref --sort=-committerdate refs/heads/ --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(color:red)%(objectname:short)%(color:reset) - %(contents:subject) - %(authorname) (%(color:green)%(committerdate:relative)%(color:reset))'"
 alias safepull='git fetch origin $(git rev-parse --abbrev-ref HEAD) && git merge FETCH_HEAD'
 
 alias yeet="git commit -a --amend --no-edit"
 alias yeet_to_github="git commit -a --amend --no-edit && git push --force-with-lease"
 
+alias docker_cleanup="docker builder prune -af && docker system prune -af"
+
+alias sync-fork="git checkout && git fetch upstream && git merge upstream/main" # requires upstream to be set up first with: git remote add upstream <upstream-repo-url>
 
 export GOOSE_ALLOWLIST_BYPASS=true
 export GOOSE_AUTO_COMPACT_THRESHOLD=0.0
@@ -76,6 +85,10 @@ export GOOSE_AUTO_COMPACT_THRESHOLD=0.0
 
 run_goose_recipe() {
     goose run --recipe "$@" --interactive
+}
+
+query_goose_database() {
+    sqlite3 ~/.local/share/goose/sessions/sessions.db "$@"
 }
 
 mcp_inspector() {

@@ -63,3 +63,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "ruff>=0.14.3",
 ]
+
+[[tool.uv.index]]
+name = "default"
+url = "https://pypi.org/simple"
