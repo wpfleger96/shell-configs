@@ -16,6 +16,7 @@
     editor = vim
     pager = less -FRX
     autocrlf = input
+    hooksPath = .hooks
 
 [push]
     default = current
