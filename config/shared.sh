@@ -89,8 +89,6 @@ _pipenv_run_complete() {
     _arguments '1: :_files' '*:: :_default'
 }
 
-compdef _pipenv_run_complete pipenv
-
 ### Utilities ###
 alias ll='ls -la'
 
