@@ -22,10 +22,13 @@ from shell_configs.display import (
     print_warning,
 )
 from shell_configs.manager import ConfigManager, OperationResult
+from shell_configs.shells.base import Shell
 from shell_configs.shells.registry import ShellRegistry
 
 
-def parse_shell_filter(ctx, param, value):
+def parse_shell_filter(
+    ctx: click.Context, param: click.Parameter, value: str | None
+) -> list[str] | None:
     """Parse shell filter from comma-separated string."""
     if not value:
         return None
@@ -33,8 +36,11 @@ def parse_shell_filter(ctx, param, value):
 
 
 def _get_selected_shells(
-    registry, shells_filter=None, config_reader=None, use_all=False
-):
+    registry: ShellRegistry,
+    shells_filter: list[str] | None = None,
+    config_reader: ConfigReader | None = None,
+    use_all: bool = False,
+) -> list[Shell]:
     """Get selected shells based on filter or available configs.
 
     Args:
@@ -68,7 +74,7 @@ def _get_selected_shells(
 
 @click.group()
 @click.version_option()
-def cli():
+def cli() -> None:
     """Manage shell configuration files across machines."""
 
 
@@ -82,7 +88,7 @@ def cli():
     "--dry-run", is_flag=True, help="Show what would be done without doing it"
 )
 @click.option("--force", is_flag=True, help="Skip confirmation prompts")
-def install(shells, dry_run, force):
+def install(shells: list[str] | None, dry_run: bool, force: bool) -> None:
     """Install or update managed configuration sections."""
     repo_root = find_repo_root()
     if not repo_root:
@@ -179,7 +185,7 @@ def install(shells, dry_run, force):
     help="Comma-separated list of shells to uninstall",
 )
 @click.option("--force", is_flag=True, help="Skip confirmation prompts")
-def uninstall(shells, force):
+def uninstall(shells: list[str] | None, force: bool) -> None:
     """Remove managed configuration sections."""
     repo_root = find_repo_root()
     if not repo_root:
@@ -241,7 +247,7 @@ def uninstall(shells, force):
     callback=parse_shell_filter,
     help="Comma-separated list of shells to check",
 )
-def status(shells):
+def status(shells: list[str] | None) -> None:
     """Show the status of managed configurations."""
     repo_root = find_repo_root()
     if not repo_root:
@@ -307,7 +313,7 @@ def status(shells):
     callback=parse_shell_filter,
     help="Comma-separated list of shells to diff",
 )
-def diff(shells):
+def diff(shells: list[str] | None) -> None:
     """Show differences between repository and installed configurations."""
     repo_root = find_repo_root()
     if not repo_root:
@@ -427,7 +433,7 @@ def diff(shells):
     callback=parse_shell_filter,
     help="Comma-separated list of shells to validate",
 )
-def validate(shells):
+def validate(shells: list[str] | None) -> None:
     """Validate configuration file syntax."""
     repo_root = find_repo_root()
     if not repo_root:
@@ -474,7 +480,7 @@ def validate(shells):
 
 
 @cli.command("list-shells")
-def list_shells():
+def list_shells() -> None:
     """List all available shell configurations."""
     repo_root = find_repo_root()
 
@@ -502,7 +508,7 @@ def list_shells():
         )
 
 
-def main():
+def main() -> None:
     """Entry point for the CLI."""
     cli()
 

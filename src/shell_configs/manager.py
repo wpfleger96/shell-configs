@@ -208,12 +208,16 @@ class ConfigManager:
             return ""
 
         if not has_shared:
+            assert shell_content is not None
             return shell_content
 
         if not has_shell:
+            assert shared_content is not None
             return shared_content
 
-        parts = []
+        parts: list[str] = []
+        assert shared_content is not None
+        assert shell_content is not None
         parts.append(self.SHARED_SECTION_MARKER)
         parts.append(shared_content)
         parts.append("")

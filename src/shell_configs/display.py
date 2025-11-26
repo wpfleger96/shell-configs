@@ -10,7 +10,7 @@ from shell_configs.manager import OperationResult
 console = Console()
 
 
-def print_warning(message: str):
+def print_warning(message: str) -> None:
     """Print a warning message.
 
     Args:
@@ -19,7 +19,7 @@ def print_warning(message: str):
     console.print(f"[yellow]⚠[/yellow] {message}")
 
 
-def print_error(message: str):
+def print_error(message: str) -> None:
     """Print an error message.
 
     Args:
@@ -28,7 +28,7 @@ def print_error(message: str):
     console.print(f"[red]✗[/red] {message}")
 
 
-def print_info(message: str):
+def print_info(message: str) -> None:
     """Print an info message.
 
     Args:
@@ -37,7 +37,7 @@ def print_info(message: str):
     console.print(f"[blue]ℹ[/blue] {message}")
 
 
-def print_operation_result(result: OperationResult, message: str):
+def print_operation_result(result: OperationResult, message: str) -> None:
     """Print an operation result with appropriate formatting.
 
     Args:
@@ -71,7 +71,9 @@ def create_status_table() -> Table:
     return table
 
 
-def add_status_row(table: Table, shell_name: str, config_file: Path, status: str):
+def add_status_row(
+    table: Table, shell_name: str, config_file: Path, status: str
+) -> None:
     """Add a row to a status table.
 
     Args:
@@ -83,7 +85,7 @@ def add_status_row(table: Table, shell_name: str, config_file: Path, status: str
     table.add_row(shell_name, str(config_file), status)
 
 
-def add_additional_file_row(table: Table, file_path: Path, status: str):
+def add_additional_file_row(table: Table, file_path: Path, status: str) -> None:
     """Add a row for an additional file to a status table.
 
     Args:
@@ -124,7 +126,9 @@ def create_validation_table() -> Table:
     return table
 
 
-def add_validation_row(table: Table, shell_name: str, valid: bool, message: str):
+def add_validation_row(
+    table: Table, shell_name: str, valid: bool, message: str
+) -> None:
     """Add a row to a validation table.
 
     Args:

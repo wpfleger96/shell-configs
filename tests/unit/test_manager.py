@@ -44,6 +44,7 @@ class TestConfigManager:
         assert manager.has_managed_section(config_file)
 
         section = manager.extract_managed_section(config_file)
+        assert section is not None
         assert section.content == content
 
     def test_install_section_existing_file(self, temp_dir):
@@ -59,6 +60,7 @@ class TestConfigManager:
         assert manager.has_managed_section(config_file)
 
         section = manager.extract_managed_section(config_file)
+        assert section is not None
         assert section.content == content
 
     def test_install_section_update_existing(self, temp_dir):
@@ -73,6 +75,7 @@ class TestConfigManager:
         assert result == OperationResult.UPDATED
 
         section = manager.extract_managed_section(config_file)
+        assert section is not None
         assert section.content == new_content
 
     def test_install_section_already_synced(self, temp_dir):

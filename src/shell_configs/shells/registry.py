@@ -9,18 +9,18 @@ from shell_configs.shells.zsh import ZshShell
 class ShellRegistry:
     """Registry for managing shell implementations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the shell registry."""
         self._shells: dict[str, Shell] = {}
         self._register_default_shells()
 
-    def _register_default_shells(self):
+    def _register_default_shells(self) -> None:
         """Register the default shell implementations."""
         self.register(BashShell())
         self.register(ZshShell())
         self.register(GitShell())
 
-    def register(self, shell: Shell):
+    def register(self, shell: Shell) -> None:
         """Register a shell implementation.
 
         Args:
