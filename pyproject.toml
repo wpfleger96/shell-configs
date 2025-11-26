@@ -24,27 +24,11 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.ruff]
-line-length = 100
-target-version = "py310"
-
 [tool.ruff.lint]
-select = [
-    "E",
-    "F",
-    "W",
-    "I",
-    "N",
-    "UP",
-    "B",
-    "C4",
-    "PIE",
-    "RET",
-    "SIM",
-]
-ignore = [
-    "E501",
-]
+select = ["I", "F", "UP", "B"]  # isort, pyflakes, pyupgrade, bugbear
+
+[tool.ruff.lint.isort]
+lines-between-types = 1
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

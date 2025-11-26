@@ -1,9 +1,11 @@
 """Pytest configuration and fixtures."""
 
 import tempfile
+
 from pathlib import Path
 
 import pytest
+
 from click.testing import CliRunner
 
 

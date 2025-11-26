@@ -15,7 +15,9 @@ class ConfigReader:
         self.repo_root = repo_root
         self.config_dir = repo_root / "config"
 
-    def get_config_content(self, shell_name: str, config_name: str | None) -> str | None:
+    def get_config_content(
+        self, shell_name: str, config_name: str | None
+    ) -> str | None:
         """Get the content of a configuration file.
 
         Args:

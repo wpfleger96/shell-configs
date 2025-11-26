@@ -44,13 +44,17 @@ class TestBashShell:
 
         assert len(additional_files) == 2
 
-        bash_helper = next((f for f in additional_files if f.name == "bash-helper.sh"), None)
+        bash_helper = next(
+            (f for f in additional_files if f.name == "bash-helper.sh"), None
+        )
         assert bash_helper is not None
         assert bash_helper.source_path == bash_config_dir / "bash-helper.sh"
         assert bash_helper.target_path.name == "bash-helper.sh"
         assert ".bash" in str(bash_helper.target_path)
 
-        git_prompt = next((f for f in additional_files if f.name == "git-prompt.sh"), None)
+        git_prompt = next(
+            (f for f in additional_files if f.name == "git-prompt.sh"), None
+        )
         assert git_prompt is not None
         assert git_prompt.source_path == shared_scripts_dir / "git-prompt.sh"
         assert git_prompt.target_path.name == "git-prompt.sh"
@@ -89,13 +93,17 @@ class TestZshShell:
 
         assert len(additional_files) == 2
 
-        zsh_helper = next((f for f in additional_files if f.name == "zsh-helper.sh"), None)
+        zsh_helper = next(
+            (f for f in additional_files if f.name == "zsh-helper.sh"), None
+        )
         assert zsh_helper is not None
         assert zsh_helper.source_path == zsh_config_dir / "zsh-helper.sh"
         assert zsh_helper.target_path.name == "zsh-helper.sh"
         assert ".zsh" in str(zsh_helper.target_path)
 
-        git_prompt = next((f for f in additional_files if f.name == "git-prompt.sh"), None)
+        git_prompt = next(
+            (f for f in additional_files if f.name == "git-prompt.sh"), None
+        )
         assert git_prompt is not None
         assert git_prompt.source_path == shared_scripts_dir / "git-prompt.sh"
         assert git_prompt.target_path.name == "git-prompt.sh"
@@ -142,7 +150,9 @@ class TestGitShell:
         assert ignore_file.target_path.name == "ignore"
         assert ".config/git" in str(ignore_file.target_path)
 
-        attributes_file = next((f for f in additional_files if f.name == "attributes"), None)
+        attributes_file = next(
+            (f for f in additional_files if f.name == "attributes"), None
+        )
         assert attributes_file is not None
         assert attributes_file.source_path == git_config_dir / "attributes"
         assert attributes_file.target_path.name == "attributes"

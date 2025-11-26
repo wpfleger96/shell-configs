@@ -44,7 +44,11 @@ def print_operation_result(result: OperationResult, message: str):
         result: Operation result
         message: Message to print
     """
-    if result in (OperationResult.CREATED, OperationResult.UPDATED, OperationResult.REMOVED):
+    if result in (
+        OperationResult.CREATED,
+        OperationResult.UPDATED,
+        OperationResult.REMOVED,
+    ):
         console.print(f"[green]✓[/green] {message}")
     elif result == OperationResult.ALREADY_SYNCED:
         console.print(f"[dim]•[/dim] {message}")

@@ -27,7 +27,9 @@ class TestInstallCommand:
         assert manager.has_managed_section(zshrc)
         assert manager.has_managed_section(gitconfig)
 
-    def test_install_with_shell_filter(self, test_repo, mock_home, cli_runner, monkeypatch):
+    def test_install_with_shell_filter(
+        self, test_repo, mock_home, cli_runner, monkeypatch
+    ):
         monkeypatch.chdir(test_repo)
 
         result = cli_runner.invoke(cli, ["install", "--shells", "bash,zsh", "--force"])
@@ -116,7 +118,14 @@ class TestStatusCommand:
         ],
     )
     def test_status_scenarios(
-        self, test_repo, mock_home, cli_runner, monkeypatch, scenario, setup_action, expected_output
+        self,
+        test_repo,
+        mock_home,
+        cli_runner,
+        monkeypatch,
+        scenario,
+        setup_action,
+        expected_output,
     ):
         monkeypatch.chdir(test_repo)
 
@@ -148,7 +157,14 @@ class TestDiffCommand:
         ],
     )
     def test_diff_scenarios(
-        self, test_repo, mock_home, cli_runner, monkeypatch, scenario, setup_action, expected_output
+        self,
+        test_repo,
+        mock_home,
+        cli_runner,
+        monkeypatch,
+        scenario,
+        setup_action,
+        expected_output,
     ):
         monkeypatch.chdir(test_repo)
 
@@ -209,7 +225,9 @@ class TestListShellsCommand:
 class TestAdditionalFiles:
     """Test CLI commands with additional files."""
 
-    def test_install_with_additional_files(self, test_repo, mock_home, cli_runner, monkeypatch):
+    def test_install_with_additional_files(
+        self, test_repo, mock_home, cli_runner, monkeypatch
+    ):
         monkeypatch.chdir(test_repo)
 
         shared_scripts_dir = test_repo / "config" / "shared-scripts"
@@ -227,10 +245,16 @@ class TestAdditionalFiles:
         assert (mock_home / ".bash" / "git-prompt.sh").exists()
         assert (mock_home / ".bash" / "bash-helper.sh").exists()
 
-        assert (mock_home / ".bash" / "git-prompt.sh").read_text() == "# Git prompt script"
-        assert (mock_home / ".bash" / "bash-helper.sh").read_text() == "# Bash helper script"
+        assert (
+            mock_home / ".bash" / "git-prompt.sh"
+        ).read_text() == "# Git prompt script"
+        assert (
+            mock_home / ".bash" / "bash-helper.sh"
+        ).read_text() == "# Bash helper script"
 
-    def test_status_with_additional_files(self, test_repo, mock_home, cli_runner, monkeypatch):
+    def test_status_with_additional_files(
+        self, test_repo, mock_home, cli_runner, monkeypatch
+    ):
         monkeypatch.chdir(test_repo)
 
         shared_scripts_dir = test_repo / "config" / "shared-scripts"
@@ -251,7 +275,9 @@ class TestAdditionalFiles:
 class TestSharedConfigSupport:
     """Test CLI commands with shared config support."""
 
-    def test_install_with_shared_config(self, test_repo, mock_home, cli_runner, monkeypatch):
+    def test_install_with_shared_config(
+        self, test_repo, mock_home, cli_runner, monkeypatch
+    ):
         monkeypatch.chdir(test_repo)
 
         shared_sh = test_repo / "config" / "shared.sh"
@@ -269,7 +295,9 @@ class TestSharedConfigSupport:
         assert "### Shell-Specific Config ###" in content
         assert "alias ll='ls -la'" in content
 
-    def test_shared_config_in_multiple_shells(self, test_repo, mock_home, cli_runner, monkeypatch):
+    def test_shared_config_in_multiple_shells(
+        self, test_repo, mock_home, cli_runner, monkeypatch
+    ):
         monkeypatch.chdir(test_repo)
 
         shared_sh = test_repo / "config" / "shared.sh"

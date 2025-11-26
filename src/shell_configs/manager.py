@@ -3,6 +3,7 @@
 import os
 import shutil
 import tempfile
+
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -140,7 +141,10 @@ class ConfigManager:
 
             existing_section = self.extract_managed_section(config_file)
 
-            if existing_section and existing_section.content.strip() == final_content.strip():
+            if (
+                existing_section
+                and existing_section.content.strip() == final_content.strip()
+            ):
                 return (
                     OperationResult.ALREADY_SYNCED,
                     f"{config_file} is already synced",
@@ -185,7 +189,9 @@ class ConfigManager:
         except Exception as e:
             return (OperationResult.ERROR, f"Error installing section: {e}")
 
-    def combine_content(self, shared_content: str | None, shell_content: str | None) -> str:
+    def combine_content(
+        self, shared_content: str | None, shell_content: str | None
+    ) -> str:
         """Combine shared and shell-specific content with subsection markers.
 
         Args:
@@ -453,7 +459,9 @@ class ConfigManager:
         """
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        fd, temp_path = tempfile.mkstemp(dir=file_path.parent, prefix=f".{file_path.name}.")
+        fd, temp_path = tempfile.mkstemp(
+            dir=file_path.parent, prefix=f".{file_path.name}."
+        )
         try:
             with os.fdopen(fd, "w") as f:
                 f.write(content)

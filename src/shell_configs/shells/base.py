@@ -2,6 +2,7 @@
 
 import subprocess
 import tempfile
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -142,7 +143,9 @@ class Shell(ABC):
         """
         return False
 
-    def _run_validation_command(self, command: list[str], temp_file: Path) -> tuple[bool, str]:
+    def _run_validation_command(
+        self, command: list[str], temp_file: Path
+    ) -> tuple[bool, str]:
         """Helper to run a validation command.
 
         Args:

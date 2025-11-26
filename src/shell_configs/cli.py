@@ -4,6 +4,7 @@ import difflib
 import sys
 
 import click
+
 from rich.syntax import Syntax
 
 from shell_configs.config import ConfigReader, find_repo_root
@@ -31,7 +32,9 @@ def parse_shell_filter(ctx, param, value):
     return [s.strip() for s in value.split(",")]
 
 
-def _get_selected_shells(registry, shells_filter=None, config_reader=None, use_all=False):
+def _get_selected_shells(
+    registry, shells_filter=None, config_reader=None, use_all=False
+):
     """Get selected shells based on filter or available configs.
 
     Args:
@@ -75,20 +78,26 @@ def cli():
     callback=parse_shell_filter,
     help="Comma-separated list of shells to install (e.g., bash,zsh,git)",
 )
-@click.option("--dry-run", is_flag=True, help="Show what would be done without doing it")
+@click.option(
+    "--dry-run", is_flag=True, help="Show what would be done without doing it"
+)
 @click.option("--force", is_flag=True, help="Skip confirmation prompts")
 def install(shells, dry_run, force):
     """Install or update managed configuration sections."""
     repo_root = find_repo_root()
     if not repo_root:
-        print_error("Not in a shell-configs repository. Run from the repository directory.")
+        print_error(
+            "Not in a shell-configs repository. Run from the repository directory."
+        )
         sys.exit(1)
 
     config_reader = ConfigReader(repo_root)
     manager = ConfigManager()
     registry = ShellRegistry()
 
-    selected_shells = _get_selected_shells(registry, shells, config_reader=config_reader)
+    selected_shells = _get_selected_shells(
+        registry, shells, config_reader=config_reader
+    )
 
     if not selected_shells:
         print_warning("No shells to install")
@@ -108,7 +117,9 @@ def install(shells, dry_run, force):
             if config_file.repo_config_name is None:
                 content = None
             else:
-                content = config_reader.get_config_content(shell.name, config_file.repo_config_name)
+                content = config_reader.get_config_content(
+                    shell.name, config_file.repo_config_name
+                )
                 if content is None:
                     print_warning(
                         f"No configuration found for {shell.name}/{config_file.repo_config_name}"
@@ -123,7 +134,10 @@ def install(shells, dry_run, force):
                 continue
 
             result, message = manager.install_section(
-                config_file.path, content, dry_run=dry_run, shared_content=shared_content
+                config_file.path,
+                content,
+                dry_run=dry_run,
+                shared_content=shared_content,
             )
             print_operation_result(result, message)
             results[shell.name] = result
@@ -132,7 +146,9 @@ def install(shells, dry_run, force):
         additional_files = shell.get_additional_files(repo_root)
         for additional_file in additional_files:
             result, message = manager.install_additional_file(
-                additional_file.source_path, additional_file.target_path, dry_run=dry_run
+                additional_file.source_path,
+                additional_file.target_path,
+                dry_run=dry_run,
             )
             print_operation_result(result, message)
             additional_file_results[str(additional_file.target_path)] = result
@@ -141,7 +157,9 @@ def install(shells, dry_run, force):
         print_info("Dry run complete. Use without --dry-run to apply changes.")
 
     success_count = sum(
-        1 for r in results.values() if r in [OperationResult.CREATED, OperationResult.UPDATED]
+        1
+        for r in results.values()
+        if r in [OperationResult.CREATED, OperationResult.UPDATED]
     )
     additional_success_count = sum(
         1
@@ -165,7 +183,9 @@ def uninstall(shells, force):
     """Remove managed configuration sections."""
     repo_root = find_repo_root()
     if not repo_root:
-        print_error("Not in a shell-configs repository. Run from the repository directory.")
+        print_error(
+            "Not in a shell-configs repository. Run from the repository directory."
+        )
         sys.exit(1)
 
     manager = ConfigManager()
@@ -179,7 +199,9 @@ def uninstall(shells, force):
 
     if not force:
         shell_names = ", ".join([s.display_name for s in selected_shells])
-        if not click.confirm(f"Remove managed sections from {shell_names} configurations?"):
+        if not click.confirm(
+            f"Remove managed sections from {shell_names} configurations?"
+        ):
             print_info("Uninstallation cancelled")
             return
 
@@ -196,7 +218,9 @@ def uninstall(shells, force):
     for shell in selected_shells:
         additional_files = shell.get_additional_files(repo_root)
         for additional_file in additional_files:
-            result, message = manager.uninstall_additional_file(additional_file.target_path)
+            result, message = manager.uninstall_additional_file(
+                additional_file.target_path
+            )
             if result != OperationResult.NOT_FOUND:
                 print_operation_result(result, message)
             additional_file_results[str(additional_file.target_path)] = result
@@ -221,14 +245,18 @@ def status(shells):
     """Show the status of managed configurations."""
     repo_root = find_repo_root()
     if not repo_root:
-        print_error("Not in a shell-configs repository. Run from the repository directory.")
+        print_error(
+            "Not in a shell-configs repository. Run from the repository directory."
+        )
         sys.exit(1)
 
     config_reader = ConfigReader(repo_root)
     manager = ConfigManager()
     registry = ShellRegistry()
 
-    selected_shells = _get_selected_shells(registry, shells, config_reader=config_reader)
+    selected_shells = _get_selected_shells(
+        registry, shells, config_reader=config_reader
+    )
 
     if not selected_shells:
         print_warning("No shell configurations found")
@@ -253,7 +281,9 @@ def status(shells):
             section = manager.extract_managed_section(config_file.path)
             exists = section is not None
             synced = (
-                (exists and section.content.strip() == repo_content.strip()) if section else False
+                (exists and section.content.strip() == repo_content.strip())
+                if section
+                else False
             )
 
             status_str = get_status_indicator(synced, exists)
@@ -262,7 +292,9 @@ def status(shells):
         additional_files = shell.get_additional_files(repo_root)
         for additional_file in additional_files:
             exists = additional_file.target_path.exists()
-            synced = manager.files_match(additional_file.source_path, additional_file.target_path)
+            synced = manager.files_match(
+                additional_file.source_path, additional_file.target_path
+            )
             status_str = get_status_indicator(synced, exists)
             add_additional_file_row(table, additional_file.target_path, status_str)
 
@@ -279,14 +311,18 @@ def diff(shells):
     """Show differences between repository and installed configurations."""
     repo_root = find_repo_root()
     if not repo_root:
-        print_error("Not in a shell-configs repository. Run from the repository directory.")
+        print_error(
+            "Not in a shell-configs repository. Run from the repository directory."
+        )
         sys.exit(1)
 
     config_reader = ConfigReader(repo_root)
     manager = ConfigManager()
     registry = ShellRegistry()
 
-    selected_shells = _get_selected_shells(registry, shells, config_reader=config_reader)
+    selected_shells = _get_selected_shells(
+        registry, shells, config_reader=config_reader
+    )
 
     if not selected_shells:
         print_warning("No shell configurations found")
@@ -311,7 +347,9 @@ def diff(shells):
             section = manager.extract_managed_section(config_file.path)
 
             if section is None:
-                console.print(f"\n[bold cyan]{shell.display_name}[/bold cyan]: {config_file.path}")
+                console.print(
+                    f"\n[bold cyan]{shell.display_name}[/bold cyan]: {config_file.path}"
+                )
                 console.print("[yellow]Not installed[/yellow]")
                 found_diffs = True
                 continue
@@ -320,7 +358,9 @@ def diff(shells):
                 continue
 
             found_diffs = True
-            console.print(f"\n[bold cyan]{shell.display_name}[/bold cyan]: {config_file.path}")
+            console.print(
+                f"\n[bold cyan]{shell.display_name}[/bold cyan]: {config_file.path}"
+            )
 
             installed_lines = section.content.splitlines(keepends=True)
             repo_lines = repo_content.splitlines(keepends=True)
@@ -348,7 +388,9 @@ def diff(shells):
                 found_diffs = True
                 continue
 
-            if manager.files_match(additional_file.source_path, additional_file.target_path):
+            if manager.files_match(
+                additional_file.source_path, additional_file.target_path
+            ):
                 continue
 
             found_diffs = True
@@ -389,13 +431,17 @@ def validate(shells):
     """Validate configuration file syntax."""
     repo_root = find_repo_root()
     if not repo_root:
-        print_error("Not in a shell-configs repository. Run from the repository directory.")
+        print_error(
+            "Not in a shell-configs repository. Run from the repository directory."
+        )
         sys.exit(1)
 
     config_reader = ConfigReader(repo_root)
     registry = ShellRegistry()
 
-    selected_shells = _get_selected_shells(registry, shells, config_reader=config_reader)
+    selected_shells = _get_selected_shells(
+        registry, shells, config_reader=config_reader
+    )
 
     if not selected_shells:
         print_warning("No shell configurations found")
@@ -406,7 +452,9 @@ def validate(shells):
 
     for shell in selected_shells:
         for config_file in shell.get_config_files():
-            content = config_reader.get_config_content(shell.name, config_file.repo_config_name)
+            content = config_reader.get_config_content(
+                shell.name, config_file.repo_config_name
+            )
             if content is None:
                 continue
 

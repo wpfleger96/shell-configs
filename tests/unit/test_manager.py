@@ -194,7 +194,9 @@ class TestConfigManagerAdditionalFiles:
 
         source_file.write_text("# Test content")
 
-        result, message = manager.install_additional_file(source_file, target_file, dry_run=True)
+        result, message = manager.install_additional_file(
+            source_file, target_file, dry_run=True
+        )
 
         assert result == OperationResult.CREATED
         assert "Would create" in message
