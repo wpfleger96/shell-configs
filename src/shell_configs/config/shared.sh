@@ -8,15 +8,19 @@ export PAGER=less
 
 ### Git - Aliases ###
 alias gs='git status'
-alias ga='git add'
+alias gd='git diff'
+alias gds='git diff --staged'
 alias gc='git commit'
-alias gp='git push'
+alias ga='git add'
+alias gaa="git add ."
+alias gpu='git push'
+alias gp='git pull'
 alias gl='git log --oneline --graph --decorate'
+alias sync-fork="git checkout && git fetch upstream && git merge upstream/main"
 alias recent_commits="git for-each-ref --sort=-committerdate refs/heads/ --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(color:red)%(objectname:short)%(color:reset) - %(contents:subject) - %(authorname) (%(color:green)%(committerdate:relative)%(color:reset))'"
 alias safepull='git fetch origin $(git rev-parse --abbrev-ref HEAD) && git merge FETCH_HEAD'
 alias yeet="git commit -a --amend --no-edit"
 alias yeet_to_github="git commit -a --amend --no-edit && git push --force-with-lease"
-alias sync-fork="git checkout && git fetch upstream && git merge upstream/main"
 
 ### Git - Configuration ###
 export GIT_PS1_SHOWDIRTYSTATE=true
