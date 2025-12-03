@@ -1,19 +1,31 @@
 """Configuration file handling."""
 
+from importlib.resources import files as resource_files
 from pathlib import Path
 
 
-class ConfigReader:
-    """Reads configuration files from the repository."""
+def get_config_dir() -> Path:
+    """Get the config directory.
 
-    def __init__(self, repo_root: Path):
+    Works in both development mode (editable install) and installed mode (PyPI wheel).
+    Uses importlib.resources which handles both cases automatically.
+    """
+    try:
+        config_resource = resource_files("shell_configs") / "config"
+        return Path(str(config_resource))
+    except Exception:
+        return Path(__file__).parent / "config"
+
+
+class ConfigReader:
+    """Reads configuration files from the package."""
+
+    def __init__(self) -> None:
         """Initialize the config reader.
 
-        Args:
-            repo_root: Root directory of the repository
+        Automatically locates the config directory using importlib.resources.
         """
-        self.repo_root = repo_root
-        self.config_dir = repo_root / "config"
+        self.config_dir = get_config_dir()
 
     def get_config_content(
         self, shell_name: str, config_name: str | None
@@ -85,26 +97,3 @@ class ConfigReader:
 
         content = config_path.read_text()
         return content.rstrip("\n")
-
-
-def find_repo_root(start_path: Path | None = None) -> Path | None:
-    """Find the repository root by looking for the config directory.
-
-    Args:
-        start_path: Path to start searching from (defaults to current directory)
-
-    Returns:
-        Path to the repository root, or None if not found
-    """
-    if start_path is None:
-        start_path = Path.cwd()
-
-    current = start_path.resolve()
-
-    while current != current.parent:
-        config_dir = current / "config"
-        if config_dir.exists() and config_dir.is_dir():
-            return current
-        current = current.parent
-
-    return None

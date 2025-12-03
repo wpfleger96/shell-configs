@@ -32,14 +32,13 @@ class GitShell(Shell):
             ),
         ]
 
-    def get_additional_files(self, repo_root: Path) -> list[AdditionalFile]:
+    def get_additional_files(self) -> list[AdditionalFile]:
         """Get additional files for Git.
 
         Discovers files from config/git/ directory.
         Files are installed to ~/.config/git/
         """
         return self._discover_additional_files(
-            repo_root,
             ["git"],
             Path.home() / ".config" / "git",
         )

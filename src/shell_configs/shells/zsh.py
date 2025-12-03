@@ -27,7 +27,7 @@ class ZshShell(Shell):
             ),
         ]
 
-    def get_additional_files(self, repo_root: Path) -> list[AdditionalFile]:
+    def get_additional_files(self) -> list[AdditionalFile]:
         """Get additional files for Zsh shell.
 
         Discovers files from:
@@ -37,7 +37,6 @@ class ZshShell(Shell):
         Files are installed to ~/.zsh/
         """
         return self._discover_additional_files(
-            repo_root,
             ["zsh", "shared-scripts"],
             Path.home() / ".zsh",
         )

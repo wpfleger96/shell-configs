@@ -87,11 +87,8 @@ class Shell(ABC):
         finally:
             temp_path.unlink(missing_ok=True)
 
-    def get_additional_files(self, repo_root: Path) -> list[AdditionalFile]:
+    def get_additional_files(self) -> list[AdditionalFile]:
         """Get additional files that should be installed for this shell.
-
-        Args:
-            repo_root: Root directory of the repository
 
         Returns:
             List of AdditionalFile objects
@@ -100,24 +97,25 @@ class Shell(ABC):
 
     def _discover_additional_files(
         self,
-        repo_root: Path,
         config_dirs: list[str],
         target_dir: Path,
     ) -> list[AdditionalFile]:
         """Helper to discover additional files from config directories.
 
         Args:
-            repo_root: Root directory of the repository
             config_dirs: List of config directory names to scan (e.g., ["bash", "git"])
             target_dir: Target directory where files will be installed
 
         Returns:
             List of AdditionalFile objects
         """
+        from shell_configs.config import get_config_dir
+
         additional_files = []
+        base_config_dir = get_config_dir()
 
         for dir_name in config_dirs:
-            config_dir = repo_root / "config" / dir_name
+            config_dir = base_config_dir / dir_name
             if not config_dir.exists():
                 continue
 

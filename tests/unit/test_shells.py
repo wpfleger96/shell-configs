@@ -26,13 +26,16 @@ class TestBashShell:
         assert not is_valid
         assert message != ""
 
-    def test_get_additional_files(self, temp_dir):
+    def test_get_additional_files(self, temp_dir, monkeypatch):
         shell = BashShell()
 
-        bash_config_dir = temp_dir / "config" / "bash"
+        config_dir = temp_dir / "config"
+        config_dir.mkdir()
+
+        bash_config_dir = config_dir / "bash"
         bash_config_dir.mkdir(parents=True)
 
-        shared_scripts_dir = temp_dir / "config" / "shared-scripts"
+        shared_scripts_dir = config_dir / "shared-scripts"
         shared_scripts_dir.mkdir(parents=True)
 
         (bash_config_dir / "bashrc").write_text("# bash config")
@@ -40,7 +43,8 @@ class TestBashShell:
         (bash_config_dir / "bash-helper.sh").write_text("# bash helper")
         (shared_scripts_dir / "git-prompt.sh").write_text("# git prompt")
 
-        additional_files = shell.get_additional_files(temp_dir)
+        monkeypatch.setattr("shell_configs.config.get_config_dir", lambda: config_dir)
+        additional_files = shell.get_additional_files()
 
         assert len(additional_files) == 2
 
@@ -75,13 +79,16 @@ class TestZshShell:
             pytest.skip("zsh not installed")
         assert is_valid
 
-    def test_get_additional_files(self, temp_dir):
+    def test_get_additional_files(self, temp_dir, monkeypatch):
         shell = ZshShell()
 
-        zsh_config_dir = temp_dir / "config" / "zsh"
+        config_dir = temp_dir / "config"
+        config_dir.mkdir()
+
+        zsh_config_dir = config_dir / "zsh"
         zsh_config_dir.mkdir(parents=True)
 
-        shared_scripts_dir = temp_dir / "config" / "shared-scripts"
+        shared_scripts_dir = config_dir / "shared-scripts"
         shared_scripts_dir.mkdir(parents=True)
 
         (zsh_config_dir / "zshrc").write_text("# zsh config")
@@ -89,7 +96,8 @@ class TestZshShell:
         (zsh_config_dir / "zsh-helper.sh").write_text("# zsh helper")
         (shared_scripts_dir / "git-prompt.sh").write_text("# git prompt")
 
-        additional_files = shell.get_additional_files(temp_dir)
+        monkeypatch.setattr("shell_configs.config.get_config_dir", lambda: config_dir)
+        additional_files = shell.get_additional_files()
 
         assert len(additional_files) == 2
 
@@ -131,16 +139,20 @@ class TestGitShell:
         assert not is_valid
         assert message != ""
 
-    def test_get_additional_files(self, temp_dir):
+    def test_get_additional_files(self, temp_dir, monkeypatch):
         shell = GitShell()
 
-        git_config_dir = temp_dir / "config" / "git"
+        config_dir = temp_dir / "config"
+        config_dir.mkdir()
+
+        git_config_dir = config_dir / "git"
         git_config_dir.mkdir(parents=True)
 
         (git_config_dir / "ignore").write_text("# global gitignore")
         (git_config_dir / "attributes").write_text("# git attributes")
 
-        additional_files = shell.get_additional_files(temp_dir)
+        monkeypatch.setattr("shell_configs.config.get_config_dir", lambda: config_dir)
+        additional_files = shell.get_additional_files()
 
         assert len(additional_files) == 2
 

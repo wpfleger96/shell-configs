@@ -21,8 +21,14 @@ shell-configs = "shell_configs.cli:main"
 requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+include-package-data = true
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+shell_configs = ["config/**/*"]
 
 [tool.ruff.lint]
 select = ["I", "F", "UP", "B"]  # isort, pyflakes, pyupgrade, bugbear

@@ -56,14 +56,6 @@ class TestInstallCommand:
         bashrc = mock_home / ".bashrc"
         assert not bashrc.exists()
 
-    def test_install_not_in_repo(self, temp_dir, cli_runner, monkeypatch):
-        monkeypatch.chdir(temp_dir)
-
-        result = cli_runner.invoke(cli, ["install", "--force"])
-
-        assert result.exit_code == 1
-        assert "Not in a shell-configs repository" in result.output
-
 
 @pytest.mark.integration
 @pytest.mark.cli

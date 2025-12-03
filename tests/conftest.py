@@ -24,7 +24,7 @@ def mock_home(temp_dir, monkeypatch):
 
 
 @pytest.fixture
-def test_repo(temp_dir):
+def test_repo(temp_dir, monkeypatch):
     repo = (temp_dir / "repo").resolve()
     repo.mkdir()
 
@@ -44,6 +44,8 @@ def test_repo(temp_dir):
 
     shared_gitconfig = config_dir / "shared.gitconfig"
     shared_gitconfig.write_text("[user]\n    name = Test User\n")
+
+    monkeypatch.setattr("shell_configs.config.get_config_dir", lambda: config_dir)
 
     return repo
 

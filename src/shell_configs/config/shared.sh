@@ -65,6 +65,8 @@ alias docker_cleanup="docker builder prune -af && docker system prune -af"
 ### AI Tools - Aliases ###
 alias ccusage="npx -y ccusage@latest"
 alias ccviewer="uvx --from claude-code-viewer claude-viewer"
+alias run_claude_code_logger="npx -y claude-code-logger@latest start -v"
+alias claude_with_logger="ANTHROPIC_BASE_URL=http://localhost:8000 claude"
 
 ### AI Tools - Configuration ###
 export GOOSE_ALLOWLIST_BYPASS=true

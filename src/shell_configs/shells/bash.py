@@ -27,7 +27,7 @@ class BashShell(Shell):
             ),
         ]
 
-    def get_additional_files(self, repo_root: Path) -> list[AdditionalFile]:
+    def get_additional_files(self) -> list[AdditionalFile]:
         """Get additional files for Bash shell.
 
         Discovers files from:
@@ -37,7 +37,6 @@ class BashShell(Shell):
         Files are installed to ~/.bash/
         """
         return self._discover_additional_files(
-            repo_root,
             ["bash", "shared-scripts"],
             Path.home() / ".bash",
         )
