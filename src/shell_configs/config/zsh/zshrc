@@ -11,6 +11,41 @@ setopt HIST_REDUCE_BLANKS
 setopt HIST_SAVE_NO_DUPS
 setopt SHARE_HISTORY
 
+### Key Bindings ###
+# Use emacs key bindings for command line editing
+bindkey -e
+
+# Arrow keys for history navigation and cursor movement
+bindkey '^[[A' up-line-or-history      # Up arrow
+bindkey '^[[B' down-line-or-history    # Down arrow
+bindkey '^[[C' forward-char            # Right arrow
+bindkey '^[[D' backward-char           # Left arrow
+
+# Delete and backspace
+bindkey '^[[3~' delete-char            # Delete key
+bindkey '^?' backward-delete-char      # Backspace
+bindkey '^H' backward-delete-char      # Backspace (alternate, common in VS Code)
+
+# Home and End keys
+bindkey '^[[H' beginning-of-line       # Home
+bindkey '^[[F' end-of-line             # End
+bindkey '^[[1~' beginning-of-line      # Home (alternate)
+bindkey '^[[4~' end-of-line            # End (alternate)
+bindkey '^[OH' beginning-of-line       # Home (VS Code/xterm application mode)
+bindkey '^[OF' end-of-line             # End (VS Code/xterm application mode)
+
+# Word navigation (Option+Arrow on macOS)
+bindkey '^[[1;3D' backward-word        # Option+Left
+bindkey '^[[1;3C' forward-word         # Option+Right
+bindkey '^[b' backward-word            # Alt+b (emacs style, works in VS Code)
+bindkey '^[f' forward-word             # Alt+f (emacs style, works in VS Code)
+
+# Delete word
+bindkey '^[[3;3~' kill-word            # Option+Delete (forward)
+bindkey '^[^?' backward-kill-word      # Option+Backspace
+bindkey '^[d' kill-word                # Alt+d (emacs style)
+bindkey '^W' backward-kill-word        # Ctrl+W
+
 ### Completion ###
 autoload -Uz compinit
 compinit
