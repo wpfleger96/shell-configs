@@ -7,15 +7,16 @@ export VISUAL=vim
 export PAGER=less
 
 ### Git - Aliases ###
-alias gs='git status'
-alias gd='git diff'
-alias gds='git diff --staged'
-alias gc='git commit'
 alias ga='git add'
 alias gaa="git add ."
-alias gpu='git push'
+alias gc='git commit'
+alias gd='git diff'
+alias gds='git diff --staged'
+alias gl='git log --oneline --graph --decorate --max-count 15'
+alias gla='git log --oneline --graph --decorate'
 alias gp='git pull'
-alias gl='git log --oneline --graph --decorate'
+alias gpu='git push'
+alias gs='git status'
 alias sync-fork="git checkout && git fetch upstream && git merge upstream/main"
 alias recent_commits="git for-each-ref --sort=-committerdate refs/heads/ --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(color:red)%(objectname:short)%(color:reset) - %(contents:subject) - %(authorname) (%(color:green)%(committerdate:relative)%(color:reset))'"
 alias safepull='git fetch origin $(git rev-parse --abbrev-ref HEAD) && git merge FETCH_HEAD'
