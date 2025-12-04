@@ -1,0 +1,8 @@
+# Shellcheck configuration
+# https://www.shellcheck.net/wiki/Directive
+
+# SC2155: Declare and assign separately (style preference, low risk)
+disable=SC2155
+
+# SC1091: Not following sourced files (can't follow dynamic paths like $NVM_DIR/nvm.sh)
+disable=SC1091

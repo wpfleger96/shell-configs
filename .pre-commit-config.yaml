@@ -1,0 +1,12 @@
+repos:
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.10.0
+    hooks:
+      - id: shellcheck
+        files: \.(sh|bash|zsh)$|bashrc$|zshrc$
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.8.0-1
+    hooks:
+      - id: shfmt
+        args: ['-i', '4', '-w']
+        files: \.(sh|bash|zsh)$|bashrc$|zshrc$

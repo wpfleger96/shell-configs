@@ -2,45 +2,46 @@
 set dotenv-load := false
 
 # Default recipe: quick quality check without tests
-default: sync type-check lint-check format-check
+default: sync type-check lint-python-check lint-shell-check format-python-check format-shell-check
 
 # Setup & Dependencies
 sync:
     uv sync
 
-install-hooks:
-    @echo "Installing git hooks..."
-    git config --local core.hooksPath .hooks
-    @echo "Git hooks installed successfully"
-
-setup: sync install-hooks
-    @echo "Development environment setup complete"
-
 # Code Quality - Check variants
 type-check:
     uv run mypy .
 
-lint-check:
+lint-python-check:
     uvx ruff check .
 
-format-check:
+lint-shell-check:
+    shfmt -f . | grep -v git-prompt.sh | xargs shellcheck
+
+format-python-check:
     uvx ruff format . --check
 
+format-shell-check:
+    shfmt -f . | grep -v git-prompt.sh | xargs shfmt -d
+
 # Code Quality - Fix variants
-lint:
+lint-python:
     uvx ruff check . --fix
 
-format:
+format-python:
     uvx ruff format .
 
+format-shell:
+    shfmt -f . | grep -v git-prompt.sh | xargs shfmt -w
+
 # Composite quality checks
-check: sync type-check lint-check format-check
+check: sync type-check lint-python-check lint-shell-check format-python-check format-shell-check
     @echo "Quick quality checks passed"
 
 check-all: check test
     @echo "All quality checks and tests passed"
 
-pre-commit: sync type-check lint format test
+pre-commit: sync type-check lint-python lint-shell-check format-python format-shell test
     @echo "Pre-commit checks passed"
 
 # Testing
@@ -73,5 +74,5 @@ cli-validate:
     uv run shell-configs validate
 
 # CI workflow (matches CI steps)
-ci: sync type-check lint-check format-check test
+ci: sync type-check lint-python-check lint-shell-check format-python-check format-shell-check test
     @echo "CI checks passed"

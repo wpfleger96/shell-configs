@@ -50,11 +50,35 @@ bindkey '^W' backward-kill-word        # Ctrl+W
 autoload -Uz compinit
 compinit
 
+# Worktree completion
+_wt() {
+    local -a subcmds
+    subcmds=('add:Create a new worktree' 'rm:Remove a worktree' 'ls:List worktrees'
+             'cd:Navigate to worktree' 'prune:Remove merged worktrees'
+             'orphans:Find stale worktrees' 'clean:Interactive cleanup' 'help:Show help')
+
+    if (( CURRENT == 2 )); then
+        _describe 'command' subcmds
+    elif (( CURRENT == 3 )); then
+        case "${words[2]}" in
+            add)
+                # Complete with remote branches not yet checked out
+                _values 'branches' $(git branch -r 2>/dev/null | sed 's/origin\///' | grep -v HEAD)
+                ;;
+            rm|cd)
+                # Complete with existing worktree branch names
+                _values 'worktrees' $(git worktree list 2>/dev/null | { skip=1; while IFS= read -r line; do [[ $skip -eq 1 ]] && { skip=0; continue; }; b="${line##* }"; b="${b#\[}"; b="${b%\]}"; echo "$b"; done; })
+                ;;
+        esac
+    fi
+}
+compdef _wt wt
+
 ### Prompt ###
 if [ -f ~/.zsh/git-prompt.sh ]; then
     source ~/.zsh/git-prompt.sh
     setopt prompt_subst
-    PROMPT='%F{251}%~%F{reset}%B%F{cyan}$(__git_ps1 " %s")%F{reset}%b '
+    PROMPT='%F{251}%~%F{reset}%B%F{cyan}$(__git_ps1 " %s")%F{yellow}$(__wt_ps1)%F{reset}%b '
 fi
 
 ### macOS Utilities ###
