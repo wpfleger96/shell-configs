@@ -19,7 +19,7 @@ alias gp='git pull'
 alias gpu='git push'
 alias gs='git status'
 alias gwt='git worktree'
-alias wtl='wt ls'
+alias wtl='wt list'
 alias wta='wt add'
 alias wtr='wt rm'
 alias sync-fork="git checkout && git fetch upstream && git merge upstream/main"
@@ -53,26 +53,12 @@ git() {
 
 ### Git Worktree Management ###
 export WT_DIR=".worktrees"
-export WT_EDITOR="${WT_EDITOR:-code}"
+export WT_EDITOR="cursor"
 
 __wt_ps1() {
     local git_dir=$(git rev-parse --git-dir 2>/dev/null)
     if [[ "$git_dir" == *".git/worktrees/"* ]]; then
         echo " [wt]"
-    fi
-}
-
-_wt_ensure_gitignore() {
-    local repo_root=$(git rev-parse --show-toplevel 2>/dev/null)
-    if [[ -z "$repo_root" ]]; then
-        return 1
-    fi
-
-    local gitignore="$repo_root/.gitignore"
-
-    if [[ ! -f "$gitignore" ]] || ! grep -q "^${WT_DIR}/$" "$gitignore" 2>/dev/null; then
-        echo "${WT_DIR}/" >>"$gitignore"
-        echo "Added ${WT_DIR}/ to .gitignore"
     fi
 }
 
@@ -104,20 +90,9 @@ _wt_remove() {
     return 2
 }
 
-_wt_parse_force_args() {
-    local -n _branch=$1 _force=$2
-    shift 2
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --force | -f) _force=true ;;
-            *) _branch="$1" ;;
-        esac
-        shift
-    done
-}
-
 _wt_add() {
     local branch=""
+    local base_branch=""
     local open_editor=false
 
     while [[ $# -gt 0 ]]; do
@@ -125,6 +100,10 @@ _wt_add() {
             --open | -o)
                 open_editor=true
                 shift
+                ;;
+            --base | -b)
+                base_branch="$2"
+                shift 2
                 ;;
             *)
                 branch="$1"
@@ -134,14 +113,12 @@ _wt_add() {
     done
 
     if [[ -z "$branch" ]]; then
-        echo "Usage: wt add <branch> [--open]"
+        echo "Usage: wt add <branch> [--open] [--base <branch>]"
         return 1
     fi
 
     local repo_root
     repo_root=$(_wt_repo_root) || return 1
-
-    _wt_ensure_gitignore
 
     local worktree_path="$repo_root/$WT_DIR/$branch"
 
@@ -152,24 +129,38 @@ _wt_add() {
 
     mkdir -p "$repo_root/$WT_DIR"
 
-    if git worktree add "$worktree_path" "$branch" 2>/dev/null; then
-        echo "Created worktree for '$branch' at $worktree_path"
-
-        if [[ "$open_editor" == true ]]; then
-            $WT_EDITOR "$worktree_path"
+    if git show-ref --verify --quiet "refs/heads/$branch" ||
+        git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+        if ! git worktree add "$worktree_path" "$branch"; then
+            echo "Error: Failed to create worktree for '$branch'"
+            return 1
         fi
-
-        _wt_prune
+        echo "Created worktree for '$branch' at $worktree_path"
     else
-        echo "Error: Failed to create worktree for '$branch'"
-        echo "Branch may not exist. Try: git fetch origin $branch"
-        return 1
+        [[ -z "$base_branch" ]] && base_branch=$(_wt_main_branch)
+        if ! git worktree add -b "$branch" "$worktree_path" "$base_branch"; then
+            echo "Error: Failed to create worktree and branch '$branch' from '$base_branch'"
+            return 1
+        fi
+        echo "Created worktree with new branch '$branch' (based on $base_branch) at $worktree_path"
+    fi
+
+    _wt_prune
+
+    if [[ "$open_editor" == true ]]; then
+        $WT_EDITOR "$worktree_path"
     fi
 }
 
 _wt_rm() {
     local branch="" force=false
-    _wt_parse_force_args branch force "$@"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --force | -f) force=true ;;
+            *) branch="$1" ;;
+        esac
+        shift
+    done
 
     if [[ -z "$branch" ]]; then
         echo "Usage: wt rm <branch> [--force]"
@@ -201,24 +192,24 @@ _wt_rm() {
 }
 
 _wt_ls() {
-    local repo_root
+    local repo_root wt_path wt_branch merged_marker
     repo_root=$(_wt_repo_root) || return 1
 
     echo "Worktrees:"
     git worktree list | while IFS= read -r line; do
-        local path="${line%% *}"
-        local branch="${line##* }"
-        branch="${branch#\[}"
-        branch="${branch%\]}"
+        wt_path="${line%% *}"
+        wt_branch="${line##* }"
+        wt_branch="${wt_branch#\[}"
+        wt_branch="${wt_branch%\]}"
 
-        if [[ "$path" == "$repo_root" ]]; then
-            echo "  * $branch (main worktree)"
+        if [[ "$wt_path" == "$repo_root" ]]; then
+            echo "  * $wt_branch (main worktree)"
         else
-            local merged_marker=""
-            if _wt_is_merged "$branch"; then
+            merged_marker=""
+            if _wt_is_merged "$wt_branch"; then
                 merged_marker=" [MERGED]"
             fi
-            echo "  - $branch$merged_marker"
+            echo "  - $wt_branch$merged_marker"
         fi
     done
 }
@@ -245,30 +236,44 @@ _wt_cd() {
 }
 
 _wt_prune() {
-    local branch="" force=false
-    _wt_parse_force_args branch force "$@"
-
-    local repo_root
-    repo_root=$(_wt_repo_root) || return 0
-
+    local force=false orphans=false
+    local repo_root wt_path wt_branch is_orphan orphan_reason
     local pruned=0 skipped=0
 
-    while IFS= read -r line; do
-        local path="${line%% *}"
-        local branch="${line##* }"
-        branch="${branch#\[}"
-        branch="${branch%\]}"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --force | -f)
+                force=true
+                shift
+                ;;
+            --orphans | -o)
+                orphans=true
+                shift
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
 
-        if [[ "$path" != "$repo_root" ]] && [[ "$path" == "$repo_root/$WT_DIR/"* ]]; then
-            if _wt_is_merged "$branch"; then
-                _wt_remove "$path" "$force"
+    repo_root=$(_wt_repo_root) || return 0
+
+    while IFS= read -r line; do
+        wt_path="${line%% *}"
+        wt_branch="${line##* }"
+        wt_branch="${wt_branch#\[}"
+        wt_branch="${wt_branch%\]}"
+
+        if [[ "$wt_path" != "$repo_root" ]] && [[ "$wt_path" == "$repo_root/$WT_DIR/"* ]]; then
+            if _wt_is_merged "$wt_branch"; then
+                _wt_remove "$wt_path" "$force"
                 case $? in
                     0)
-                        echo "Pruned merged worktree: $branch"
+                        echo "Pruned merged worktree: $wt_branch"
                         pruned=$((pruned + 1))
                         ;;
                     1)
-                        echo "Skipped '$branch' (has uncommitted changes, use --force)"
+                        echo "Skipped '$wt_branch' (has uncommitted changes, use --force)"
                         skipped=$((skipped + 1))
                         ;;
                 esac
@@ -276,30 +281,66 @@ _wt_prune() {
         fi
     done < <(git worktree list)
 
+    if [[ "$orphans" == true ]]; then
+        while IFS= read -r line; do
+            wt_path="${line%% *}"
+            wt_branch="${line##* }"
+            wt_branch="${wt_branch#\[}"
+            wt_branch="${wt_branch%\]}"
+
+            if [[ "$wt_path" != "$repo_root" ]] && [[ "$wt_path" == "$repo_root/$WT_DIR/"* ]]; then
+                is_orphan=false
+                orphan_reason=""
+
+                if ! git show-ref --verify --quiet "refs/heads/$wt_branch" 2>/dev/null; then
+                    is_orphan=true
+                    orphan_reason="branch no longer exists"
+                elif [[ -n "$(find "$wt_path" -maxdepth 0 -mtime +30 2>/dev/null)" ]]; then
+                    is_orphan=true
+                    orphan_reason="not accessed in 30+ days"
+                fi
+
+                if [[ "$is_orphan" == true ]]; then
+                    _wt_remove "$wt_path" "$force"
+                    case $? in
+                        0)
+                            echo "Pruned orphaned worktree: $wt_branch ($orphan_reason)"
+                            pruned=$((pruned + 1))
+                            ;;
+                        1)
+                            echo "Skipped '$wt_branch' (has uncommitted changes, use --force)"
+                            skipped=$((skipped + 1))
+                            ;;
+                    esac
+                fi
+            fi
+        done < <(git worktree list)
+    fi
+
     if [[ $pruned -eq 0 ]] && [[ $skipped -eq 0 ]]; then
-        echo "No merged worktrees to prune"
+        [[ "$orphans" == true ]] && echo "No merged or orphaned worktrees to prune" || echo "No merged worktrees to prune"
     fi
 }
 
 _wt_orphans() {
-    local repo_root
+    local repo_root wt_path wt_branch
+    local found=0
     repo_root=$(_wt_repo_root) || return 1
 
     echo "Checking for orphaned worktrees..."
-    local found=0
 
     while IFS= read -r line; do
-        local path="${line%% *}"
-        local branch="${line##* }"
-        branch="${branch#\[}"
-        branch="${branch%\]}"
+        wt_path="${line%% *}"
+        wt_branch="${line##* }"
+        wt_branch="${wt_branch#\[}"
+        wt_branch="${wt_branch%\]}"
 
-        if [[ "$path" != "$repo_root" ]] && [[ "$path" == "$repo_root/$WT_DIR/"* ]]; then
-            if ! git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
-                echo "  - $branch (branch no longer exists)"
+        if [[ "$wt_path" != "$repo_root" ]] && [[ "$wt_path" == "$repo_root/$WT_DIR/"* ]]; then
+            if ! git show-ref --verify --quiet "refs/heads/$wt_branch" 2>/dev/null; then
+                echo "  - $wt_branch (branch no longer exists)"
                 found=$((found + 1))
-            elif [[ -n "$(find "$path" -maxdepth 0 -mtime +30 2>/dev/null)" ]]; then
-                echo "  - $branch (not accessed in 30+ days)"
+            elif [[ -n "$(find "$wt_path" -maxdepth 0 -mtime +30 2>/dev/null)" ]]; then
+                echo "  - $wt_branch (not accessed in 30+ days)"
                 found=$((found + 1))
             fi
         fi
@@ -310,13 +351,6 @@ _wt_orphans() {
     fi
 }
 
-_wt_clean() {
-    echo "Interactive cleanup not yet implemented"
-    echo "Use 'wt prune' to remove merged worktrees"
-    echo "Use 'wt orphans' to find stale worktrees"
-    echo "Use 'wt rm <branch>' to remove specific worktrees"
-}
-
 _wt_help() {
     cat <<EOF
 Git Worktree Management Tool
@@ -324,22 +358,21 @@ Git Worktree Management Tool
 Usage: wt <command> [options]
 
 Commands:
-  add <branch> [--open]  Create a new worktree for the branch
-  rm <branch> [--force]  Remove a worktree (--force if uncommitted changes)
-  ls                     List all worktrees with status
-  cd <branch>            Navigate to a worktree
-  prune [--force]        Remove worktrees for merged branches (--force if uncommitted changes)
-  orphans                List stale/orphaned worktrees
-  clean                  Interactive cleanup (coming soon)
-  help                   Show this help message
+  add <branch> [--open] [--base <branch>]  Create a new worktree for the branch
+  rm <branch> [--force]                     Remove a worktree (--force if uncommitted changes)
+  list                                      List all worktrees with status
+  cd <branch>                               Navigate to a worktree
+  prune [--force] [--orphans]               Remove merged worktrees (--orphans includes stale)
+  orphans                                   List stale/orphaned worktrees
+  help                                      Show this help message
 
 Environment Variables:
   WT_DIR                 Directory name for worktrees (default: .worktrees)
-  WT_EDITOR              Editor to open worktrees (default: code)
+  WT_EDITOR              Editor to open worktrees (default: cursor)
 
 Examples:
   wt add feature-auth --open    # Create worktree and open in editor
-  wt ls                         # List all worktrees
+  wt list                       # List all worktrees
   wt cd feature-auth            # Navigate to worktree
   wt prune                      # Clean up merged worktrees
   wt rm feature-auth            # Remove a worktree
@@ -347,18 +380,17 @@ EOF
 }
 
 wt() {
-    local cmd="${1:-ls}"
+    local cmd="${1:-list}"
     shift 2>/dev/null
 
     case "$cmd" in
         add) _wt_add "$@" ;;
         rm) _wt_rm "$@" ;;
-        ls) _wt_ls "$@" ;;
+        list) _wt_ls "$@" ;;
         cd) _wt_cd "$@" ;;
         prune) _wt_prune "$@" ;;
         orphans) _wt_orphans "$@" ;;
-        clean) _wt_clean "$@" ;;
-        help) _wt_help ;;
+        help | --help | -h) _wt_help ;;
         *) echo "Unknown command: $cmd. Run 'wt help' for usage." ;;
     esac
 }

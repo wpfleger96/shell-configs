@@ -17,6 +17,7 @@
     pager = less -FRX
     autocrlf = input
     hooksPath = .hooks
+    excludesfile = ~/.config/git/ignore
 
 [push]
     default = current

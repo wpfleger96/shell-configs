@@ -3,3 +3,6 @@
 
 # Ignore PLAN__*.md files created by Claude Code /dev-docs slash command
 PLAN__*.md
+
+# Ignore git worktrees directory
+.worktrees/
