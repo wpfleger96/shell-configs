@@ -6,6 +6,8 @@
 export EDITOR=vim
 export VISUAL=vim
 export PAGER=less
+export PATH="$PATH:$HOME/.local/bin"
+export PATH="$PATH:$HOME/.rvm/bin"
 
 ### Git - Aliases ###
 alias ga='git add'
