@@ -1,12 +1,15 @@
 """Command-line interface for shell-configs."""
 
 import difflib
+import logging
 import sys
 
 import click
 
+from rich.prompt import Confirm
 from rich.syntax import Syntax
 
+from shell_configs import __version__
 from shell_configs.config import ConfigReader
 from shell_configs.display import (
     add_additional_file_row,
@@ -24,6 +27,102 @@ from shell_configs.display import (
 from shell_configs.manager import ConfigManager, OperationResult
 from shell_configs.shells.base import Shell
 from shell_configs.shells.registry import ShellRegistry
+
+logger = logging.getLogger(__name__)
+
+
+def _background_update_check() -> None:
+    """Run update check in background thread for all registered tools.
+
+    This runs silently and saves results for display on next CLI invocation.
+    """
+    from datetime import datetime
+
+    from shell_configs.bootstrap import (
+        UPDATABLE_TOOLS,
+        check_tool_updates,
+        load_auto_update_config,
+        save_auto_update_config,
+        save_pending_update,
+    )
+
+    try:
+        for tool in UPDATABLE_TOOLS:
+            update_info = check_tool_updates(tool)
+            if update_info and update_info.has_update:
+                save_pending_update(update_info, tool.tool_id)
+
+        config = load_auto_update_config()
+        config.last_check = datetime.now().isoformat()
+        save_auto_update_config(config)
+    except Exception as e:
+        logger.debug(f"Background update check failed: {e}")
+
+
+def _check_pending_updates() -> None:
+    """Check for and display pending update notifications."""
+    from shell_configs.bootstrap import (
+        clear_all_pending_updates,
+        get_tool_by_id,
+        load_all_pending_updates,
+    )
+
+    try:
+        pending = load_all_pending_updates()
+        if not pending:
+            return
+
+        updates = []
+        for tid, info in pending.items():
+            tool = get_tool_by_id(tid)
+            if tool:
+                updates.append(
+                    f"{tool.display_name} {info.current_version} → {info.latest_version}"
+                )
+
+        if not updates:
+            return
+
+        update_label = "Update available" if len(updates) == 1 else "Updates available"
+        console.print(f"\n[cyan]{update_label}:[/cyan] {', '.join(updates)}")
+
+        if sys.stdin.isatty() and sys.stdout.isatty():
+            prompt = "Install now?" if len(updates) == 1 else "Install all updates?"
+            if Confirm.ask(prompt, default=False):
+                ctx = click.get_current_context()
+                ctx.invoke(upgrade, check=False, force=False)
+            else:
+                console.print("[dim]Run 'shell-configs upgrade' when ready[/dim]")
+        else:
+            console.print("[dim]Run 'shell-configs upgrade' to install[/dim]")
+
+        clear_all_pending_updates()
+    except Exception as e:
+        logger.debug(f"Failed to check pending updates: {e}")
+
+
+def version_callback(ctx: click.Context, param: click.Parameter, value: bool) -> None:
+    """Custom version callback that also checks for updates."""
+    if not value or ctx.resilient_parsing:
+        return
+
+    console.print(f"shell-configs, version {__version__}")
+
+    try:
+        from shell_configs.bootstrap import check_tool_updates, get_tool_by_id
+
+        tool = get_tool_by_id("shell-configs")
+        if tool:
+            update_info = check_tool_updates(tool, timeout=3)
+            if update_info and update_info.has_update:
+                console.print(
+                    f"\n[cyan]Update available:[/cyan] {update_info.current_version} → {update_info.latest_version}"
+                )
+                console.print("[dim]Run 'shell-configs upgrade' to install[/dim]")
+    except Exception as e:
+        logger.debug(f"Failed to check for updates in version callback: {e}")
+
+    ctx.exit()
 
 
 def parse_shell_filter(
@@ -72,10 +171,134 @@ def _get_selected_shells(
     return selected_shells
 
 
+def _display_diffs_for_shells(
+    selected_shells: list[Shell],
+    config_reader: ConfigReader,
+    manager: ConfigManager,
+) -> bool:
+    """Display diffs for selected shells before install.
+
+    Returns:
+        True if diffs were found and displayed, False otherwise
+    """
+    found_diffs = False
+
+    for shell in selected_shells:
+        for config_file in shell.get_config_files():
+            repo_content = config_reader.get_config_content(
+                shell.name, config_file.repo_config_name
+            )
+            if repo_content is None:
+                continue
+
+            shared_content = None
+            if shell.supports_shared_config():
+                shared_content = config_reader.get_shared_config_content(shell.name)
+
+            repo_content = manager.combine_content(shared_content, repo_content)
+
+            section = manager.extract_managed_section(config_file.path)
+
+            if section is None:
+                console.print(
+                    f"\n[bold cyan]{shell.display_name}[/bold cyan]: {config_file.path}"
+                )
+                console.print("[yellow]Not installed[/yellow]")
+                found_diffs = True
+                continue
+
+            if section.content.strip() == repo_content.strip():
+                continue
+
+            found_diffs = True
+            console.print(
+                f"\n[bold cyan]{shell.display_name}[/bold cyan]: {config_file.path}"
+            )
+
+            installed_lines = section.content.splitlines(keepends=True)
+            repo_lines = repo_content.splitlines(keepends=True)
+
+            diff_lines = difflib.unified_diff(
+                installed_lines,
+                repo_lines,
+                fromfile="Installed",
+                tofile="Repository",
+                lineterm="",
+            )
+
+            diff_text = "\n".join(diff_lines)
+            if diff_text:
+                syntax = Syntax(diff_text, "diff", theme="monokai")
+                console.print(syntax)
+
+        additional_files = shell.get_additional_files()
+        for additional_file in additional_files:
+            if not additional_file.target_path.exists():
+                console.print(
+                    f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
+                )
+                console.print("[yellow]Not installed[/yellow]")
+                found_diffs = True
+                continue
+
+            if manager.files_match(
+                additional_file.source_path, additional_file.target_path
+            ):
+                continue
+
+            found_diffs = True
+            console.print(
+                f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
+            )
+
+            installed_content = additional_file.target_path.read_text()
+            repo_content = additional_file.source_path.read_text()
+
+            installed_lines = installed_content.splitlines(keepends=True)
+            repo_lines = repo_content.splitlines(keepends=True)
+
+            diff_lines = difflib.unified_diff(
+                installed_lines,
+                repo_lines,
+                fromfile="Installed",
+                tofile="Repository",
+                lineterm="",
+            )
+
+            diff_text = "\n".join(diff_lines)
+            if diff_text:
+                syntax = Syntax(diff_text, "diff", theme="monokai")
+                console.print(syntax)
+
+    return found_diffs
+
+
 @click.group()
-@click.version_option()
+@click.option(
+    "--version",
+    is_flag=True,
+    callback=version_callback,
+    expose_value=False,
+    is_eager=True,
+    help="Show version and check for updates",
+)
 def cli() -> None:
     """Manage shell configuration files across machines."""
+    import os
+    import threading
+
+    from shell_configs.bootstrap import load_auto_update_config, should_check_now
+
+    _check_pending_updates()
+
+    try:
+        if "PYTEST_CURRENT_TEST" not in os.environ:
+            config = load_auto_update_config()
+            if config.enabled and should_check_now(config):
+                thread = threading.Thread(target=_background_update_check, daemon=True)
+                thread.start()
+    except Exception:
+        pass
 
 
 @cli.command()
@@ -103,9 +326,16 @@ def install(shells: list[str] | None, dry_run: bool, force: bool) -> None:
         return
 
     if not force and not dry_run:
-        shell_names = ", ".join([s.display_name for s in selected_shells])
-        if not click.confirm(f"Install configurations for {shell_names}?"):
-            print_info("Installation cancelled")
+        # Show diffs before confirmation
+        has_diffs = _display_diffs_for_shells(selected_shells, config_reader, manager)
+
+        if has_diffs:
+            console.print()  # Blank line before prompt
+            if not click.confirm("Apply these changes?"):
+                print_info("Installation cancelled")
+                return
+        else:
+            print_info("All configurations already in sync")
             return
 
     results = {}
@@ -462,6 +692,111 @@ def list_shells() -> None:
         print_warning(
             "No shell configurations found. Add config files to the config/ directory."
         )
+
+
+@cli.command()
+@click.option("--check", is_flag=True, help="Check for updates without installing")
+@click.option("--force", is_flag=True, help="Force reinstall even if up to date")
+def upgrade(check: bool, force: bool) -> None:
+    """Upgrade shell-configs to the latest version from PyPI.
+
+    Examples:
+        shell-configs upgrade             # Check and install updates
+        shell-configs upgrade --check     # Only check for updates
+    """
+    from shell_configs.bootstrap import (
+        UPDATABLE_TOOLS,
+        check_tool_updates,
+        perform_pypi_update,
+    )
+
+    tools = [t for t in UPDATABLE_TOOLS if t.is_installed()]
+
+    if not tools:
+        console.print("[yellow]⚠[/yellow] No tools are installed")
+        sys.exit(1)
+
+    tool_updates = []
+    for tool in tools:
+        try:
+            current = tool.get_version()
+            if current:
+                console.print(
+                    f"[dim]{tool.display_name} current version: {current}[/dim]"
+                )
+        except Exception as e:
+            console.print(
+                f"[red]Error:[/red] Could not get {tool.display_name} version: {e}"
+            )
+            continue
+
+        with console.status(f"Checking {tool.display_name} for updates..."):
+            try:
+                update_info = check_tool_updates(tool)
+            except Exception as e:
+                console.print(
+                    f"[red]Error:[/red] Failed to check {tool.display_name} updates: {e}"
+                )
+                continue
+
+        if update_info and (update_info.has_update or force):
+            tool_updates.append((tool, update_info))
+        elif update_info and not update_info.has_update:
+            console.print(
+                f"[green]✓[/green] {tool.display_name} is already up to date!"
+            )
+
+    console.print()
+
+    if not tool_updates and not force:
+        console.print("[green]✓[/green] All tools are up to date!")
+        return
+
+    if not check:
+        for tool, update_info in tool_updates:
+            if update_info.has_update:
+                console.print(
+                    f"[cyan]Update available for {tool.display_name}:[/cyan] "
+                    f"{update_info.current_version} → {update_info.latest_version}"
+                )
+
+    if check:
+        if tool_updates:
+            console.print("\nRun [bold]shell-configs upgrade[/bold] to install")
+        return
+
+    if not force:
+        if len(tool_updates) == 1:
+            prompt = f"\nInstall {tool_updates[0][0].display_name} update?"
+        else:
+            prompt = f"\nInstall {len(tool_updates)} updates?"
+        if not Confirm.ask(prompt, default=True):
+            console.print("[yellow]Cancelled.[/yellow]")
+            return
+
+    for tool, _ in tool_updates:
+        with console.status(f"Upgrading {tool.display_name}..."):
+            try:
+                success, msg, was_upgraded = perform_pypi_update(tool.package_name)
+            except Exception as e:
+                console.print(
+                    f"\n[red]Error:[/red] {tool.display_name} upgrade failed: {e}"
+                )
+                continue
+
+        if success:
+            if was_upgraded:
+                console.print(
+                    f"[green]✓[/green] {tool.display_name} upgraded successfully!"
+                )
+            else:
+                console.print(
+                    f"[green]✓[/green] {tool.display_name} is already up to date"
+                )
+        else:
+            console.print(
+                f"[red]Error:[/red] {tool.display_name} upgrade failed: {msg}"
+            )
 
 
 def main() -> None:

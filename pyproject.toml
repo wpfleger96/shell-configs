@@ -6,13 +6,33 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
-    { name = "Will" }
+    { name = "Will Pfleger", email = "pfleger.will@gmail.com" }
+]
+keywords = ["shell", "cli", "configuration", "dotfiles", "bash", "zsh"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Shells",
+    "Topic :: Utilities",
 ]
 dependencies = [
     "click>=8.1",
+    "packaging>=21.0",
     "rich>=13.0",
     "pyyaml>=6.0",
+    "tomli>=2.0.0; python_version<'3.11'",
 ]
+
+[project.urls]
+Homepage = "https://github.com/wpfleger96/shell-configs"
+Repository = "https://github.com/wpfleger96/shell-configs"
+Issues = "https://github.com/wpfleger96/shell-configs/issues"
 
 [project.scripts]
 shell-configs = "shell_configs.cli:main"
@@ -46,6 +66,7 @@ markers = [
     "unit: Unit tests that don't touch the filesystem",
     "integration: Integration tests that modify files",
     "cli: CLI command tests",
+    "bootstrap: Bootstrap module tests",
 ]
 
 [dependency-groups]
@@ -68,10 +89,28 @@ explicit_package_bases = true
 strict = true
 
 [[tool.mypy.overrides]]
-module = []
+module = ["yaml.*", "tomli.*"]
 ignore_missing_imports = true  # Only for external libs without stubs
 
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
 disable_error_code = ["var-annotated", "type-arg"]
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+tag_format = "v{version}"
+branch = "main"
+commit_parser = "conventional"
+commit_message = "chore(release): {version}"
+
+[tool.semantic_release.commit_parser_opts]
+allowed_types = ["feat", "fix", "chore", "ci", "docs", "style", "refactor", "test"]
+
+[tool.semantic_release.commit_type_map]
+chore = "patch"
+ci = "patch"
+docs = "patch"
+style = "patch"
+refactor = "patch"
+test = "patch"
