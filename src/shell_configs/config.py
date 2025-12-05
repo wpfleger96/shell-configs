@@ -20,12 +20,14 @@ def get_config_dir() -> Path:
 class ConfigReader:
     """Reads configuration files from the package."""
 
-    def __init__(self) -> None:
+    def __init__(self, config_dir: Path | None = None) -> None:
         """Initialize the config reader.
 
-        Automatically locates the config directory using importlib.resources.
+        Args:
+            config_dir: Optional override for config directory path.
+                       If None, automatically locates using importlib.resources.
         """
-        self.config_dir = get_config_dir()
+        self.config_dir = config_dir if config_dir is not None else get_config_dir()
 
     def get_config_content(
         self, shell_name: str, config_name: str | None

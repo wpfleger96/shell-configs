@@ -4,6 +4,8 @@ import difflib
 import logging
 import sys
 
+from pathlib import Path
+
 import click
 
 from rich.prompt import Confirm
@@ -311,9 +313,17 @@ def cli() -> None:
     "--dry-run", is_flag=True, help="Show what would be done without doing it"
 )
 @click.option("--force", is_flag=True, help="Skip confirmation prompts")
-def install(shells: list[str] | None, dry_run: bool, force: bool) -> None:
+@click.option(
+    "--config-dir",
+    type=click.Path(exists=True, path_type=Path),
+    hidden=True,
+    help="Override config directory path (for setup command)",
+)
+def install(
+    shells: list[str] | None, dry_run: bool, force: bool, config_dir: Path | None
+) -> None:
     """Install or update managed configuration sections."""
-    config_reader = ConfigReader()
+    config_reader = ConfigReader(config_dir=config_dir)
     manager = ConfigManager()
     registry = ShellRegistry()
 
@@ -797,6 +807,105 @@ def upgrade(check: bool, force: bool) -> None:
             console.print(
                 f"[red]Error:[/red] {tool.display_name} upgrade failed: {msg}"
             )
+
+
+@cli.command()
+@click.option("--force", is_flag=True, help="Skip confirmation prompts")
+@click.option("--dry-run", is_flag=True, help="Show what would be done")
+@click.option(
+    "--shells",
+    callback=parse_shell_filter,
+    help="Comma-separated shells to install",
+)
+@click.option("--skip-completions", is_flag=True, help="Skip shell completion setup")
+@click.pass_context
+def setup(
+    ctx: click.Context,
+    force: bool,
+    dry_run: bool,
+    shells: list[str] | None,
+    skip_completions: bool,
+) -> None:
+    """One-command setup for shell-configs.
+
+    Installs shell-configs globally via uv tool install, sets up shell
+    configurations, and optionally installs tab completions.
+
+    Run this after installing with uvx: uvx shell-configs setup
+    """
+    from shell_configs.bootstrap.installer import (
+        get_tool_config_dir,
+        install_tool,
+    )
+    from shell_configs.completions import (
+        detect_shell,
+        get_supported_shells,
+        install_completion,
+    )
+
+    console.print(
+        "\n[bold cyan]Step 1/3: Install shell-configs system-wide[/bold cyan]"
+    )
+    console.print(
+        "[dim]This allows you to run 'shell-configs' from any directory.[/dim]\n"
+    )
+
+    if not force and not dry_run:
+        if not Confirm.ask("Install shell-configs permanently?", default=True):
+            console.print("[yellow]Setup cancelled[/yellow]")
+            sys.exit(0)
+
+    success, message = install_tool("shell-configs", force=force, dry_run=dry_run)
+
+    if not success:
+        console.print(f"[red]Error:[/red] {message}")
+        sys.exit(1)
+
+    console.print(f"[green]✓[/green] {message}")
+
+    config_dir = get_tool_config_dir("shell-configs") if not dry_run else None
+
+    console.print(
+        "\n[bold cyan]Step 2/3: Installing shell configurations[/bold cyan]\n"
+    )
+
+    ctx.invoke(
+        install,
+        shells=shells,
+        dry_run=dry_run,
+        force=force,
+        config_dir=config_dir,
+    )
+
+    if not skip_completions:
+        console.print("\n[bold cyan]Step 3/3: Shell completion setup[/bold cyan]\n")
+
+        shell = detect_shell()
+        if shell is None:
+            supported = ", ".join(get_supported_shells())
+            console.print(
+                f"[yellow]⚠[/yellow] Could not detect shell. Supported: {supported}"
+            )
+            console.print("[dim]Skipping completion installation[/dim]")
+        else:
+            if not force and not dry_run:
+                if not Confirm.ask(f"Install {shell} tab completion?", default=True):
+                    console.print("[dim]Skipping completion installation[/dim]")
+                else:
+                    success, message = install_completion(shell, dry_run=dry_run)
+                    if success:
+                        console.print(f"[green]✓[/green] {message}")
+                    else:
+                        console.print(f"[yellow]⚠[/yellow] {message}")
+            else:
+                success, message = install_completion(shell, dry_run=dry_run)
+                if success:
+                    console.print(f"[green]✓[/green] {message}")
+                else:
+                    console.print(f"[yellow]⚠[/yellow] {message}")
+
+    console.print("\n[green bold]✓ Setup complete![/green bold]")
+    console.print("You can now run shell-configs from anywhere.")
 
 
 def main() -> None:
