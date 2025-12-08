@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.3.0 (2025-12-08)
+
+### Chores
+
+- Add AGENTS.md
+  ([`5fc0825`](https://github.com/wpfleger96/shell-configs/commit/5fc08258d74bb6944862b7ffd6e283fb97da4e1b))
+
+### Features
+
+- Auto fetch git remote after cd into local repo dir
+  ([`a8987e8`](https://github.com/wpfleger96/shell-configs/commit/a8987e80423e0cf175cb83e2367b8dc274d0af12))
+
+
 ## v0.2.0 (2025-12-05)
 
 ### Features
