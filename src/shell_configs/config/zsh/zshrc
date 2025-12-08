@@ -81,6 +81,11 @@ if [ -f ~/.zsh/git-prompt.sh ]; then
     PROMPT='%F{251}%~%F{reset}%B%F{cyan}$(__git_ps1 " %s")%F{yellow}$(__wt_ps1)%F{reset}%b '
 fi
 
+### Auto-fetch on directory change ###
+chpwd() {
+    _git_auto_fetch
+}
+
 ### macOS Utilities ###
 unlock_file() {
     local file=$1

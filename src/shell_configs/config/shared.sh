@@ -60,6 +60,27 @@ git() {
     fi
 }
 
+### Git - Auto Fetch ###
+_git_auto_fetch() {
+    local git_dir fetch_head cooldown_seconds=300
+
+    git_dir=$(git rev-parse --git-dir 2>/dev/null) || return
+    fetch_head="$git_dir/FETCH_HEAD"
+
+    # Check if FETCH_HEAD exists and is less than 5 minutes old
+    if [[ -f "$fetch_head" ]]; then
+        local last_fetch
+        last_fetch=$(stat -f %m "$fetch_head" 2>/dev/null || stat -c %Y "$fetch_head" 2>/dev/null)
+        local now=$(date +%s)
+        if ((now - last_fetch < cooldown_seconds)); then
+            return
+        fi
+    fi
+
+    # Fetch in background, suppress all output
+    git fetch --quiet &>/dev/null &
+}
+
 ### Git Worktree Management ###
 export WT_DIR=".worktrees"
 export WT_EDITOR="cursor"
@@ -72,7 +93,7 @@ __wt_ps1() {
 }
 
 _wt_main_branch() {
-    git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main"
+    git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/@@' || echo "origin/main"
 }
 
 _wt_is_merged() {

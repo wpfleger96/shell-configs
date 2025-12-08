@@ -35,3 +35,9 @@ if [ -f ~/.bash/git-prompt.sh ]; then
     source ~/.bash/git-prompt.sh
     export PS1='\u@\h:\w\[\033[1;36m\]$(__git_ps1 " %s")\[\033[1;33m\]$(__wt_ps1)\[\033[0m\] \$ '
 fi
+
+### Auto-fetch on directory change ###
+cd() {
+    builtin cd "$@" || return
+    _git_auto_fetch
+}
