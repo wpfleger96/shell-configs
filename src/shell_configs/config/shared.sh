@@ -47,12 +47,13 @@ export GPG_TTY
 
 ### Git - Functions ###
 git() {
-    if [[ "$1" == "checkout" && "$2" == "master" ]]; then
-        master_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
-        if [[ -n "$master_branch" ]]; then
-            command git checkout "$master_branch"
+    if [[ "$1" == "checkout" && -z "$2" ]]; then
+        local default_branch
+        default_branch=$(command git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+        if [[ -n "$default_branch" ]]; then
+            command git checkout "$default_branch"
         else
-            echo "Error: Could not determine default branch (main/master)."
+            echo "Error: Could not determine default branch."
             return 1
         fi
     else
@@ -64,10 +65,9 @@ git() {
 _git_auto_fetch() {
     local git_dir fetch_head cooldown_seconds=300
 
-    git_dir=$(git rev-parse --git-dir 2>/dev/null) || return
+    git_dir=$(command git rev-parse --git-dir 2>/dev/null) || return
     fetch_head="$git_dir/FETCH_HEAD"
 
-    # Check if FETCH_HEAD exists and is less than 5 minutes old
     if [[ -f "$fetch_head" ]]; then
         local last_fetch
         last_fetch=$(stat -f %m "$fetch_head" 2>/dev/null || stat -c %Y "$fetch_head" 2>/dev/null)
@@ -77,8 +77,7 @@ _git_auto_fetch() {
         fi
     fi
 
-    # Fetch in background, suppress all output
-    git fetch --quiet &>/dev/null &
+    command git fetch --quiet &>/dev/null &
 }
 
 ### Git Worktree Management ###
@@ -86,25 +85,25 @@ export WT_DIR=".worktrees"
 export WT_EDITOR="cursor"
 
 __wt_ps1() {
-    local git_dir=$(git rev-parse --git-dir 2>/dev/null)
+    local git_dir=$(command git rev-parse --git-dir 2>/dev/null)
     if [[ "$git_dir" == *".git/worktrees/"* ]]; then
         echo " [wt]"
     fi
 }
 
 _wt_main_branch() {
-    git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/@@' || echo "origin/main"
+    command git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/@@' || echo "origin/main"
 }
 
 _wt_is_merged() {
     local branch="$1"
     local main_branch=$(_wt_main_branch)
-    git branch --merged "$main_branch" 2>/dev/null | grep -q "^\s*${branch}$"
+    command git branch --merged "$main_branch" 2>/dev/null | grep -q "^\s*${branch}$"
 }
 
 _wt_repo_root() {
     local root
-    root=$(git rev-parse --show-toplevel 2>/dev/null)
+    root=$(command git rev-parse --show-toplevel 2>/dev/null)
     if [[ -z "$root" ]]; then
         echo "Error: Not in a git repository" >&2
         return 1
@@ -113,16 +112,25 @@ _wt_repo_root() {
 }
 
 _wt_remove() {
-    local path="$1" force="${2:-false}"
-    git worktree remove "$path" 2>/dev/null && return 0
-    [[ "$force" == true ]] && git worktree remove --force "$path" 2>/dev/null && return 0
-    [[ "$force" == false ]] && return 1
+    local wt_path="$1" force="${2:-false}"
+    local error_output
+
+    if [[ "$force" == true ]]; then
+        error_output=$(command git worktree remove --force "$wt_path" 2>&1) && return 0
+    else
+        error_output=$(command git worktree remove "$wt_path" 2>&1) && return 0
+    fi
+
+    if [[ "$error_output" == *"uncommitted changes"* ]] || [[ "$error_output" == *"untracked files"* ]]; then
+        return 1
+    fi
+
+    echo "$error_output" >&2
     return 2
 }
 
 _wt_sanitize_dirname() {
     local name="$1"
-    # Replace /, \, and : with - for safe directory names
     name="${name//\//-}"
     name="${name//\\/-}"
     name="${name//:/-}"
@@ -170,16 +178,16 @@ _wt_add() {
 
     mkdir -p "$repo_root/$WT_DIR"
 
-    if git show-ref --verify --quiet "refs/heads/$branch" ||
-        git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
-        if ! git worktree add "$worktree_path" "$branch"; then
+    if command git show-ref --verify --quiet "refs/heads/$branch" ||
+        command git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+        if ! command git worktree add "$worktree_path" "$branch"; then
             echo "Error: Failed to create worktree for '$branch'"
             return 1
         fi
         echo "Created worktree for '$branch' at $worktree_path"
     else
         [[ -z "$base_branch" ]] && base_branch=$(_wt_main_branch)
-        if ! git worktree add -b "$branch" "$worktree_path" "$base_branch"; then
+        if ! command git worktree add -b "$branch" "$worktree_path" "$base_branch"; then
             echo "Error: Failed to create worktree and branch '$branch' from '$base_branch'"
             return 1
         fi
@@ -223,7 +231,7 @@ _wt_rm() {
     case $? in
         0) echo "Removed worktree for '$branch'" ;;
         1)
-            echo "Error: Worktree '$branch' has uncommitted changes"
+            echo "Error: Worktree '$branch' has uncommitted changes or untracked files"
             echo "Use 'wt rm $branch --force' to remove anyway"
             return 1
             ;;
@@ -239,7 +247,7 @@ _wt_ls() {
     repo_root=$(_wt_repo_root) || return 1
 
     echo "Worktrees:"
-    git worktree list | while IFS= read -r line; do
+    command git worktree list | while IFS= read -r line; do
         wt_path="${line%% *}"
         wt_branch="${line##* }"
         wt_branch="${wt_branch#\[}"
@@ -324,7 +332,7 @@ _wt_prune() {
                 esac
             fi
         fi
-    done < <(git worktree list)
+    done < <(command git worktree list)
 
     if [[ "$orphans" == true ]]; then
         while IFS= read -r line; do
@@ -337,7 +345,7 @@ _wt_prune() {
                 is_orphan=false
                 orphan_reason=""
 
-                if ! git show-ref --verify --quiet "refs/heads/$wt_branch" 2>/dev/null; then
+                if ! command git show-ref --verify --quiet "refs/heads/$wt_branch" 2>/dev/null; then
                     is_orphan=true
                     orphan_reason="branch no longer exists"
                 elif [[ -n "$(find "$wt_path" -maxdepth 0 -mtime +30 2>/dev/null)" ]]; then
@@ -359,7 +367,7 @@ _wt_prune() {
                     esac
                 fi
             fi
-        done < <(git worktree list)
+        done < <(command git worktree list)
     fi
 
     if [[ $pruned -eq 0 ]] && [[ $skipped -eq 0 ]]; then
@@ -381,7 +389,7 @@ _wt_orphans() {
         wt_branch="${wt_branch%\]}"
 
         if [[ "$wt_path" != "$repo_root" ]] && [[ "$wt_path" == "$repo_root/$WT_DIR/"* ]]; then
-            if ! git show-ref --verify --quiet "refs/heads/$wt_branch" 2>/dev/null; then
+            if ! command git show-ref --verify --quiet "refs/heads/$wt_branch" 2>/dev/null; then
                 echo "  - $wt_branch (branch no longer exists)"
                 found=$((found + 1))
             elif [[ -n "$(find "$wt_path" -maxdepth 0 -mtime +30 2>/dev/null)" ]]; then
@@ -389,7 +397,7 @@ _wt_orphans() {
                 found=$((found + 1))
             fi
         fi
-    done < <(git worktree list)
+    done < <(command git worktree list)
 
     if [[ $found -eq 0 ]]; then
         echo "No orphaned worktrees found"
@@ -430,8 +438,8 @@ wt() {
 
     case "$cmd" in
         add) _wt_add "$@" ;;
-        rm) _wt_rm "$@" ;;
-        list) _wt_ls "$@" ;;
+        rm | remove) _wt_rm "$@" ;;
+        list | ls) _wt_ls "$@" ;;
         cd) _wt_cd "$@" ;;
         prune) _wt_prune "$@" ;;
         orphans) _wt_orphans "$@" ;;
