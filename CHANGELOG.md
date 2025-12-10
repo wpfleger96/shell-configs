@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.3.2 (2025-12-10)
+
+### Bug Fixes
+
+- Git command confusion
+  ([`bfb3b60`](https://github.com/wpfleger96/shell-configs/commit/bfb3b60cbbcdee189fc471d1c2780db1a4a511a4))
+
+
 ## v0.3.1 (2025-12-10)
 
 ### Bug Fixes
