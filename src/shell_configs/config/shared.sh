@@ -120,6 +120,15 @@ _wt_remove() {
     return 2
 }
 
+_wt_sanitize_dirname() {
+    local name="$1"
+    # Replace /, \, and : with - for safe directory names
+    name="${name//\//-}"
+    name="${name//\\/-}"
+    name="${name//:/-}"
+    echo "$name"
+}
+
 _wt_add() {
     local branch=""
     local base_branch=""
@@ -150,7 +159,9 @@ _wt_add() {
     local repo_root
     repo_root=$(_wt_repo_root) || return 1
 
-    local worktree_path="$repo_root/$WT_DIR/$branch"
+    local dir_name
+    dir_name=$(_wt_sanitize_dirname "$branch")
+    local worktree_path="$repo_root/$WT_DIR/$dir_name"
 
     if [[ -d "$worktree_path" ]]; then
         echo "Error: Worktree for '$branch' already exists at $worktree_path"
@@ -199,7 +210,9 @@ _wt_rm() {
 
     local repo_root
     repo_root=$(_wt_repo_root) || return 1
-    local worktree_path="$repo_root/$WT_DIR/$branch"
+    local dir_name
+    dir_name=$(_wt_sanitize_dirname "$branch")
+    local worktree_path="$repo_root/$WT_DIR/$dir_name"
 
     if [[ ! -d "$worktree_path" ]]; then
         echo "Error: Worktree for '$branch' does not exist"
@@ -255,7 +268,9 @@ _wt_cd() {
     local repo_root
     repo_root=$(_wt_repo_root) || return 1
 
-    local worktree_path="$repo_root/$WT_DIR/$branch"
+    local dir_name
+    dir_name=$(_wt_sanitize_dirname "$branch")
+    local worktree_path="$repo_root/$WT_DIR/$dir_name"
 
     if [[ ! -d "$worktree_path" ]]; then
         echo "Error: Worktree for '$branch' does not exist"
