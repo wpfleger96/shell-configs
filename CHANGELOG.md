@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.3.3 (2025-12-10)
+
+### Bug Fixes
+
+- Auto install after update
+  ([`7152500`](https://github.com/wpfleger96/shell-configs/commit/7152500cb7ff514199d95637e03986651ae20ddd))
+
+
 ## v0.3.2 (2025-12-10)
 
 ### Bug Fixes
