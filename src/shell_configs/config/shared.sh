@@ -8,6 +8,7 @@ export VISUAL=vim
 export PAGER=less
 export PATH="$PATH:$HOME/.local/bin"
 export PATH="$PATH:$HOME/.rvm/bin"
+export PYPI="https://pypi.org/simple"
 
 ### Git - Aliases ###
 alias ga='git add'
