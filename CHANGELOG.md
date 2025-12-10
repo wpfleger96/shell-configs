@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.3.4 (2025-12-10)
+
+### Bug Fixes
+
+- Merged branches not getting pruned
+  ([`bf4931d`](https://github.com/wpfleger96/shell-configs/commit/bf4931dc3f0b02ec3eefc564c146ee5ba7cdcaa3))
+
+
 ## v0.3.3 (2025-12-10)
 
 ### Bug Fixes
