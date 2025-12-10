@@ -707,7 +707,8 @@ def list_shells() -> None:
 @cli.command()
 @click.option("--check", is_flag=True, help="Check for updates without installing")
 @click.option("--force", is_flag=True, help="Force reinstall even if up to date")
-def upgrade(check: bool, force: bool) -> None:
+@click.pass_context
+def upgrade(ctx: click.Context, check: bool, force: bool) -> None:
     """Upgrade shell-configs to the latest version from PyPI.
 
     Examples:
@@ -784,6 +785,7 @@ def upgrade(check: bool, force: bool) -> None:
             console.print("[yellow]Cancelled.[/yellow]")
             return
 
+    upgraded_tools = []
     for tool, _ in tool_updates:
         with console.status(f"Upgrading {tool.display_name}..."):
             try:
@@ -796,6 +798,7 @@ def upgrade(check: bool, force: bool) -> None:
 
         if success:
             if was_upgraded:
+                upgraded_tools.append(tool)
                 console.print(
                     f"[green]✓[/green] {tool.display_name} upgraded successfully!"
                 )
@@ -807,6 +810,11 @@ def upgrade(check: bool, force: bool) -> None:
             console.print(
                 f"[red]Error:[/red] {tool.display_name} upgrade failed: {msg}"
             )
+
+    if upgraded_tools:
+        console.print()
+        console.print("[cyan]Installing updated configurations...[/cyan]")
+        ctx.invoke(install, force=True)
 
 
 @cli.command()
