@@ -11,13 +11,12 @@ from dataclasses import dataclass
 
 from .installer import (
     UV_NOT_FOUND_ERROR,
-    _validate_package_name,
-    get_tool_source,
     is_command_available,
 )
 from .version import get_package_version, is_newer
 
 logger = logging.getLogger(__name__)
+GITHUB_REPO = "wpfleger96/shell-configs"
 
 
 @dataclass
@@ -30,61 +29,63 @@ class UpdateInfo:
     source: str
 
 
-def check_pypi_updates(
-    package_name: str, current_version: str, timeout: int = 10
+def check_github_updates(
+    repo: str, current_version: str, timeout: int = 10
 ) -> UpdateInfo:
-    """Check PyPI for newer version.
+    """Check GitHub tags for newer version.
 
     Args:
-        package_name: Package name on PyPI
+        repo: GitHub repository in format "owner/repo"
         current_version: Currently installed version
         timeout: Request timeout in seconds (default: 10)
 
     Returns:
         UpdateInfo with update status
     """
-    if not re.match(r"^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$", package_name):
-        return UpdateInfo(
-            has_update=False,
-            current_version=current_version,
-            latest_version=current_version,
-            source="pypi",
-        )
-
     try:
-        url = f"https://pypi.org/pypi/{package_name}/json"
+        url = f"https://api.github.com/repos/{repo}/tags"
 
         req = urllib.request.Request(url)
-        req.add_header("User-Agent", f"{package_name}/{current_version}")
+        req.add_header("User-Agent", f"shell-configs/{current_version}")
 
         with urllib.request.urlopen(req, timeout=timeout) as response:
             data = json.loads(response.read().decode())
 
-        latest_version = data["info"]["version"]
+        if not data or len(data) == 0:
+            return UpdateInfo(
+                has_update=False,
+                current_version=current_version,
+                latest_version=current_version,
+                source="github",
+            )
+
+        latest_tag = data[0]["name"]
+        latest_version = latest_tag.lstrip("v")
+
         has_update = is_newer(latest_version, current_version)
 
         return UpdateInfo(
             has_update=has_update,
             current_version=current_version,
             latest_version=latest_version,
-            source="pypi",
+            source="github",
         )
 
-    except (urllib.error.URLError, json.JSONDecodeError, KeyError) as e:
-        logger.debug(f"PyPI check failed: {e}")
+    except (urllib.error.URLError, json.JSONDecodeError, KeyError, IndexError) as e:
+        logger.debug(f"GitHub check failed: {e}")
         return UpdateInfo(
             has_update=False,
             current_version=current_version,
             latest_version=current_version,
-            source="pypi",
+            source="github",
         )
 
 
-def perform_pypi_update(package_name: str) -> tuple[bool, str, bool]:
-    """Upgrade via uv tool upgrade.
+def perform_github_update(repo_url: str) -> tuple[bool, str, bool]:
+    """Upgrade via uv tool install --force from GitHub.
 
     Args:
-        package_name: Name of package to upgrade
+        repo_url: GitHub repository URL (e.g., git+ssh://git@github.com/owner/repo.git)
 
     Returns:
         Tuple of (success, message, was_upgraded)
@@ -92,18 +93,10 @@ def perform_pypi_update(package_name: str) -> tuple[bool, str, bool]:
         - message: Human-readable status message
         - was_upgraded: True if package was actually upgraded (not already up-to-date)
     """
-    if not _validate_package_name(package_name):
-        return False, f"Invalid package name: {package_name}", False
-
     if not is_command_available("uv"):
         return False, UV_NOT_FOUND_ERROR, False
 
-    source = get_tool_source(package_name)
-
-    if source == "local":
-        cmd = ["uv", "tool", "install", package_name, "--force"]
-    else:
-        cmd = ["uv", "tool", "upgrade", package_name]
+    cmd = ["uv", "tool", "install", "--force", "--reinstall", repo_url]
 
     try:
         result = subprocess.run(
@@ -195,7 +188,7 @@ def check_tool_updates(tool: ToolSpec, timeout: int = 10) -> UpdateInfo | None:
     if current is None:
         return None
 
-    return check_pypi_updates(tool.package_name, current, timeout)
+    return check_github_updates(GITHUB_REPO, current, timeout)
 
 
 def get_tool_by_id(tool_id: str) -> ToolSpec | None:

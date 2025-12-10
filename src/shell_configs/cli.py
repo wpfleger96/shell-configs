@@ -718,8 +718,9 @@ def upgrade(ctx: click.Context, check: bool, force: bool) -> None:
     from shell_configs.bootstrap import (
         UPDATABLE_TOOLS,
         check_tool_updates,
-        perform_pypi_update,
+        perform_github_update,
     )
+    from shell_configs.bootstrap.installer import GITHUB_REPO_URL
 
     tools = [t for t in UPDATABLE_TOOLS if t.is_installed()]
 
@@ -789,7 +790,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool) -> None:
     for tool, _ in tool_updates:
         with console.status(f"Upgrading {tool.display_name}..."):
             try:
-                success, msg, was_upgraded = perform_pypi_update(tool.package_name)
+                success, msg, was_upgraded = perform_github_update(GITHUB_REPO_URL)
             except Exception as e:
                 console.print(
                     f"\n[red]Error:[/red] {tool.display_name} upgrade failed: {e}"
@@ -863,7 +864,7 @@ def setup(
             console.print("[yellow]Setup cancelled[/yellow]")
             sys.exit(0)
 
-    success, message = install_tool("shell-configs", force=force, dry_run=dry_run)
+    success, message = install_tool(force=force, dry_run=dry_run)
 
     if not success:
         console.print(f"[red]Error:[/red] {message}")

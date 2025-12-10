@@ -14,6 +14,7 @@ else:
     import tomli as tomllib
 
 UV_NOT_FOUND_ERROR = "uv not found in PATH. Install from https://docs.astral.sh/uv/"
+GITHUB_REPO_URL = "git+ssh://git@github.com/wpfleger96/shell-configs.git"
 
 
 def _validate_package_name(package_name: str) -> bool:
@@ -51,13 +52,14 @@ def get_tool_config_dir(package_name: str = "shell-configs") -> Path:
 
 
 def get_tool_source(package_name: str) -> str | None:
-    """Detect how a uv tool was installed (PyPI vs local file).
+    """Detect how a uv tool was installed (PyPI vs GitHub vs local file).
 
     Args:
         package_name: Name of the uv tool package
 
     Returns:
-        "pypi" if installed from PyPI (no path key in requirements)
+        "pypi" if installed from PyPI (no path/git key in requirements)
+        "github" if installed from GitHub (has git key with github.com URL)
         "local" if installed from local file (has path key)
         None if tool not installed or receipt file not found
     """
@@ -76,8 +78,11 @@ def get_tool_source(package_name: str) -> str | None:
             return None
 
         first_req = requirements[0]
-        if isinstance(first_req, dict) and "path" in first_req:
-            return "local"
+        if isinstance(first_req, dict):
+            if "path" in first_req:
+                return "local"
+            if "git" in first_req and "github.com" in first_req["git"]:
+                return "github"
 
         return "pypi"
 
@@ -98,29 +103,25 @@ def is_command_available(command: str) -> bool:
 
 
 def install_tool(
-    package_name: str = "shell-configs",
     force: bool = False,
     dry_run: bool = False,
 ) -> tuple[bool, str]:
-    """Install package as a uv tool from PyPI.
+    """Install shell-configs as a uv tool from GitHub.
 
     Args:
-        package_name: Name of package to install
         force: Force reinstall if already installed
         dry_run: Show what would be done without executing
 
     Returns:
         Tuple of (success, message)
     """
-    if not _validate_package_name(package_name):
-        return False, f"Invalid package name: {package_name}"
-
     if not is_command_available("uv"):
         return False, UV_NOT_FOUND_ERROR
 
-    cmd = ["uv", "tool", "install", package_name]
+    cmd = ["uv", "tool", "install", GITHUB_REPO_URL]
     if force:
         cmd.insert(3, "--force")
+        cmd.insert(4, "--reinstall")
 
     if dry_run:
         return True, f"Would run: {' '.join(cmd)}"

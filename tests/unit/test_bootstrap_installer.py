@@ -23,7 +23,7 @@ class TestInstallTool:
         monkeypatch.setattr(
             "shell_configs.bootstrap.installer.is_command_available", lambda cmd: False
         )
-        success, message = install_tool("test-package")
+        success, message = install_tool()
         assert success is False
         assert message == UV_NOT_FOUND_ERROR
 
@@ -45,7 +45,7 @@ class TestInstallTool:
             return Result()
 
         monkeypatch.setattr("subprocess.run", mock_run)
-        success, message = install_tool("test-package")
+        success, message = install_tool()
         assert success is True
         assert message == "Installation successful"
         assert len(captured_args) == 1
@@ -53,7 +53,7 @@ class TestInstallTool:
         assert "uv" in call_args
         assert "tool" in call_args
         assert "install" in call_args
-        assert "test-package" in call_args
+        assert "git+ssh://git@github.com/wpfleger96/shell-configs.git" in call_args
 
     def test_install_with_force_flag(self, monkeypatch):
         monkeypatch.setattr(
@@ -73,7 +73,7 @@ class TestInstallTool:
             return Result()
 
         monkeypatch.setattr("subprocess.run", mock_run)
-        success, message = install_tool("test-package", force=True)
+        success, message = install_tool(force=True)
         assert success is True
         assert len(captured_args) == 1
         call_args = captured_args[0][0][0]
@@ -83,7 +83,7 @@ class TestInstallTool:
         monkeypatch.setattr(
             "shell_configs.bootstrap.installer.is_command_available", lambda cmd: True
         )
-        success, message = install_tool("test-package", dry_run=True)
+        success, message = install_tool(dry_run=True)
         assert success is True
         assert "Would run:" in message
 
@@ -125,7 +125,7 @@ class TestInstallTool:
                 raise ValueError("Unexpected error")
 
         monkeypatch.setattr("subprocess.run", mock_run)
-        success, message = install_tool("test-package")
+        success, message = install_tool()
         assert success is False
         assert expected_message in message.lower()
 
@@ -139,7 +139,7 @@ class TestUninstallTool:
         monkeypatch.setattr(
             "shell_configs.bootstrap.installer.is_command_available", lambda cmd: False
         )
-        success, message = uninstall_tool("test-package")
+        success, message = uninstall_tool()
         assert success is False
         assert message == UV_NOT_FOUND_ERROR
 
@@ -161,7 +161,7 @@ class TestUninstallTool:
             return Result()
 
         monkeypatch.setattr("subprocess.run", mock_run)
-        success, message = uninstall_tool("test-package")
+        success, message = uninstall_tool()
         assert success is True
         assert message == "Uninstallation successful"
         assert len(captured_args) == 1
@@ -169,7 +169,7 @@ class TestUninstallTool:
         assert "uv" in call_args
         assert "tool" in call_args
         assert "uninstall" in call_args
-        assert "test-package" in call_args
+        assert "shell-configs" in call_args
 
     @pytest.mark.parametrize(
         "error_type,expected_message",
@@ -209,7 +209,7 @@ class TestUninstallTool:
                 raise ValueError("Unexpected error")
 
         monkeypatch.setattr("subprocess.run", mock_run)
-        success, message = uninstall_tool("test-package")
+        success, message = uninstall_tool()
         assert success is False
         assert expected_message in message.lower()
 

@@ -1,8 +1,8 @@
 """Bootstrap module for system-wide installation and auto-update functionality.
 
 This module provides utilities for:
-- Installing tools via uv (PyPI-based)
-- Checking for and applying updates from PyPI
+- Installing tools via uv (GitHub-based)
+- Checking for and applying updates from GitHub
 - Managing auto-update configuration
 
 Designed to be self-contained and easily extractable for use in other projects.
@@ -34,10 +34,10 @@ from .updater import (
     UPDATABLE_TOOLS,
     ToolSpec,
     UpdateInfo,
-    check_pypi_updates,
+    check_github_updates,
     check_tool_updates,
     get_tool_by_id,
-    perform_pypi_update,
+    perform_github_update,
 )
 from .version import get_package_version, is_newer, parse_version
 
@@ -54,10 +54,10 @@ __all__ = [
     "UPDATABLE_TOOLS",
     "ToolSpec",
     "UpdateInfo",
-    "check_pypi_updates",
+    "check_github_updates",
     "check_tool_updates",
     "get_tool_by_id",
-    "perform_pypi_update",
+    "perform_github_update",
     "AutoUpdateConfig",
     "clear_all_pending_updates",
     "clear_pending_update",
