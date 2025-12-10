@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.3.5 (2025-12-10)
+
+### Bug Fixes
+
+- Add pypi helper env var
+  ([`76397fc`](https://github.com/wpfleger96/shell-configs/commit/76397fcf8d7c2ba1120365da0f5c647bdc394448))
+
+
 ## v0.3.4 (2025-12-10)
 
 ### Bug Fixes
