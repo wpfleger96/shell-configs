@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.4.0 (2025-12-10)
+
+### Features
+
+- Make package private and only support github install
+  ([`507c321`](https://github.com/wpfleger96/shell-configs/commit/507c32135b6916d8e4964e00e810736824153aa8))
+
+
 ## v0.3.5 (2025-12-10)
 
 ### Bug Fixes
