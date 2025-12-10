@@ -98,7 +98,7 @@ _wt_main_branch() {
 _wt_is_merged() {
     local branch="$1"
     local main_branch=$(_wt_main_branch)
-    command git branch --merged "$main_branch" 2>/dev/null | grep -q "^\s*${branch}$"
+    command git branch --merged "$main_branch" 2>/dev/null | grep -q "^[*+ ]*${branch}$"
 }
 
 _wt_repo_root() {
