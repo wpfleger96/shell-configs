@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.3.1 (2025-12-10)
+
+### Bug Fixes
+
+- Sanitize dir names
+  ([`8810a0d`](https://github.com/wpfleger96/shell-configs/commit/8810a0dbde9a52dd3f5d37daedcf66b6aaebfd35))
+
+
 ## v0.3.0 (2025-12-08)
 
 ### Chores
