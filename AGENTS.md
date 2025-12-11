@@ -5,14 +5,42 @@ CLI tool to manage shell configurations (bash, zsh, git) by installing "managed 
 ## Quick Commands
 
 ```bash
-just sync              # Install dependencies
+# Setup & Quality Checks
+just sync              # Install dependencies with uv
+just                   # Default: quick quality checks (no tests)
 just check             # Quick quality checks (type, lint, format)
-just test              # Run all tests with coverage
-just test-unit         # Unit tests only
-just test-integration  # Integration tests
-just test-cli          # CLI tests
-just ci                # Full CI workflow
+just check-all         # All quality checks including tests
+just ci                # Full CI workflow (matches GitHub Actions)
 just pre-commit        # Pre-commit checks with auto-fix
+
+# Testing
+just test              # Run all tests with coverage
+just test-unit         # Unit tests only (pytest -m unit)
+just test-integration  # Integration tests (pytest -m integration)
+just test-cli          # CLI tests (pytest -m cli)
+just test-cov          # Tests with coverage report
+just test-nocov        # Tests without coverage overhead
+
+# Code Quality - Fix variants
+just lint-python       # Fix Python linting issues (ruff --fix)
+just format-python     # Auto-format Python code (ruff format)
+just format-shell      # Auto-format shell scripts (shfmt -w)
+
+# Code Quality - Check variants (CI mode)
+just type-check        # Run mypy type checking (strict mode)
+just lint-python-check # Check Python linting (ruff check)
+just lint-shell-check  # Check shell scripts (shellcheck)
+just format-python-check # Check Python formatting
+just format-shell-check  # Check shell formatting
+
+# CLI Development Helpers
+just cli-install       # Test install command (dry-run)
+just cli-status        # Test status command
+just cli-validate      # Test validate command
+
+# Installation & Upgrades
+uv run shell-configs setup     # First-time setup (sync deps + install git hooks)
+uv run shell-configs upgrade   # Check for and install updates from GitHub
 ```
 
 ## Project Structure
@@ -24,6 +52,7 @@ src/shell_configs/
 ├── manager.py          # ConfigManager for install/uninstall operations
 ├── display.py          # Rich console output utilities
 ├── completions.py      # Shell completion installation
+├── installer.py        # Legacy installer (use bootstrap instead)
 ├── shells/
 │   ├── base.py         # Abstract Shell base class
 │   ├── bash.py         # Bash implementation
@@ -31,6 +60,10 @@ src/shell_configs/
 │   ├── git.py          # Git config implementation
 │   └── registry.py     # ShellRegistry for shell lookup
 ├── bootstrap/          # System-wide install & auto-update
+│   ├── installer.py    # uv tool install utilities
+│   ├── updater.py      # GitHub update checking
+│   ├── version.py      # Version comparison
+│   └── config.py       # Auto-update config management
 └── config/             # Bundled config files (bash/, zsh/, git/)
 tests/
 ├── conftest.py         # Fixtures: temp_dir, mock_home, test_repo, cli_runner
@@ -79,6 +112,8 @@ Markers: `unit`, `integration`, `cli`, `bootstrap`
 3. **Shell formatting:** `shfmt` excludes `git-prompt.sh` (vendored file)
 4. **CLI runner width:** Tests set `COLUMNS=200` to prevent output wrapping
 5. **Type checking:** mypy strict mode enabled - full type hints required
+6. **Installation method:** Package is private - install via `uv tool install git+ssh://git@github.com/wpfleger96/shell-configs.git` (not PyPI)
+7. **Shell linting:** `shellcheck` and `shfmt` both exclude `git-prompt.sh` automatically via justfile grep filter
 
 ## Key Files by Task
 

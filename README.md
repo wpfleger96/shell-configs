@@ -14,13 +14,17 @@ Manage shell configuration files across machines with version control.
 
 ### Installation
 
-Install globally from GitHub:
+**From GitHub (Development)**
+
+Install from GitHub to get the latest development code:
 
 ```bash
-# Using uv (recommended)
 uv tool install git+ssh://git@github.com/wpfleger96/shell-configs.git
+```
 
-# Or from cloned repo
+**From Cloned Repository**
+
+```bash
 cd shell-configs
 uv run shell-configs setup
 ```

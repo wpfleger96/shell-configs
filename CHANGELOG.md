@@ -3,6 +3,17 @@
 
 ## v0.4.0 (2025-12-10)
 
+### Breaking Changes
+
+- **Removed PyPI support**: Package is now private and only available via GitHub installation
+  ([`507c321`](https://github.com/wpfleger96/shell-configs/commit/507c32135b6916d8e4964e00e810736824153aa8))
+
+  **Migration:** Uninstall the PyPI version and reinstall from GitHub:
+  ```bash
+  uv tool uninstall shell-configs
+  uv tool install git+ssh://git@github.com/wpfleger96/shell-configs.git
+  ```
+
 ### Features
 
 - Make package private and only support github install
