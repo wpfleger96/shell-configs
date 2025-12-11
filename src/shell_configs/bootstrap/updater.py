@@ -1,10 +1,8 @@
 """Update checking and application utilities."""
 
-import json
 import logging
 import re
 import subprocess
-import urllib.request
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -32,7 +30,7 @@ class UpdateInfo:
 def check_github_updates(
     repo: str, current_version: str, timeout: int = 10
 ) -> UpdateInfo:
-    """Check GitHub tags for newer version.
+    """Check GitHub tags for newer version using GitHub CLI.
 
     Args:
         repo: GitHub repository in format "owner/repo"
@@ -41,17 +39,15 @@ def check_github_updates(
 
     Returns:
         UpdateInfo with update status
+
+    Note:
+        Requires GitHub CLI (gh) to be installed and authenticated.
+        Install: https://cli.github.com
+        Authenticate: gh auth login
     """
     try:
-        url = f"https://api.github.com/repos/{repo}/tags"
-
-        req = urllib.request.Request(url)
-        req.add_header("User-Agent", f"shell-configs/{current_version}")
-
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            data = json.loads(response.read().decode())
-
-        if not data or len(data) == 0:
+        if not is_command_available("gh"):
+            logger.debug("GitHub CLI not found. Install from https://cli.github.com")
             return UpdateInfo(
                 has_update=False,
                 current_version=current_version,
@@ -59,7 +55,33 @@ def check_github_updates(
                 source="github",
             )
 
-        latest_tag = data[0]["name"]
+        result = subprocess.run(
+            ["gh", "api", f"repos/{repo}/tags", "--jq", ".[0].name"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+
+        if result.returncode != 0:
+            logger.debug(f"gh api failed: {result.stderr.strip()}")
+            return UpdateInfo(
+                has_update=False,
+                current_version=current_version,
+                latest_version=current_version,
+                source="github",
+            )
+
+        latest_tag = result.stdout.strip()
+
+        if not latest_tag:
+            logger.debug("No tags found in repository")
+            return UpdateInfo(
+                has_update=False,
+                current_version=current_version,
+                latest_version=current_version,
+                source="github",
+            )
+
         latest_version = latest_tag.lstrip("v")
 
         has_update = is_newer(latest_version, current_version)
@@ -71,7 +93,15 @@ def check_github_updates(
             source="github",
         )
 
-    except (urllib.error.URLError, json.JSONDecodeError, KeyError, IndexError) as e:
+    except subprocess.TimeoutExpired:
+        logger.debug(f"GitHub check timed out after {timeout} seconds")
+        return UpdateInfo(
+            has_update=False,
+            current_version=current_version,
+            latest_version=current_version,
+            source="github",
+        )
+    except Exception as e:
         logger.debug(f"GitHub check failed: {e}")
         return UpdateInfo(
             has_update=False,

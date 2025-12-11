@@ -1,8 +1,6 @@
 """Tests for update checking and application utilities."""
 
-import json
 import subprocess
-import urllib.error
 
 import pytest
 
@@ -17,21 +15,19 @@ class TestCheckGitHubUpdates:
 
     def test_check_github_no_update(self, monkeypatch):
         """Test when current version is up to date."""
-
-        class MockResponse:
-            def read(self):
-                return json.dumps([{"name": "v1.0.0"}]).encode()
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                pass
-
         monkeypatch.setattr(
-            "shell_configs.bootstrap.updater.urllib.request.urlopen",
-            lambda req, timeout: MockResponse(),
+            "shell_configs.bootstrap.updater.is_command_available", lambda cmd: True
         )
+
+        def mock_run(cmd, **kwargs):
+            class Result:
+                returncode = 0
+                stdout = "v1.0.0\n"
+                stderr = ""
+
+            return Result()
+
+        monkeypatch.setattr("shell_configs.bootstrap.updater.subprocess.run", mock_run)
 
         update_info = check_github_updates("owner/repo", "1.0.0")
         assert update_info.has_update is False
@@ -40,21 +36,19 @@ class TestCheckGitHubUpdates:
 
     def test_check_github_has_update(self, monkeypatch):
         """Test when newer version is available."""
-
-        class MockResponse:
-            def read(self):
-                return json.dumps([{"name": "v1.1.0"}]).encode()
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                pass
-
         monkeypatch.setattr(
-            "shell_configs.bootstrap.updater.urllib.request.urlopen",
-            lambda req, timeout: MockResponse(),
+            "shell_configs.bootstrap.updater.is_command_available", lambda cmd: True
         )
+
+        def mock_run(cmd, **kwargs):
+            class Result:
+                returncode = 0
+                stdout = "v1.1.0\n"
+                stderr = ""
+
+            return Result()
+
+        monkeypatch.setattr("shell_configs.bootstrap.updater.subprocess.run", mock_run)
 
         update_info = check_github_updates("owner/repo", "1.0.0")
         assert update_info.has_update is True
@@ -64,74 +58,78 @@ class TestCheckGitHubUpdates:
 
     def test_check_github_network_error(self, monkeypatch):
         """Test handling of network errors."""
-
-        def mock_urlopen(*args, **kwargs):
-            raise urllib.error.URLError("Network error")
-
         monkeypatch.setattr(
-            "shell_configs.bootstrap.updater.urllib.request.urlopen", mock_urlopen
+            "shell_configs.bootstrap.updater.is_command_available", lambda cmd: True
         )
+
+        def mock_run(cmd, **kwargs):
+            raise Exception("Network error")
+
+        monkeypatch.setattr("shell_configs.bootstrap.updater.subprocess.run", mock_run)
+
         update_info = check_github_updates("owner/repo", "1.0.0")
         assert update_info.has_update is False
 
     def test_check_github_no_tags(self, monkeypatch):
         """Test when repository has no tags."""
-
-        class MockResponse:
-            def read(self):
-                return json.dumps([]).encode()
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                pass
-
         monkeypatch.setattr(
-            "shell_configs.bootstrap.updater.urllib.request.urlopen",
-            lambda req, timeout: MockResponse(),
+            "shell_configs.bootstrap.updater.is_command_available", lambda cmd: True
         )
+
+        def mock_run(cmd, **kwargs):
+            class Result:
+                returncode = 0
+                stdout = "\n"
+                stderr = ""
+
+            return Result()
+
+        monkeypatch.setattr("shell_configs.bootstrap.updater.subprocess.run", mock_run)
 
         update_info = check_github_updates("owner/repo", "1.0.0")
         assert update_info.has_update is False
 
-    def test_check_github_handles_missing_name_key(self, monkeypatch):
-        """Test handling of malformed GitHub response."""
-
-        class MockResponse:
-            def read(self):
-                return json.dumps([{"commit": "abc123"}]).encode()
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                pass
-
+    def test_check_github_gh_not_installed(self, monkeypatch):
+        """Test when gh CLI is not available."""
         monkeypatch.setattr(
-            "shell_configs.bootstrap.updater.urllib.request.urlopen",
-            lambda req, timeout: MockResponse(),
+            "shell_configs.bootstrap.updater.is_command_available", lambda cmd: False
         )
+
+        update_info = check_github_updates("owner/repo", "1.0.0")
+        assert update_info.has_update is False
+        assert update_info.current_version == "1.0.0"
+        assert update_info.latest_version == "1.0.0"
+
+    def test_check_github_gh_api_failure(self, monkeypatch):
+        """Test handling of gh api failures (auth, rate limit, etc)."""
+        monkeypatch.setattr(
+            "shell_configs.bootstrap.updater.is_command_available", lambda cmd: True
+        )
+
+        def mock_run(cmd, **kwargs):
+            class Result:
+                returncode = 1
+                stdout = ""
+                stderr = "gh api failed for some reason"
+
+            return Result()
+
+        monkeypatch.setattr("shell_configs.bootstrap.updater.subprocess.run", mock_run)
+
         update_info = check_github_updates("owner/repo", "1.0.0")
         assert update_info.has_update is False
 
-    def test_check_github_handles_json_decode_error(self, monkeypatch):
-        """Test handling of invalid JSON response."""
-
-        class MockResponse:
-            def read(self):
-                return b"invalid json"
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                pass
-
+    def test_check_github_timeout(self, monkeypatch):
+        """Test handling of timeout."""
         monkeypatch.setattr(
-            "shell_configs.bootstrap.updater.urllib.request.urlopen",
-            lambda req, timeout: MockResponse(),
+            "shell_configs.bootstrap.updater.is_command_available", lambda cmd: True
         )
+
+        def mock_run(cmd, **kwargs):
+            raise subprocess.TimeoutExpired("gh", 10)
+
+        monkeypatch.setattr("shell_configs.bootstrap.updater.subprocess.run", mock_run)
+
         update_info = check_github_updates("owner/repo", "1.0.0")
         assert update_info.has_update is False
 
