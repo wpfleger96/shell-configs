@@ -1,18 +1,20 @@
 # CHANGELOG
 
 
+## v0.4.1 (2025-12-11)
+
+### Bug Fixes
+
+- Remove auto fetch
+  ([`beeb310`](https://github.com/wpfleger96/shell-configs/commit/beeb3101c770cdd1038bfef5da0d9db452afdd88))
+
+### Chores
+
+- Docs
+  ([`406a5fb`](https://github.com/wpfleger96/shell-configs/commit/406a5fba773289934ea5b6ec40c09b3300ab86d9))
+
+
 ## v0.4.0 (2025-12-10)
-
-### Breaking Changes
-
-- **Removed PyPI support**: Package is now private and only available via GitHub installation
-  ([`507c321`](https://github.com/wpfleger96/shell-configs/commit/507c32135b6916d8e4964e00e810736824153aa8))
-
-  **Migration:** Uninstall the PyPI version and reinstall from GitHub:
-  ```bash
-  uv tool uninstall shell-configs
-  uv tool install git+ssh://git@github.com/wpfleger96/shell-configs.git
-  ```
 
 ### Features
 
