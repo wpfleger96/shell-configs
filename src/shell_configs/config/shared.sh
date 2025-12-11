@@ -62,25 +62,6 @@ git() {
     fi
 }
 
-### Git - Auto Fetch ###
-_git_auto_fetch() {
-    local git_dir fetch_head cooldown_seconds=300
-
-    git_dir=$(command git rev-parse --git-dir 2>/dev/null) || return
-    fetch_head="$git_dir/FETCH_HEAD"
-
-    if [[ -f "$fetch_head" ]]; then
-        local last_fetch
-        last_fetch=$(stat -f %m "$fetch_head" 2>/dev/null || stat -c %Y "$fetch_head" 2>/dev/null)
-        local now=$(date +%s)
-        if ((now - last_fetch < cooldown_seconds)); then
-            return
-        fi
-    fi
-
-    command git fetch --quiet &>/dev/null &
-}
-
 ### Git Worktree Management ###
 export WT_DIR=".worktrees"
 export WT_EDITOR="cursor"
