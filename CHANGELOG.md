@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.4.2 (2025-12-11)
+
+### Bug Fixes
+
+- Cant query public API for private repo
+  ([`dfd1d4f`](https://github.com/wpfleger96/shell-configs/commit/dfd1d4fea4749d1805638db451df6ad6583db37d))
+
+
 ## v0.4.1 (2025-12-11)
 
 ### Bug Fixes
