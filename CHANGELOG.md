@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.4.3 (2025-12-18)
+
+### Bug Fixes
+
+- More git aliases
+  ([`36165b4`](https://github.com/wpfleger96/shell-configs/commit/36165b4480ecec939bce8b376ece89d5c70db955))
+
+
 ## v0.4.2 (2025-12-11)
 
 ### Bug Fixes
