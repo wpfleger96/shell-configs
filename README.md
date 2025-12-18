@@ -65,12 +65,15 @@ choco install just
 
 | Command | Description | Example |
 |---------|-------------|---------|
+| `setup` | Install shell-configs permanently (with auto-upgrade check) | `uv run shell-configs setup` |
 | `install` | Install or update managed sections | `uv run shell-configs install` |
 | `status` | Show sync status (✓ Synced, ⚠ Outdated, ✗ Not installed) | `uv run shell-configs status` |
 | `diff` | Show differences between repository and installed configs | `uv run shell-configs diff` |
 | `uninstall` | Remove managed sections | `uv run shell-configs uninstall` |
 | `validate` | Validate configuration file syntax | `uv run shell-configs validate` |
 | `list-shells` | List all available shell configurations | `uv run shell-configs list-shells` |
+| `info` | Show installation source and version info | `shell-configs info` |
+| `upgrade` | Check for and install available updates | `shell-configs upgrade` |
 
 ### Common Options
 

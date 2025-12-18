@@ -41,6 +41,7 @@ just cli-validate      # Test validate command
 # Installation & Upgrades
 uv run shell-configs setup     # First-time setup (sync deps + install git hooks)
 uv run shell-configs upgrade   # Check for and install updates from GitHub
+uv run shell-configs info      # Show installation source and version info
 ```
 
 ## Project Structure
