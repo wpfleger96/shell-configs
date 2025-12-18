@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.4.6 (2025-12-18)
+
+### Bug Fixes
+
+- Expose completions functionality in CLI and cleanup dead/duplicated code
+  ([`07f3532`](https://github.com/wpfleger96/shell-configs/commit/07f35323228204389f4c4afae21d8fc5169f1525))
+
+### Chores
+
+- Docs
+  ([`0bd2265`](https://github.com/wpfleger96/shell-configs/commit/0bd2265c4d0d5a6012d1e837d317f8d0729bdc9f))
+
+- More docs and cleanup
+  ([`c7163d5`](https://github.com/wpfleger96/shell-configs/commit/c7163d565cbec8a20526b5e450878af5265ef881))
+
+
 ## v0.4.5 (2025-12-18)
 
 ### Bug Fixes
