@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.4.4 (2025-12-18)
+
+### Bug Fixes
+
+- Copying ideas from ai-rules (add info command and setup should upgrade)
+  ([`ffbe028`](https://github.com/wpfleger96/shell-configs/commit/ffbe0286b5b563b71b64834099c4098ef40e7e7d))
+
+
 ## v0.4.3 (2025-12-18)
 
 ### Bug Fixes
