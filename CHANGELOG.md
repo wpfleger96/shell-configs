@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.4.5 (2025-12-18)
+
+### Bug Fixes
+
+- Remove unneccessary hook
+  ([`6349bed`](https://github.com/wpfleger96/shell-configs/commit/6349bed937556a8c1df17910af3863322af8e42b))
+
+
 ## v0.4.4 (2025-12-18)
 
 ### Bug Fixes
