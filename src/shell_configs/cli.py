@@ -336,11 +336,10 @@ def install(
         return
 
     if not force and not dry_run:
-        # Show diffs before confirmation
         has_diffs = _display_diffs_for_shells(selected_shells, config_reader, manager)
 
         if has_diffs:
-            console.print()  # Blank line before prompt
+            console.print()
             if not click.confirm("Apply these changes?"):
                 print_info("Installation cancelled")
                 return
@@ -819,6 +818,59 @@ def upgrade(ctx: click.Context, check: bool, force: bool) -> None:
 
 
 @cli.command()
+def info() -> None:
+    """Show installation source and version info for shell-configs.
+
+    Displays how shell-configs was installed (GitHub) along with current
+    version and update availability.
+    """
+    from rich.table import Table
+
+    from shell_configs.bootstrap import (
+        UPDATABLE_TOOLS,
+        check_tool_updates,
+    )
+    from shell_configs.bootstrap.installer import get_tool_source
+
+    table = Table(title="shell-configs Installation Info", show_header=True)
+    table.add_column("Tool", style="cyan")
+    table.add_column("Source", style="bold")
+    table.add_column("Version")
+    table.add_column("Update")
+
+    has_updates = False
+
+    for tool in UPDATABLE_TOOLS:
+        tool_name = tool.display_name
+
+        if not tool.is_installed():
+            table.add_row(tool_name, "-", "-", "[dim](not installed)[/dim]")
+            continue
+
+        source = get_tool_source(tool.package_name)
+        source_display = source if source else "[dim]unknown[/dim]"
+
+        version = tool.get_version()
+        version_display = version if version else "[dim]unknown[/dim]"
+
+        update_display = "-"
+        try:
+            update_info = check_tool_updates(tool, timeout=5)
+            if update_info and update_info.has_update:
+                update_display = f"[cyan]{update_info.latest_version} available[/cyan]"
+                has_updates = True
+        except Exception:
+            update_display = "[dim](check failed)[/dim]"
+
+        table.add_row(tool_name, source_display, version_display, update_display)
+
+    console.print(table)
+
+    if has_updates:
+        console.print("\n[dim]Run 'shell-configs upgrade' to install updates.[/dim]")
+
+
+@cli.command()
 @click.option("--force", is_flag=True, help="Skip confirmation prompts")
 @click.option("--dry-run", is_flag=True, help="Show what would be done")
 @click.option(
@@ -846,6 +898,11 @@ def setup(
         get_tool_config_dir,
         install_tool,
     )
+    from shell_configs.bootstrap.updater import (
+        check_tool_updates,
+        get_tool_by_id,
+        perform_github_update,
+    )
     from shell_configs.completions import (
         detect_shell,
         get_supported_shells,
@@ -859,18 +916,62 @@ def setup(
         "[dim]This allows you to run 'shell-configs' from any directory.[/dim]\n"
     )
 
-    if not force and not dry_run:
-        if not Confirm.ask("Install shell-configs permanently?", default=True):
-            console.print("[yellow]Setup cancelled[/yellow]")
-            sys.exit(0)
+    shell_configs_tool = get_tool_by_id("shell-configs")
+    tool_install_success = False
 
-    success, message = install_tool(force=force, dry_run=dry_run)
+    if shell_configs_tool and shell_configs_tool.is_installed():
+        try:
+            update_info = check_tool_updates(shell_configs_tool, timeout=10)
+            if update_info and update_info.has_update:
+                if dry_run:
+                    console.print(
+                        f"[dim]Would upgrade shell-configs {update_info.current_version} → {update_info.latest_version}[/dim]"
+                    )
+                    tool_install_success = True
+                else:
+                    if not force and not Confirm.ask(
+                        f"Upgrade shell-configs {update_info.current_version} → {update_info.latest_version}?",
+                        default=True,
+                    ):
+                        console.print("[yellow]Skipped shell-configs upgrade[/yellow]")
+                        tool_install_success = True
+                    else:
+                        from shell_configs.bootstrap.installer import GITHUB_REPO_URL
 
-    if not success:
-        console.print(f"[red]Error:[/red] {message}")
+                        success, msg, _ = perform_github_update(GITHUB_REPO_URL)
+                        if success:
+                            console.print(
+                                f"[green]✓[/green] Upgraded shell-configs ({update_info.current_version} → {update_info.latest_version})"
+                            )
+                            tool_install_success = True
+                        else:
+                            console.print(
+                                f"[red]Error:[/red] Failed to upgrade shell-configs: {msg}"
+                            )
+            else:
+                console.print("[green]✓[/green] shell-configs is already up to date")
+                tool_install_success = True
+        except Exception as e:
+            logger.debug(f"Failed to check for updates: {e}")
+            tool_install_success = False
+
+    if not tool_install_success:
+        if not force and not dry_run:
+            if not Confirm.ask("Install shell-configs permanently?", default=True):
+                console.print("[yellow]Setup cancelled[/yellow]")
+                sys.exit(0)
+
+        success, message = install_tool(force=force, dry_run=dry_run)
+
+        if not success:
+            console.print(f"[red]Error:[/red] {message}")
+            sys.exit(1)
+
+        console.print(f"[green]✓[/green] {message}")
+        tool_install_success = True
+
+    if not tool_install_success:
         sys.exit(1)
-
-    console.print(f"[green]✓[/green] {message}")
 
     config_dir = get_tool_config_dir("shell-configs") if not dry_run else None
 
@@ -913,8 +1014,11 @@ def setup(
                 else:
                     console.print(f"[yellow]⚠[/yellow] {message}")
 
-    console.print("\n[green bold]✓ Setup complete![/green bold]")
-    console.print("You can now run shell-configs from anywhere.")
+    if dry_run:
+        console.print("\n[dim]Dry run complete - no changes were made.[/dim]")
+    else:
+        console.print("\n[green bold]✓ Setup complete![/green bold]")
+        console.print("You can now run shell-configs from anywhere.")
 
 
 def main() -> None:

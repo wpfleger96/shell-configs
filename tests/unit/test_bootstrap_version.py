@@ -29,14 +29,12 @@ class TestIsNewer:
     @pytest.mark.parametrize(
         "latest,current,expected",
         [
-            # Basic version comparisons
             ("1.2.0", "1.1.0", True),  # newer minor
             ("1.1.0", "1.2.0", False),  # older
             ("1.2.0", "1.2.0", False),  # same
             ("2.0.0", "1.9.9", True),  # major bump
             ("1.3.0", "1.2.9", True),  # minor bump
             ("1.2.4", "1.2.3", True),  # patch bump
-            # Version prefix variations
             ("v1.2.0", "v1.1.0", True),  # both with v prefix
             ("v1.2.0", "1.1.0", True),  # only latest with v prefix
             ("1.2.0", "v1.1.0", True),  # only current with v prefix
