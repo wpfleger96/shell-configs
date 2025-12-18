@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.4.7 (2025-12-18)
+
+### Bug Fixes
+
+- Add completions status command
+  ([`bffa83c`](https://github.com/wpfleger96/shell-configs/commit/bffa83ca0d6b93e8d45e271372bc8ba481effdce))
+
+
 ## v0.4.6 (2025-12-18)
 
 ### Bug Fixes
