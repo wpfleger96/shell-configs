@@ -2,7 +2,27 @@
 
 CLI tool to manage shell configurations (bash, zsh, git) by installing "managed sections" into user config files while preserving existing content.
 
-## Quick Commands
+## Application Commands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `setup` | First-time setup (sync deps + install git hooks) | `uv run shell-configs setup` |
+| `install` | Install or update managed sections | `uv run shell-configs install` |
+| `status` | Show sync status (✓ Synced, ⚠ Outdated, ✗ Not installed) | `uv run shell-configs status` |
+| `diff` | Show differences between repository and installed configs | `uv run shell-configs diff` |
+| `uninstall` | Remove managed sections | `uv run shell-configs uninstall` |
+| `validate` | Validate configuration file syntax | `uv run shell-configs validate` |
+| `list-shells` | List all available shell configurations | `uv run shell-configs list-shells` |
+| `info` | Show installation source and version info | `shell-configs info` |
+| `upgrade` | Check for and install available updates | `shell-configs upgrade` |
+| `completions install` | Install shell tab completion | `shell-configs completions install` |
+| `completions bash` | Output bash completion script | `shell-configs completions bash` |
+| `completions zsh` | Output zsh completion script | `shell-configs completions zsh` |
+| `completions uninstall` | Remove shell completion | `shell-configs completions uninstall` |
+
+**Common options:** `--shells bash,zsh`, `--dry-run`, `--force`
+
+## Development Commands
 
 ```bash
 # Setup & Quality Checks
@@ -37,11 +57,6 @@ just format-shell-check  # Check shell formatting
 just cli-install       # Test install command (dry-run)
 just cli-status        # Test status command
 just cli-validate      # Test validate command
-
-# Installation & Upgrades
-uv run shell-configs setup     # First-time setup (sync deps + install git hooks)
-uv run shell-configs upgrade   # Check for and install updates from GitHub
-uv run shell-configs info      # Show installation source and version info
 ```
 
 ## Project Structure
@@ -52,8 +67,7 @@ src/shell_configs/
 ├── config.py           # ConfigReader for reading configs
 ├── manager.py          # ConfigManager for install/uninstall operations
 ├── display.py          # Rich console output utilities
-├── completions.py      # Shell completion installation
-├── installer.py        # Legacy installer (use bootstrap instead)
+├── completions.py      # Shell completion management (install/uninstall)
 ├── shells/
 │   ├── base.py         # Abstract Shell base class
 │   ├── bash.py         # Bash implementation
@@ -65,7 +79,17 @@ src/shell_configs/
 │   ├── updater.py      # GitHub update checking
 │   ├── version.py      # Version comparison
 │   └── config.py       # Auto-update config management
-└── config/             # Bundled config files (bash/, zsh/, git/)
+└── config/             # Bundled config files
+    ├── bash/
+    │   └── bashrc      # Main bash config
+    ├── zsh/
+    │   └── zshrc       # Main zsh config
+    ├── git/
+    │   └── ignore      # Global gitignore
+    ├── shared-scripts/
+    │   └── git-prompt.sh  # Git prompt script (vendored)
+    ├── shared.sh       # Shared shell config (bash/zsh)
+    └── shared.gitconfig   # Shared git config
 tests/
 ├── conftest.py         # Fixtures: temp_dir, mock_home, test_repo, cli_runner
 ├── unit/               # Unit tests (-m unit)
@@ -115,6 +139,11 @@ Markers: `unit`, `integration`, `cli`, `bootstrap`
 5. **Type checking:** mypy strict mode enabled - full type hints required
 6. **Installation method:** Package is private - install via `uv tool install git+ssh://git@github.com/wpfleger96/shell-configs.git` (not PyPI)
 7. **Shell linting:** `shellcheck` and `shfmt` both exclude `git-prompt.sh` automatically via justfile grep filter
+8. **GitHub CLI Required (Private Repo):** This repository is PRIVATE. All GitHub operations (PRs, issues, releases, checks) MUST use `gh` CLI commands with authentication. Standard GitHub API calls will fail. Examples:
+   - Create PR: `gh pr create --title "..." --body "..."`
+   - View issue: `gh issue view 123`
+   - Check PR status: `gh pr checks`
+   - **Never** use `curl https://api.github.com/...` directly
 
 ## Key Files by Task
 
@@ -124,4 +153,5 @@ Markers: `unit`, `integration`, `cli`, `bootstrap`
 | Add shell type | `src/shell_configs/shells/` + `registry.py` |
 | Change install behavior | `src/shell_configs/manager.py` |
 | Add bundled config | `src/shell_configs/config/{shell}/` |
+| Modify completion logic | `src/shell_configs/completions.py` |
 | Fix test fixtures | `tests/conftest.py` |

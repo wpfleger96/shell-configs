@@ -74,6 +74,7 @@ choco install just
 | `list-shells` | List all available shell configurations | `uv run shell-configs list-shells` |
 | `info` | Show installation source and version info | `shell-configs info` |
 | `upgrade` | Check for and install available updates | `shell-configs upgrade` |
+| `completions` | Manage shell tab completion (bash, zsh, install, uninstall) | `shell-configs completions install` |
 
 ### Common Options
 
@@ -87,20 +88,17 @@ choco install just
 
 ```
 shell-configs/
-├── config/
-│   ├── bash/
-│   │   ├── bashrc              # Main bash config
-│   │   └── *.sh                # Additional bash scripts → ~/.bash/
-│   ├── zsh/
-│   │   ├── zshrc               # Main zsh config
-│   │   └── *.sh                # Additional zsh scripts → ~/.zsh/
-│   ├── git/
-│   │   ├── ignore              # Global gitignore → ~/.config/git/
-│   │   └── *                   # Other git configs → ~/.config/git/
-│   ├── shared-scripts/
-│   │   └── *.sh                # Shared scripts → ~/.bash/ and ~/.zsh/
-│   ├── shared.sh               # Shared shell config (bash/zsh)
-│   └── shared.gitconfig        # Shared git config
+└── config/
+    ├── bash/
+    │   └── bashrc              # Main bash config
+    ├── zsh/
+    │   └── zshrc               # Main zsh config
+    ├── git/
+    │   └── ignore              # Global gitignore → ~/.config/git/
+    ├── shared-scripts/
+    │   └── git-prompt.sh       # Git prompt script (vendored)
+    ├── shared.sh               # Shared shell config (bash/zsh)
+    └── shared.gitconfig        # Shared git config
 ```
 
 ## License

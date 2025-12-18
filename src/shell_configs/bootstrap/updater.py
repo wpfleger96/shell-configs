@@ -6,12 +6,13 @@ import subprocess
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from importlib.metadata import version
 
 from .installer import (
     UV_NOT_FOUND_ERROR,
     is_command_available,
 )
-from .version import get_package_version, is_newer
+from .version import is_newer
 
 logger = logging.getLogger(__name__)
 GITHUB_REPO = "wpfleger96/shell-configs"
@@ -195,7 +196,7 @@ UPDATABLE_TOOLS: list[ToolSpec] = [
         tool_id="shell-configs",
         package_name="shell-configs",
         display_name="shell-configs",
-        get_version=lambda: get_package_version("shell-configs"),
+        get_version=lambda: version("shell-configs"),
         is_installed=lambda: True,
     ),
 ]
