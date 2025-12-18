@@ -524,6 +524,36 @@ def status(shells: list[str] | None) -> None:
 
     console.print(table)
 
+    console.print()
+
+    console.print("[bold cyan]Shell Completions[/bold cyan]\n")
+    from shell_configs.completions import (
+        detect_shell,
+        find_config_file,
+        get_supported_shells,
+        is_completion_installed,
+    )
+
+    detected_shell = detect_shell()
+    if detected_shell:
+        config_path = find_config_file(detected_shell)
+        if config_path and is_completion_installed(config_path):
+            console.print(
+                f"  [green]✓[/green] {detected_shell} completion installed ({config_path})"
+            )
+        else:
+            console.print(
+                f"  [yellow]○[/yellow] {detected_shell} completion not installed "
+                "(run: shell-configs completions install)"
+            )
+    else:
+        supported = ", ".join(get_supported_shells())
+        console.print(
+            f"  [dim]Shell completion not available for your shell (only {supported} supported)[/dim]"
+        )
+
+    console.print()
+
 
 @cli.command()
 @click.option(
@@ -1039,6 +1069,51 @@ def completions_uninstall(shell: str | None) -> None:
     else:
         console.print(f"[red]Error:[/red] {message}")
         sys.exit(1)
+
+
+@completions.command(name="status")
+def completions_status() -> None:
+    """Show shell completion installation status."""
+    from shell_configs.completions import (
+        detect_shell,
+        find_config_file,
+        get_supported_shells,
+        is_completion_installed,
+    )
+
+    detected_shell = detect_shell()
+    console.print("[bold cyan]Shell Completions Status[/bold cyan]\n")
+
+    if detected_shell:
+        console.print(f"Detected shell: [cyan]{detected_shell}[/cyan]\n")
+    else:
+        console.print("[yellow]No supported shell detected[/yellow]\n")
+
+    from rich.table import Table
+
+    table = Table(show_header=True)
+    table.add_column("Shell")
+    table.add_column("Status")
+    table.add_column("Config File")
+
+    for shell in get_supported_shells():
+        config_path = find_config_file(shell)
+
+        if config_path is None:
+            status = "[dim]-[/dim]"
+            config_str = "[dim]No config file found[/dim]"
+        elif is_completion_installed(config_path):
+            status = "[green]✓[/green]"
+            config_str = str(config_path)
+        else:
+            status = "[yellow]○[/yellow]"
+            config_str = f"{config_path} [dim](not installed)[/dim]"
+
+        shell_name = f"[bold]{shell}[/bold]" if shell == detected_shell else shell
+        table.add_row(shell_name, status, config_str)
+
+    console.print(table)
+    console.print("\n[dim]To install: shell-configs completions install[/dim]")
 
 
 def main() -> None:
