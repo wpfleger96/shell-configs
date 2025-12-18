@@ -545,94 +545,7 @@ def diff(shells: list[str] | None) -> None:
         print_warning("No shell configurations found")
         return
 
-    found_diffs = False
-
-    for shell in selected_shells:
-        for config_file in shell.get_config_files():
-            repo_content = config_reader.get_config_content(
-                shell.name, config_file.repo_config_name
-            )
-            if repo_content is None:
-                continue
-
-            shared_content = None
-            if shell.supports_shared_config():
-                shared_content = config_reader.get_shared_config_content(shell.name)
-
-            repo_content = manager.combine_content(shared_content, repo_content)
-
-            section = manager.extract_managed_section(config_file.path)
-
-            if section is None:
-                console.print(
-                    f"\n[bold cyan]{shell.display_name}[/bold cyan]: {config_file.path}"
-                )
-                console.print("[yellow]Not installed[/yellow]")
-                found_diffs = True
-                continue
-
-            if section.content.strip() == repo_content.strip():
-                continue
-
-            found_diffs = True
-            console.print(
-                f"\n[bold cyan]{shell.display_name}[/bold cyan]: {config_file.path}"
-            )
-
-            installed_lines = section.content.splitlines(keepends=True)
-            repo_lines = repo_content.splitlines(keepends=True)
-
-            diff_lines = difflib.unified_diff(
-                installed_lines,
-                repo_lines,
-                fromfile="Installed",
-                tofile="Repository",
-                lineterm="",
-            )
-
-            diff_text = "\n".join(diff_lines)
-            if diff_text:
-                syntax = Syntax(diff_text, "diff", theme="monokai")
-                console.print(syntax)
-
-        additional_files = shell.get_additional_files()
-        for additional_file in additional_files:
-            if not additional_file.target_path.exists():
-                console.print(
-                    f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
-                )
-                console.print("[yellow]Not installed[/yellow]")
-                found_diffs = True
-                continue
-
-            if manager.files_match(
-                additional_file.source_path, additional_file.target_path
-            ):
-                continue
-
-            found_diffs = True
-            console.print(
-                f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
-            )
-
-            installed_content = additional_file.target_path.read_text()
-            repo_content = additional_file.source_path.read_text()
-
-            installed_lines = installed_content.splitlines(keepends=True)
-            repo_lines = repo_content.splitlines(keepends=True)
-
-            diff_lines = difflib.unified_diff(
-                installed_lines,
-                repo_lines,
-                fromfile="Installed",
-                tofile="Repository",
-                lineterm="",
-            )
-
-            diff_text = "\n".join(diff_lines)
-            if diff_text:
-                syntax = Syntax(diff_text, "diff", theme="monokai")
-                console.print(syntax)
+    found_diffs = _display_diffs_for_shells(selected_shells, config_reader, manager)
 
     if not found_diffs:
         print_info("All configurations are in sync")
@@ -708,7 +621,7 @@ def list_shells() -> None:
 @click.option("--force", is_flag=True, help="Force reinstall even if up to date")
 @click.pass_context
 def upgrade(ctx: click.Context, check: bool, force: bool) -> None:
-    """Upgrade shell-configs to the latest version from PyPI.
+    """Upgrade shell-configs to the latest version from GitHub.
 
     Examples:
         shell-configs upgrade             # Check and install updates
@@ -1019,6 +932,113 @@ def setup(
     else:
         console.print("\n[green bold]✓ Setup complete![/green bold]")
         console.print("You can now run shell-configs from anywhere.")
+
+
+@cli.group()
+def completions() -> None:
+    """Manage shell tab completion."""
+    pass
+
+
+from shell_configs.completions import get_supported_shells
+
+_SUPPORTED_SHELLS = list(get_supported_shells())
+
+
+@completions.command(name="bash")
+def completions_bash() -> None:
+    """Output bash completion script for manual installation."""
+    from shell_configs.completions import generate_completion_script
+
+    try:
+        script = generate_completion_script("bash")
+        console.print(script)
+        console.print(
+            "\n[dim]To install: Add the above to your ~/.bashrc or run:[/dim]"
+        )
+        console.print("[dim]  shell-configs completions install[/dim]")
+    except Exception as e:
+        console.print(f"[red]Error generating completion script:[/red] {e}")
+        sys.exit(1)
+
+
+@completions.command(name="zsh")
+def completions_zsh() -> None:
+    """Output zsh completion script for manual installation."""
+    from shell_configs.completions import generate_completion_script
+
+    try:
+        script = generate_completion_script("zsh")
+        console.print(script)
+        console.print("\n[dim]To install: Add the above to your ~/.zshrc or run:[/dim]")
+        console.print("[dim]  shell-configs completions install[/dim]")
+    except Exception as e:
+        console.print(f"[red]Error generating completion script:[/red] {e}")
+        sys.exit(1)
+
+
+@completions.command(name="install")
+@click.option(
+    "--shell",
+    type=click.Choice(_SUPPORTED_SHELLS, case_sensitive=False),
+    help="Shell type (auto-detected if not specified)",
+)
+def completions_install(shell: str | None) -> None:
+    """Install shell completion to config file."""
+    from shell_configs.completions import detect_shell, install_completion
+
+    if shell is None:
+        shell = detect_shell()
+        if shell is None:
+            console.print(
+                "[red]Error:[/red] Could not detect shell. Please specify with --shell"
+            )
+            sys.exit(1)
+        console.print(f"[dim]Detected shell:[/dim] {shell}")
+
+    success, message = install_completion(shell, dry_run=False)
+
+    if success:
+        console.print(f"[green]✓[/green] {message}")
+    else:
+        console.print(f"[red]Error:[/red] {message}")
+        sys.exit(1)
+
+
+@completions.command(name="uninstall")
+@click.option(
+    "--shell",
+    type=click.Choice(_SUPPORTED_SHELLS, case_sensitive=False),
+    help="Shell type (auto-detected if not specified)",
+)
+def completions_uninstall(shell: str | None) -> None:
+    """Remove shell completion from config file."""
+    from shell_configs.completions import (
+        detect_shell,
+        find_config_file,
+        uninstall_completion,
+    )
+
+    if shell is None:
+        shell = detect_shell()
+        if shell is None:
+            console.print(
+                "[red]Error:[/red] Could not detect shell. Please specify with --shell"
+            )
+            sys.exit(1)
+
+    config_path = find_config_file(shell)
+    if config_path is None:
+        console.print(f"[red]Error:[/red] No {shell} config file found")
+        sys.exit(1)
+
+    success, message = uninstall_completion(config_path)
+
+    if success:
+        console.print(f"[green]✓[/green] {message}")
+    else:
+        console.print(f"[red]Error:[/red] {message}")
+        sys.exit(1)
 
 
 def main() -> None:

@@ -51,19 +51,6 @@ class ConfigReader:
         content = config_path.read_text()
         return content.rstrip("\n")
 
-    def has_config(self, shell_name: str, config_name: str) -> bool:
-        """Check if a configuration file exists.
-
-        Args:
-            shell_name: Name of the shell
-            config_name: Name of the config file
-
-        Returns:
-            True if the config file exists
-        """
-        config_path = self.config_dir / shell_name / config_name
-        return config_path.exists()
-
     def get_available_shells(self) -> list[str]:
         """Get a list of available shell configurations.
 

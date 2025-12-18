@@ -470,7 +470,8 @@ class ConfigManager:
             with os.fdopen(fd, "w") as f:
                 f.write(content)
 
-            shutil.copystat(file_path, temp_path) if file_path.exists() else None
+            if file_path.exists():
+                shutil.copystat(file_path, temp_path)
             shutil.move(temp_path, file_path)
         except Exception:
             if os.path.exists(temp_path):
