@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.5.0 (2025-12-19)
+
+### Features
+
+- Add package management support with platform-dependent auto install
+  ([`1613719`](https://github.com/wpfleger96/shell-configs/commit/16137198dbbac5ee0d67b89be2f7ac1c12f4f610))
+
+
 ## v0.4.8 (2025-12-19)
 
 ### Bug Fixes
