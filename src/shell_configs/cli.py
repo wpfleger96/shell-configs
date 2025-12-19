@@ -27,6 +27,13 @@ from shell_configs.display import (
     print_warning,
 )
 from shell_configs.manager import ConfigManager, OperationResult
+from shell_configs.packages import (
+    get_package_manager,
+    is_macos,
+    load_packages,
+    sort_packages_for_install,
+    sort_packages_for_uninstall,
+)
 from shell_configs.shells.base import Shell
 from shell_configs.shells.registry import ShellRegistry
 
@@ -335,6 +342,7 @@ def install(
         print_warning("No shells to install")
         return
 
+    has_diffs = False
     if not force and not dry_run:
         has_diffs = _display_diffs_for_shells(selected_shells, config_reader, manager)
 
@@ -343,9 +351,6 @@ def install(
             if not click.confirm("Apply these changes?"):
                 print_info("Installation cancelled")
                 return
-        else:
-            print_info("All configurations already in sync")
-            return
 
     results = {}
     additional_file_results = {}
@@ -408,6 +413,53 @@ def install(
 
     if total_success > 0 and not dry_run:
         print_info(f"Successfully installed/updated {total_success} file(s)")
+    elif not has_diffs and not dry_run:
+        print_info("All configurations already in sync")
+
+    if not dry_run:
+        pkg_manager = get_package_manager()
+        if pkg_manager:
+            try:
+                packages = load_packages()
+                missing = [pkg for pkg in packages if not pkg_manager.is_installed(pkg)]
+
+                if missing:
+                    console.print()
+                    console.print(
+                        f"[yellow]⚠[/yellow] {len(missing)}/{len(packages)} packages missing"
+                    )
+
+                    if force or Confirm.ask("Install missing packages?", default=True):
+                        console.print()
+                        total = len(missing)
+                        for i, pkg in enumerate(missing, start=1):
+                            console.print(
+                                f"[dim][{i}/{total}] Installing {pkg.name}...[/dim]"
+                            )
+                            success, message = pkg_manager.install(pkg, dry_run=False)
+
+                            if success:
+                                console.print(f"[green]✓[/green] {pkg.name}")
+                            else:
+                                console.print(f"[red]✗[/red] {pkg.name}: {message}")
+
+                            if i < total:
+                                console.print()
+
+                        console.print(
+                            f"\n[green]✓[/green] Package installation complete ({total} packages)"
+                        )
+                    else:
+                        print_info(
+                            "Skipping package installation. Run 'shell-configs packages install' later."
+                        )
+                elif not has_diffs:
+                    console.print()
+                    console.print(
+                        f"[green]✓[/green] All {len(packages)} packages already installed"
+                    )
+            except Exception as e:
+                console.print(f"\n[red]Error checking packages:[/red] {e}")
 
 
 @cli.command()
@@ -551,6 +603,38 @@ def status(shells: list[str] | None) -> None:
         console.print(
             f"  [dim]Shell completion not available for your shell (only {supported} supported)[/dim]"
         )
+
+    console.print()
+
+    console.print("[bold cyan]Packages[/bold cyan]\n")
+
+    pkg_manager = get_package_manager()
+    if pkg_manager:
+        try:
+            packages = load_packages()
+            installed = []
+            missing = []
+            for pkg in packages:
+                if pkg_manager.is_installed(pkg):
+                    installed.append(pkg)
+                else:
+                    missing.append(pkg)
+
+            if not missing:
+                console.print(
+                    f"  [green]✓[/green] {len(installed)}/{len(packages)} packages installed ({pkg_manager.display_name})"
+                )
+            else:
+                console.print(
+                    f"  [yellow]⚠[/yellow] {len(installed)}/{len(packages)} packages installed ({pkg_manager.display_name})"
+                )
+                console.print(
+                    "  [dim]Run 'shell-configs packages status' for details[/dim]"
+                )
+        except Exception as e:
+            console.print(f"  [red]✗[/red] Error checking packages: {e}")
+    else:
+        console.print("  [dim]No package manager available[/dim]")
 
     console.print()
 
@@ -822,6 +906,7 @@ def info() -> None:
     help="Comma-separated shells to install",
 )
 @click.option("--skip-completions", is_flag=True, help="Skip shell completion setup")
+@click.option("--skip-packages", is_flag=True, help="Skip package installation")
 @click.pass_context
 def setup(
     ctx: click.Context,
@@ -829,6 +914,7 @@ def setup(
     dry_run: bool,
     shells: list[str] | None,
     skip_completions: bool,
+    skip_packages: bool,
 ) -> None:
     """One-command setup for shell-configs.
 
@@ -852,8 +938,15 @@ def setup(
         install_completion,
     )
 
+    if not skip_packages:
+        console.print("\n[bold cyan]Step 1/4: Install required packages[/bold cyan]")
+        console.print(
+            "[dim]Installing system packages needed by shell configurations.[/dim]\n"
+        )
+        ctx.invoke(packages_install, dry_run=dry_run, force=force)
+
     console.print(
-        "\n[bold cyan]Step 1/3: Install shell-configs system-wide[/bold cyan]"
+        "\n[bold cyan]Step 2/4: Install shell-configs system-wide[/bold cyan]"
     )
     console.print(
         "[dim]This allows you to run 'shell-configs' from any directory.[/dim]\n"
@@ -919,7 +1012,7 @@ def setup(
     config_dir = get_tool_config_dir("shell-configs") if not dry_run else None
 
     console.print(
-        "\n[bold cyan]Step 2/3: Installing shell configurations[/bold cyan]\n"
+        "\n[bold cyan]Step 3/4: Installing shell configurations[/bold cyan]\n"
     )
 
     ctx.invoke(
@@ -931,7 +1024,7 @@ def setup(
     )
 
     if not skip_completions:
-        console.print("\n[bold cyan]Step 3/3: Shell completion setup[/bold cyan]\n")
+        console.print("\n[bold cyan]Step 4/4: Shell completion setup[/bold cyan]\n")
 
         shell = detect_shell()
         if shell is None:
@@ -962,6 +1055,252 @@ def setup(
     else:
         console.print("\n[green bold]✓ Setup complete![/green bold]")
         console.print("You can now run shell-configs from anywhere.")
+
+
+@cli.group()
+def packages() -> None:
+    """Manage system packages required by shell-configs."""
+    pass
+
+
+@packages.command(name="install")
+@click.option("--dry-run", is_flag=True, help="Show what would be installed")
+@click.option("--force", is_flag=True, help="Skip confirmation prompts")
+def packages_install(dry_run: bool, force: bool) -> None:
+    """Install required system packages."""
+    platform_name = "macOS" if is_macos() else "Linux/WSL"
+    console.print(f"[dim]Platform:[/dim] {platform_name}")
+
+    manager = get_package_manager()
+
+    if manager is None:
+        print_error("No package manager available for this platform")
+        print_info("Install Homebrew: https://brew.sh (macOS) or use apt (Linux/WSL)")
+        sys.exit(1)
+
+    console.print(f"[dim]Package manager:[/dim] {manager.display_name}\n")
+
+    try:
+        packages = load_packages()
+    except FileNotFoundError as e:
+        print_error(str(e))
+        sys.exit(1)
+
+    if not packages:
+        print_info("No packages to install for this platform")
+        return
+
+    to_install = []
+    already_installed = []
+
+    for pkg in packages:
+        if manager.is_installed(pkg):
+            already_installed.append(pkg)
+        else:
+            to_install.append(pkg)
+
+    to_install = sort_packages_for_install(to_install)
+
+    if already_installed:
+        console.print(f"[green]Already installed ({len(already_installed)}):[/green]")
+        for pkg in already_installed:
+            console.print(f"  [dim]{pkg.name}[/dim]")
+
+    if not to_install:
+        console.print("\n[green]✓[/green] All required packages are already installed")
+        return
+
+    console.print(f"\n[cyan]Packages to install ({len(to_install)}):[/cyan]")
+    for pkg in to_install:
+        desc = f" - {pkg.description}" if pkg.description else ""
+        console.print(f"  {pkg.name}{desc}")
+
+    if not force and not dry_run:
+        if not Confirm.ask("\nInstall these packages?", default=True):
+            print_info("Installation cancelled")
+            return
+
+    console.print()
+    total = len(to_install)
+    for i, pkg in enumerate(to_install, start=1):
+        if not dry_run:
+            console.print(f"[dim][{i}/{total}] Installing {pkg.name}...[/dim]")
+
+        success, message = manager.install(pkg, dry_run=dry_run)
+
+        if success:
+            if "already installed" in message:
+                console.print(
+                    f"[green]✓[/green] {pkg.name} [dim](already installed)[/dim]"
+                )
+            elif dry_run:
+                console.print(f"[dim]  Would install {pkg.name}[/dim]")
+            else:
+                console.print(f"[green]✓[/green] {pkg.name}")
+        else:
+            console.print(f"[red]✗[/red] {pkg.name}: {message}")
+
+        if not dry_run and i < total:
+            console.print()
+
+    if dry_run:
+        print_info("\nDry run complete. Use without --dry-run to install.")
+    else:
+        console.print(
+            f"\n[green]✓[/green] Package installation complete ({total} packages)"
+        )
+
+
+@packages.command(name="status")
+def packages_status() -> None:
+    """Show status of required packages."""
+    platform_name = "macOS" if is_macos() else "Linux/WSL"
+    console.print(f"[dim]Platform:[/dim] {platform_name}\n")
+
+    manager = get_package_manager()
+
+    if manager is None:
+        print_error("No package manager available")
+        return
+
+    console.print(f"[dim]Package manager:[/dim] {manager.display_name}\n")
+
+    try:
+        packages = load_packages()
+    except FileNotFoundError as e:
+        print_error(str(e))
+        sys.exit(1)
+
+    if not packages:
+        print_info("No packages configured for this platform")
+        return
+
+    installed = []
+    missing = []
+
+    for pkg in packages:
+        if manager.is_installed(pkg):
+            installed.append(pkg)
+        else:
+            missing.append(pkg)
+
+    if installed:
+        console.print(f"[green]Installed ({len(installed)}):[/green]")
+        for pkg in installed:
+            console.print(f"  [green]✓[/green] {pkg.name}")
+
+    if missing:
+        console.print(f"\n[yellow]Missing ({len(missing)}):[/yellow]")
+        for pkg in missing:
+            console.print(f"  [yellow]✗[/yellow] {pkg.name}")
+        console.print(
+            "\n[dim]Run 'shell-configs packages install' to install missing packages[/dim]"
+        )
+    else:
+        console.print("\n[green]✓[/green] All required packages are installed")
+
+
+@packages.command(name="uninstall")
+@click.option("--dry-run", is_flag=True, help="Show what would be uninstalled")
+@click.option("--force", is_flag=True, help="Skip confirmation prompts")
+def packages_uninstall(dry_run: bool, force: bool) -> None:
+    """Uninstall managed system packages."""
+    platform_name = "macOS" if is_macos() else "Linux/WSL"
+    console.print(f"[dim]Platform:[/dim] {platform_name}")
+
+    manager = get_package_manager()
+
+    if manager is None:
+        print_error("No package manager available for this platform")
+        sys.exit(1)
+
+    console.print(f"[dim]Package manager:[/dim] {manager.display_name}\n")
+
+    try:
+        packages = load_packages()
+    except FileNotFoundError as e:
+        print_error(str(e))
+        sys.exit(1)
+
+    if not packages:
+        print_info("No packages configured for this platform")
+        return
+
+    to_uninstall = []
+    managed_externally = []
+    not_installed = []
+
+    for pkg in packages:
+        if manager.can_uninstall(pkg):
+            to_uninstall.append(pkg)
+        elif manager.is_installed(pkg):
+            managed_externally.append(pkg)
+        else:
+            not_installed.append(pkg)
+
+    to_uninstall = sort_packages_for_uninstall(to_uninstall)
+
+    if managed_externally:
+        console.print(f"[dim]Managed externally ({len(managed_externally)}):[/dim]")
+        for pkg in managed_externally:
+            console.print(f"  [dim]{pkg.name} (not via {manager.display_name})[/dim]")
+
+    if not_installed:
+        console.print(f"[dim]Not installed ({len(not_installed)}):[/dim]")
+        for pkg in not_installed:
+            console.print(f"  [dim]{pkg.name}[/dim]")
+
+    if not to_uninstall:
+        console.print("\n[green]✓[/green] No packages to uninstall")
+        return
+
+    console.print(f"\n[cyan]Packages to uninstall ({len(to_uninstall)}):[/cyan]")
+    for pkg in to_uninstall:
+        desc = f" - {pkg.description}" if pkg.description else ""
+        console.print(f"  {pkg.name}{desc}")
+
+    if not force and not dry_run:
+        if not Confirm.ask("\nUninstall these packages?", default=False):
+            print_info("Uninstall cancelled")
+            return
+
+    console.print()
+    total = len(to_uninstall)
+    success_count = 0
+    fail_count = 0
+
+    for i, pkg in enumerate(to_uninstall, start=1):
+        if not dry_run:
+            console.print(f"[dim][{i}/{total}] Uninstalling {pkg.name}...[/dim]")
+
+        success, message = manager.uninstall(pkg, dry_run=dry_run)
+
+        if success:
+            if "not installed" in message or "skipping" in message:
+                console.print(f"[dim]  {pkg.name} ({message})[/dim]")
+            elif dry_run:
+                console.print(f"[dim]  Would uninstall {pkg.name}[/dim]")
+            else:
+                console.print(f"[green]✓[/green] {pkg.name}")
+                success_count += 1
+        else:
+            console.print(f"[red]✗[/red] {pkg.name}: {message}")
+            fail_count += 1
+
+        if not dry_run and i < total:
+            console.print()
+
+    if dry_run:
+        print_info("\nDry run complete. Use without --dry-run to uninstall.")
+    else:
+        if fail_count > 0:
+            console.print(
+                f"\n[yellow]⚠[/yellow] {success_count} uninstalled, {fail_count} failed"
+            )
+        else:
+            console.print(
+                f"\n[green]✓[/green] Package uninstall complete ({success_count} packages)"
+            )
 
 
 @cli.group()

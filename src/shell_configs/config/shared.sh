@@ -491,6 +491,7 @@ alias claude_with_logger="ANTHROPIC_BASE_URL=http://localhost:8000 claude"
 export GOOSE_ALLOWLIST_BYPASS=true
 export GOOSE_AUTO_COMPACT_THRESHOLD=0.0
 export CLAUDE_CODE_STATUSLINE_DEBUG=1
+export ENABLE_EXPERIMENTAL_MCP_CLI=true
 
 ### AI Tools - Functions ###
 run_goose_recipe() {

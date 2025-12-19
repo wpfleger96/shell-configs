@@ -1,0 +1,127 @@
+# Package manifest for shell-configs
+# Packages required for development environment
+
+packages:
+  # Shell tools
+  - name: expect
+    command: unbuffer
+    description: "Provides unbuffer for line buffering"
+    macos:
+      method: brew
+    linux:
+      method: apt
+
+  - name: shellcheck
+    command: shellcheck
+    description: "Shell script linter"
+    macos:
+      method: brew
+    linux:
+      method: apt
+
+  - name: shfmt
+    command: shfmt
+    description: "Shell script formatter"
+    macos:
+      method: brew
+    linux:
+      method: script
+      install_cmd: "curl -sS https://webi.sh/shfmt | sh"
+
+  # Infrastructure as Code
+  - name: terraform
+    command: terraform
+    description: "Infrastructure as code tool"
+    macos:
+      method: brew
+      tap: hashicorp/tap
+      package: hashicorp/tap/terraform
+    linux:
+      method: apt
+      package: terraform
+      repo:
+        name: hashicorp
+        key_url: https://apt.releases.hashicorp.com/gpg
+        source: "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+
+  - name: tflint
+    command: tflint
+    description: "Terraform linter"
+    macos:
+      method: brew
+    linux:
+      method: script
+      install_cmd: "curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash"
+
+  # Configuration Management
+  - name: ansible
+    command: ansible
+    description: "Configuration management tool"
+    macos:
+      method: brew
+    linux:
+      method: pip
+
+  - name: ansible-lint
+    command: ansible-lint
+    description: "Ansible linter"
+    macos:
+      method: brew
+    linux:
+      method: pip
+
+  # Development Tools
+  - name: gh
+    command: gh
+    description: "GitHub CLI"
+    macos:
+      method: brew
+    linux:
+      method: apt
+      package: gh
+      repo:
+        name: github-cli
+        key_url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+        source: "deb [arch=amd64] https://cli.github.com/packages stable main"
+
+  - name: just
+    command: just
+    description: "Task runner"
+    macos:
+      method: brew
+    linux:
+      method: script
+      install_cmd: "curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/bin"
+
+  - name: powershell
+    command: pwsh
+    description: "PowerShell runtime"
+    macos:
+      method: brew
+      cask: true
+    linux:
+      method: apt
+      package: powershell
+      repo:
+        name: microsoft
+        key_url: https://packages.microsoft.com/keys/microsoft.asc
+        source: "deb [arch=amd64] https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(lsb_release -cs) main"
+
+  # PowerShell Modules
+  - name: PSScriptAnalyzer
+    description: "PowerShell script analyzer/linter"
+    macos:
+      method: pwsh
+    linux:
+      method: pwsh
+
+  # Database
+  - name: sqlite
+    command: sqlite3
+    description: "SQL database engine"
+    macos:
+      method: brew
+      package: sqlite
+    linux:
+      method: apt
+      package: sqlite3
