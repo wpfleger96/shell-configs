@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.4.8 (2025-12-19)
+
+### Bug Fixes
+
+- Dont instantly prune just-created worktrees, and denote both orphans and pruneable worktrees in
+  list output
+  ([`bde3b09`](https://github.com/wpfleger96/shell-configs/commit/bde3b090e380a5f4f3762f08dc668b83cb29b92e))
+
+
 ## v0.4.7 (2025-12-18)
 
 ### Bug Fixes
