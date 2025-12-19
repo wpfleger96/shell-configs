@@ -9,6 +9,7 @@ Manage shell configuration files across machines with version control.
 - **Version controlled**: Store shared configs in a git repository
 - **Safe operations**: Creates timestamped backups before modifications
 - **Syntax validation**: Validate configuration syntax before installation
+- **Included utilities**: Git worktree management, shell aliases, and productivity tools
 
 ## Getting Started
 
@@ -81,6 +82,104 @@ choco install just
 - `--shells bash,zsh` - Operate on specific shells only
 - `--dry-run` - Preview changes without applying
 - `--force` - Skip confirmation prompts
+
+## Included Utilities
+
+After installing shell-configs, you get productivity aliases and functions:
+
+### Git Worktree Management
+
+Manage multiple branches simultaneously with streamlined commands:
+
+```bash
+wt add feature-auth --open    # Create worktree and open in editor
+wt add feature-auth --base dev # Create from specific base branch
+wt list                       # Show all worktrees with [MERGED] and [ORPHAN] markers
+wt cd feature-auth            # Navigate to worktree
+wt rm feature-auth            # Remove worktree
+wt orphans                    # List orphaned/stale worktrees
+wt prune                      # Remove merged worktrees
+wt prune --orphans            # Also remove orphaned/stale worktrees
+```
+
+Worktrees stored in `.worktrees/` (auto-gitignored). Prompt shows `[wt]` and git status when in worktree. Tab completion for branches and commands.
+
+**Customize:** Set `WT_DIR` (default: `.worktrees`) and `WT_EDITOR` (default: `cursor`).
+
+### Git Aliases
+
+Common operations shortened:
+
+```bash
+# Basic operations
+ga / gaa          # git add / git add .
+gc -m "msg"       # git commit
+gd / gds          # git diff / diff --staged
+gl / gla          # git log (last 15 / all, graph)
+gf                # git fetch
+gp / gpu          # git pull / push
+gs                # git status
+gch / gchb        # git checkout / checkout -b
+
+# Stash operations
+gst / gstu        # git stash / stash -u (with untracked)
+gstp              # git stash pop
+
+# Useful shortcuts
+gundo / gunstage  # Undo last commit / unstage files
+grecover          # Reset to ORIG_HEAD (undo rebase/merge)
+safepull          # Safe pull (fetch + merge, no rebase)
+sync-fork         # Sync fork with upstream/main
+yeet              # Amend last commit (no edit)
+yeet_to_github    # Amend + force push with lease
+
+# History & inspection
+grl               # git reflog
+gwhatchanged      # Show what changed since last pull
+recent_commits    # Formatted log by date
+```
+
+**Git config aliases** (also available): `st`, `co`, `br`, `ci`, `unstage`, `last`, `lg`, `amend`
+
+### Development Tools
+
+```bash
+# Python
+pytest_coverage              # Run pytest with coverage report
+python_package_versions pkg  # Check available versions
+
+# Node
+npm_package_versions pkg     # Check NPM package versions
+
+# Docker
+docker_cleanup              # Remove unused images/containers
+
+# AI Tools - Claude Code
+ccusage                      # Claude Code usage stats
+ccviewer                     # View Claude Code sessions
+run_claude_code_logger       # Start logging proxy
+claude_with_logger           # Run Claude with logging
+
+# AI Tools - Goose
+run_goose_recipe recipe      # Run Goose recipe interactively
+query_goose_database "sql"   # Query Goose sessions database
+mcp_inspector                # Run MCP inspector
+```
+
+### Other Utilities
+
+```bash
+ll                      # ls -la
+extract file.zip        # Extract any archive format
+unlock_file file.dmg    # Remove macOS quarantine (zsh only)
+```
+
+### Git Configuration Enhancements
+
+- **Auto-setup remote:** `git push` automatically sets up remote tracking
+- **Default branch:** `main` (not master)
+- **Rerere enabled:** Automatically reuse recorded merge conflict resolutions
+- **Merge conflict style:** diff3 (shows original, theirs, and yours)
 
 ## Configuration Guide
 

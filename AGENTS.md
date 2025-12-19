@@ -96,6 +96,34 @@ tests/
 └── integration/        # Integration tests (-m integration, -m cli)
 ```
 
+## Bundled Shell Utilities
+
+The managed configs include these shell utilities (sourced when installed):
+
+**Git Worktree Management (`wt` command):**
+```bash
+wt add <branch> [--open] [--base <branch>]  # Create worktree
+wt list                                      # List worktrees (shows [MERGED], [ORPHAN] status)
+wt cd <branch>                               # Navigate to worktree
+wt rm <branch> [--force]                     # Remove worktree
+wt prune [--force] [--orphans]               # Clean up merged/orphan worktrees
+wt orphans                                   # List orphaned worktrees
+```
+
+**Python/Node Utilities:**
+- `pytest_coverage` - Run pytest with coverage
+- `python_package_versions <pkg>` - Check PyPI versions
+- `npm_package_versions <pkg>` - Check npm versions for @block scope
+
+**AI Tool Helpers:**
+- `run_goose_recipe <recipe>` - Run Goose recipe interactively
+- `query_goose_database <sql>` - Query Goose sessions DB
+- `mcp_inspector` - Launch MCP inspector
+
+**General:**
+- `extract <file>` - Extract archives (tar.gz, zip, etc.)
+- `docker_cleanup` - Prune Docker images and containers
+
 ## Tech Stack
 
 - Python 3.10+ (src layout)
@@ -139,7 +167,8 @@ Markers: `unit`, `integration`, `cli`, `bootstrap`
 5. **Type checking:** mypy strict mode enabled - full type hints required
 6. **Installation method:** Package is private - install via `uv tool install git+ssh://git@github.com/wpfleger96/shell-configs.git` (not PyPI)
 7. **Shell linting:** `shellcheck` and `shfmt` both exclude `git-prompt.sh` automatically via justfile grep filter
-8. **GitHub CLI Required (Private Repo):** This repository is PRIVATE. All GitHub operations (PRs, issues, releases, checks) MUST use `gh` CLI commands with authentication. Standard GitHub API calls will fail. Examples:
+8. **Worktree auto-prune removed:** `wt add` no longer auto-prunes worktrees. New branches created from main won't be immediately deleted. Use `wt list` to see `[MERGED]` and `[ORPHAN]` markers, then run `wt prune` manually when needed. Implementation: Orphan detection is consolidated in `_wt_is_orphan()` helper (used by `_wt_ls`, `_wt_prune`, `_wt_orphans`)
+9. **GitHub CLI Required (Private Repo):** This repository is PRIVATE. All GitHub operations (PRs, issues, releases, checks) MUST use `gh` CLI commands with authentication. Standard GitHub API calls will fail. Examples:
    - Create PR: `gh pr create --title "..." --body "..."`
    - View issue: `gh issue view 123`
    - Check PR status: `gh pr checks`
@@ -153,5 +182,6 @@ Markers: `unit`, `integration`, `cli`, `bootstrap`
 | Add shell type | `src/shell_configs/shells/` + `registry.py` |
 | Change install behavior | `src/shell_configs/manager.py` |
 | Add bundled config | `src/shell_configs/config/{shell}/` |
+| Modify shell utilities (wt, extract, etc.) | `src/shell_configs/config/shared.sh` |
 | Modify completion logic | `src/shell_configs/completions.py` |
 | Fix test fixtures | `tests/conftest.py` |

@@ -81,10 +81,41 @@ _wt_main_branch() {
     command git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/@@' || echo "origin/main"
 }
 
-_wt_is_merged() {
+_wt_branch_status() {
     local branch="$1"
     local main_branch=$(_wt_main_branch)
-    command git branch --merged "$main_branch" 2>/dev/null | grep -q "^[*+ ]*${branch}$"
+    local branch_head merge_base unique_count
+
+    branch_head=$(command git rev-parse "refs/heads/$branch" 2>/dev/null) || return 1
+    merge_base=$(command git merge-base "$branch" "$main_branch" 2>/dev/null) || return 1
+
+    if [[ "$branch_head" == "$merge_base" ]]; then
+        echo "NEW"
+        return 0
+    fi
+
+    unique_count=$(command git rev-list --count "$main_branch..$branch" 2>/dev/null)
+    if [[ "$unique_count" == "0" ]]; then
+        echo "MERGED"
+        return 0
+    fi
+
+    return 1
+}
+
+_wt_is_orphan() {
+    local branch="$1"
+    local wt_path="$2"
+
+    if ! command git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
+        echo "branch deleted"
+        return 0
+    fi
+    if [[ -n "$(find "$wt_path" -maxdepth 0 -mtime +30 2>/dev/null)" ]]; then
+        echo "stale 30+ days"
+        return 0
+    fi
+    return 1
 }
 
 _wt_repo_root() {
@@ -180,8 +211,6 @@ _wt_add() {
         echo "Created worktree with new branch '$branch' (based on $base_branch) at $worktree_path"
     fi
 
-    _wt_prune
-
     if [[ "$open_editor" == true ]]; then
         $WT_EDITOR "$worktree_path"
     fi
@@ -229,7 +258,7 @@ _wt_rm() {
 }
 
 _wt_ls() {
-    local repo_root wt_path wt_branch merged_marker
+    local repo_root wt_path wt_branch status_markers orphan_reason branch_status
     repo_root=$(_wt_repo_root) || return 1
 
     echo "Worktrees:"
@@ -242,11 +271,16 @@ _wt_ls() {
         if [[ "$wt_path" == "$repo_root" ]]; then
             echo "  * $wt_branch (main worktree)"
         else
-            merged_marker=""
-            if _wt_is_merged "$wt_branch"; then
-                merged_marker=" [MERGED]"
+            status_markers=""
+            branch_status=$(_wt_branch_status "$wt_branch")
+            if [[ -n "$branch_status" ]]; then
+                status_markers=" [$branch_status]"
             fi
-            echo "  - $wt_branch$merged_marker"
+            orphan_reason=$(_wt_is_orphan "$wt_branch" "$wt_path")
+            if [[ -n "$orphan_reason" ]]; then
+                status_markers="$status_markers [ORPHAN: $orphan_reason]"
+            fi
+            echo "  - $wt_branch$status_markers"
         fi
     done
 }
@@ -276,7 +310,7 @@ _wt_cd() {
 
 _wt_prune() {
     local force=false orphans=false
-    local repo_root wt_path wt_branch is_orphan orphan_reason
+    local repo_root wt_path wt_branch orphan_reason branch_status
     local pruned=0 skipped=0
 
     while [[ $# -gt 0 ]]; do
@@ -304,7 +338,8 @@ _wt_prune() {
         wt_branch="${wt_branch%\]}"
 
         if [[ "$wt_path" != "$repo_root" ]] && [[ "$wt_path" == "$repo_root/$WT_DIR/"* ]]; then
-            if _wt_is_merged "$wt_branch"; then
+            branch_status=$(_wt_branch_status "$wt_branch")
+            if [[ "$branch_status" == "MERGED" ]]; then
                 _wt_remove "$wt_path" "$force"
                 case $? in
                     0)
@@ -328,18 +363,8 @@ _wt_prune() {
             wt_branch="${wt_branch%\]}"
 
             if [[ "$wt_path" != "$repo_root" ]] && [[ "$wt_path" == "$repo_root/$WT_DIR/"* ]]; then
-                is_orphan=false
-                orphan_reason=""
-
-                if ! command git show-ref --verify --quiet "refs/heads/$wt_branch" 2>/dev/null; then
-                    is_orphan=true
-                    orphan_reason="branch no longer exists"
-                elif [[ -n "$(find "$wt_path" -maxdepth 0 -mtime +30 2>/dev/null)" ]]; then
-                    is_orphan=true
-                    orphan_reason="not accessed in 30+ days"
-                fi
-
-                if [[ "$is_orphan" == true ]]; then
+                orphan_reason=$(_wt_is_orphan "$wt_branch" "$wt_path")
+                if [[ -n "$orphan_reason" ]]; then
                     _wt_remove "$wt_path" "$force"
                     case $? in
                         0)
@@ -362,7 +387,7 @@ _wt_prune() {
 }
 
 _wt_orphans() {
-    local repo_root wt_path wt_branch
+    local repo_root wt_path wt_branch orphan_reason
     local found=0
     repo_root=$(_wt_repo_root) || return 1
 
@@ -375,11 +400,9 @@ _wt_orphans() {
         wt_branch="${wt_branch%\]}"
 
         if [[ "$wt_path" != "$repo_root" ]] && [[ "$wt_path" == "$repo_root/$WT_DIR/"* ]]; then
-            if ! command git show-ref --verify --quiet "refs/heads/$wt_branch" 2>/dev/null; then
-                echo "  - $wt_branch (branch no longer exists)"
-                found=$((found + 1))
-            elif [[ -n "$(find "$wt_path" -maxdepth 0 -mtime +30 2>/dev/null)" ]]; then
-                echo "  - $wt_branch (not accessed in 30+ days)"
+            orphan_reason=$(_wt_is_orphan "$wt_branch" "$wt_path")
+            if [[ -n "$orphan_reason" ]]; then
+                echo "  - $wt_branch ($orphan_reason)"
                 found=$((found + 1))
             fi
         fi
@@ -461,7 +484,7 @@ alias docker_cleanup="docker builder prune -af && docker system prune -af"
 ### AI Tools - Aliases ###
 alias ccusage="npx -y ccusage@latest"
 alias ccviewer="uvx --from claude-code-viewer claude-viewer"
-alias run_claude_code_logger="npx -y claude-code-logger@latest start -v"
+alias run_claude_code_logger="unbuffer npx -y claude-code-logger@latest start -v"
 alias claude_with_logger="ANTHROPIC_BASE_URL=http://localhost:8000 claude"
 
 ### AI Tools - Configuration ###
