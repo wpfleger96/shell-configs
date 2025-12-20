@@ -80,16 +80,3 @@ if [ -f ~/.zsh/git-prompt.sh ]; then
     setopt prompt_subst
     PROMPT='%F{251}%~%F{reset}%B%F{cyan}$(__git_ps1 " %s")%F{yellow}$(__wt_ps1)%F{reset}%b '
 fi
-
-### macOS Utilities ###
-unlock_file() {
-    local file=$1
-    sudo xattr -r -d com.apple.quarantine "$file"
-}
-
-### AI Tools ###
-open_goose_recipe_desktop() {
-    local recipe_name=$1
-    local deeplink=$(goose recipe deeplink "$recipe_name" | grep -o 'goose://recipe?config=[^ ]*')
-    open "$deeplink"
-}

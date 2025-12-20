@@ -3,6 +3,8 @@
 from importlib.resources import files as resource_files
 from pathlib import Path
 
+from shell_configs.platform import detect_platform
+
 
 def get_config_dir() -> Path:
     """Get the config directory.
@@ -68,21 +70,36 @@ class ConfigReader:
         return sorted(shells)
 
     def get_shared_config_content(self, shell_name: str) -> str | None:
-        """Get the content of a shared configuration file.
+        """Get the content of shared configuration with platform overlay.
+
+        This method:
+        1. Loads the base shared config (shared.sh or shared.gitconfig)
+        2. Appends platform-specific overlay if it exists
 
         Args:
             shell_name: Name of the shell (e.g., 'bash', 'zsh', 'git')
 
         Returns:
-            Content of the shared config file, or None if not found
+            Combined content with platform overlay, or None if not found
         """
         if shell_name == "git":
-            config_path = self.config_dir / "shared.gitconfig"
+            base_path = self.config_dir / "shared.gitconfig"
+            suffix = ".gitconfig"
         else:
-            config_path = self.config_dir / "shared.sh"
+            base_path = self.config_dir / "shared.sh"
+            suffix = ".sh"
 
-        if not config_path.exists():
+        if not base_path.exists():
             return None
 
-        content = config_path.read_text()
-        return content.rstrip("\n")
+        content = base_path.read_text().rstrip("\n")
+
+        platform = detect_platform()
+        overlay_path = self.config_dir / "platform" / f"{platform.value}{suffix}"
+
+        if overlay_path.exists():
+            overlay = overlay_path.read_text().rstrip("\n")
+            if overlay:
+                content = f"{content}\n\n### Platform-Specific ({platform.display_name}) ###\n{overlay}"
+
+        return content

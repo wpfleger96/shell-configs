@@ -29,11 +29,11 @@ from shell_configs.display import (
 from shell_configs.manager import ConfigManager, OperationResult
 from shell_configs.packages import (
     get_package_manager,
-    is_macos,
     load_packages,
     sort_packages_for_install,
     sort_packages_for_uninstall,
 )
+from shell_configs.platform import detect_platform
 from shell_configs.shells.base import Shell
 from shell_configs.shells.registry import ShellRegistry
 
@@ -250,18 +250,37 @@ def _display_diffs_for_shells(
                 found_diffs = True
                 continue
 
-            if manager.files_match(
-                additional_file.source_path, additional_file.target_path
-            ):
-                continue
+            repo_content = additional_file.source_path.read_text()
+
+            if additional_file.comment_prefix:
+                section = manager.extract_managed_section(
+                    additional_file.target_path,
+                    comment_prefix=additional_file.comment_prefix,
+                )
+                if section is None:
+                    console.print(
+                        f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
+                    )
+                    console.print("[yellow]Not installed[/yellow]")
+                    found_diffs = True
+                    continue
+
+                if manager.managed_content_matches(section.content, repo_content):
+                    continue
+
+                installed_content = section.content
+                repo_content = manager._strip_json_outer_brackets(repo_content)
+            else:
+                if manager.files_match(
+                    additional_file.source_path, additional_file.target_path
+                ):
+                    continue
+                installed_content = additional_file.target_path.read_text()
 
             found_diffs = True
             console.print(
                 f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
             )
-
-            installed_content = additional_file.target_path.read_text()
-            repo_content = additional_file.source_path.read_text()
 
             installed_lines = installed_content.splitlines(keepends=True)
             repo_lines = repo_content.splitlines(keepends=True)
@@ -388,11 +407,20 @@ def install(
     for shell in selected_shells:
         additional_files = shell.get_additional_files()
         for additional_file in additional_files:
-            result, message = manager.install_additional_file(
-                additional_file.source_path,
-                additional_file.target_path,
-                dry_run=dry_run,
-            )
+            if additional_file.comment_prefix:
+                content = additional_file.source_path.read_text()
+                result, message = manager.install_section(
+                    additional_file.target_path,
+                    content,
+                    dry_run=dry_run,
+                    comment_prefix=additional_file.comment_prefix,
+                )
+            else:
+                result, message = manager.install_additional_file(
+                    additional_file.source_path,
+                    additional_file.target_path,
+                    dry_run=dry_run,
+                )
             print_operation_result(result, message)
             additional_file_results[str(additional_file.target_path)] = result
 
@@ -501,9 +529,15 @@ def uninstall(shells: list[str] | None, force: bool) -> None:
     for shell in selected_shells:
         additional_files = shell.get_additional_files()
         for additional_file in additional_files:
-            result, message = manager.uninstall_additional_file(
-                additional_file.target_path
-            )
+            if additional_file.comment_prefix:
+                result, message = manager.uninstall_section(
+                    additional_file.target_path,
+                    comment_prefix=additional_file.comment_prefix,
+                )
+            else:
+                result, message = manager.uninstall_additional_file(
+                    additional_file.target_path
+                )
             if result != OperationResult.NOT_FOUND:
                 print_operation_result(result, message)
             additional_file_results[str(additional_file.target_path)] = result
@@ -538,19 +572,26 @@ def status(shells: list[str] | None) -> None:
         print_warning("No shell configurations found")
         return
 
+    console.print(f"[bold]Platform:[/bold] {detect_platform().display_name}\n")
+
     table = create_status_table()
+    home = str(Path.home())
 
     for shell in selected_shells:
+        has_shown_name = False
+
         for config_file in shell.get_config_files():
             repo_content = config_reader.get_config_content(
                 shell.name, config_file.repo_config_name
             )
-            if repo_content is None:
-                continue
-
             shared_content = None
             if shell.supports_shared_config():
                 shared_content = config_reader.get_shared_config_content(shell.name)
+
+            if repo_content is None and shared_content is not None:
+                repo_content = ""
+            elif repo_content is None:
+                continue
 
             repo_content = manager.combine_content(shared_content, repo_content)
 
@@ -563,16 +604,41 @@ def status(shells: list[str] | None) -> None:
             )
 
             status_str = get_status_indicator(synced, exists)
-            add_status_row(table, shell.display_name, config_file.path, status_str)
+            path_display = str(config_file.path).replace(home, "~")
+            add_status_row(table, shell.display_name, path_display, status_str)
+            has_shown_name = True
 
         additional_files = shell.get_additional_files()
-        for additional_file in additional_files:
-            exists = additional_file.target_path.exists()
-            synced = manager.files_match(
-                additional_file.source_path, additional_file.target_path
-            )
+        for i, additional_file in enumerate(additional_files):
+            if additional_file.comment_prefix:
+                source_content = (
+                    additional_file.source_path.read_text()
+                    if additional_file.source_path.exists()
+                    else None
+                )
+                section = manager.extract_managed_section(
+                    additional_file.target_path,
+                    comment_prefix=additional_file.comment_prefix,
+                )
+                exists = section is not None
+                synced = (
+                    manager.managed_content_matches(section.content, source_content)
+                    if section and source_content
+                    else False
+                )
+            else:
+                exists = additional_file.target_path.exists()
+                synced = manager.files_match(
+                    additional_file.source_path, additional_file.target_path
+                )
             status_str = get_status_indicator(synced, exists)
-            add_additional_file_row(table, additional_file.target_path, status_str)
+            path_display = str(additional_file.target_path).replace(home, "~")
+
+            if i == 0 and not has_shown_name:
+                add_status_row(table, shell.display_name, path_display, status_str)
+                has_shown_name = True
+            else:
+                add_additional_file_row(table, path_display, status_str)
 
     console.print(table)
 
@@ -1068,7 +1134,7 @@ def packages() -> None:
 @click.option("--force", is_flag=True, help="Skip confirmation prompts")
 def packages_install(dry_run: bool, force: bool) -> None:
     """Install required system packages."""
-    platform_name = "macOS" if is_macos() else "Linux/WSL"
+    platform_name = detect_platform().display_name
     console.print(f"[dim]Platform:[/dim] {platform_name}")
 
     manager = get_package_manager()
@@ -1154,7 +1220,7 @@ def packages_install(dry_run: bool, force: bool) -> None:
 @packages.command(name="status")
 def packages_status() -> None:
     """Show status of required packages."""
-    platform_name = "macOS" if is_macos() else "Linux/WSL"
+    platform_name = detect_platform().display_name
     console.print(f"[dim]Platform:[/dim] {platform_name}\n")
 
     manager = get_package_manager()
@@ -1205,7 +1271,7 @@ def packages_status() -> None:
 @click.option("--force", is_flag=True, help="Skip confirmation prompts")
 def packages_uninstall(dry_run: bool, force: bool) -> None:
     """Uninstall managed system packages."""
-    platform_name = "macOS" if is_macos() else "Linux/WSL"
+    platform_name = detect_platform().display_name
     console.print(f"[dim]Platform:[/dim] {platform_name}")
 
     manager = get_package_manager()

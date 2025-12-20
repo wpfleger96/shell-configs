@@ -1,12 +1,11 @@
 """Cursor IDE configuration."""
 
-import platform
 import subprocess
 
 from pathlib import Path
 
 from shell_configs.config import get_config_dir
-from shell_configs.packages.packages import is_wsl
+from shell_configs.platform import Platform, is_platform
 from shell_configs.shells.base import AdditionalFile, ConfigFile, Shell
 
 
@@ -54,12 +53,12 @@ class CursorShell(Shell):
         Returns:
             Path to Cursor User directory or None if unable to determine
         """
-        if is_wsl():
+        if is_platform(Platform.WSL):
             win_user = _get_windows_username()
             if not win_user:
                 return None
             return Path(f"/mnt/c/Users/{win_user}/AppData/Roaming/Cursor/User")
-        elif platform.system() == "Darwin":
+        elif is_platform(Platform.MACOS):
             return Path.home() / "Library" / "Application Support" / "Cursor" / "User"
         else:
             return Path.home() / ".config" / "Cursor" / "User"
@@ -87,11 +86,13 @@ class CursorShell(Shell):
                 name="settings.json",
                 source_path=config_dir / "cursor" / "settings.json",
                 target_path=cursor_dir / "settings.json",
+                comment_prefix="//",
             ),
             AdditionalFile(
                 name="keybindings.json",
                 source_path=config_dir / "cursor" / "keybindings.json",
                 target_path=cursor_dir / "keybindings.json",
+                comment_prefix="//",
             ),
         ]
 

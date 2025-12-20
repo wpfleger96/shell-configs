@@ -1,6 +1,5 @@
 """Package management for shell-configs."""
 
-import platform
 import shutil
 import subprocess
 
@@ -11,22 +10,7 @@ import yaml
 
 from pydantic import BaseModel
 
-
-def is_macos() -> bool:
-    """Check if running on macOS."""
-    return platform.system().lower() == "darwin"
-
-
-def is_wsl() -> bool:
-    """Check if running in Windows Subsystem for Linux."""
-    if platform.system().lower() != "linux":
-        return False
-    try:
-        with open("/proc/version") as f:
-            version_info = f.read().lower()
-            return "microsoft" in version_info or "wsl" in version_info
-    except OSError:
-        return False
+from shell_configs.platform import Platform, is_platform
 
 
 def _is_pwsh_module_installed(name: str) -> bool:
@@ -146,7 +130,7 @@ class Package(BaseModel):
 
     def get_config_for_platform(self) -> InstallConfig | None:
         """Get install config for current platform."""
-        return self.macos if is_macos() else self.linux
+        return self.macos if is_platform(Platform.MACOS) else self.linux
 
 
 class PackageManager(ABC):
@@ -669,11 +653,11 @@ def get_package_manager() -> PackageManager | None:
     Returns:
         PackageManager if available, None otherwise
     """
-    if is_macos():
+    if is_platform(Platform.MACOS):
         brew = HomebrewManager()
         return brew if brew.is_available() else None
 
-    if is_wsl() or platform.system().lower() == "linux":
+    if is_platform(Platform.WSL) or is_platform(Platform.LINUX):
         linux_installer = LinuxInstaller()
         return linux_installer if linux_installer.is_available() else None
 

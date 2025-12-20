@@ -33,10 +33,6 @@ class ManagedSection:
 class ConfigManager:
     """Manages configuration sections in shell config files."""
 
-    START_MARKER = "##### shell-configs Managed Config #####"
-    START_DECORATION = "########################################"
-    END_MARKER = "##### End shell-configs Managed Config #####"
-    END_DECORATION = "########################################"
     SHARED_SECTION_MARKER = "### Shared Config ###"
     SHELL_SPECIFIC_MARKER = "### Shell-Specific Config ###"
 
@@ -48,11 +44,84 @@ class ConfigManager:
         """
         self.backup_suffix = backup_suffix
 
-    def has_managed_section(self, config_file: Path) -> bool:
+    def _build_markers(self, prefix: str) -> tuple[str, str, str]:
+        """Build marker strings with given comment prefix.
+
+        Args:
+            prefix: Comment prefix to use (e.g., '#', '//')
+
+        Returns:
+            Tuple of (decoration, start_marker, end_marker)
+        """
+        decoration = prefix * 40
+        start_marker = f"{prefix * 5} shell-configs Managed Config {prefix * 5}"
+        end_marker = f"{prefix * 5} End shell-configs Managed Config {prefix * 5}"
+        return decoration, start_marker, end_marker
+
+    def _is_json_content(self, content: str) -> bool:
+        """Check if content appears to be JSON/JSONC format.
+
+        Args:
+            content: Content to check
+
+        Returns:
+            True if content looks like JSON
+        """
+        stripped = content.strip()
+        return stripped.startswith("{") or stripped.startswith("[")
+
+    def _strip_json_outer_brackets(self, content: str) -> str:
+        """Strip outer { } or [ ] from JSON content for comparison.
+
+        When markers are injected inside JSON brackets, we need to strip
+        the outer brackets from source content before comparing with
+        extracted managed section content.
+
+        Args:
+            content: JSON content with outer brackets
+
+        Returns:
+            Content with outer brackets removed
+        """
+        if not self._is_json_content(content):
+            return content
+
+        lines = content.splitlines()
+        if not lines:
+            return content
+
+        if lines[0].strip() in ("{", "["):
+            lines = lines[1:]
+
+        if lines and lines[-1].strip() in ("}", "]"):
+            lines = lines[:-1]
+
+        return "\n".join(lines)
+
+    def managed_content_matches(
+        self, section_content: str, source_content: str
+    ) -> bool:
+        """Compare managed section content against source, handling JSON brackets.
+
+        For JSON files, markers are injected inside brackets, so we strip
+        outer brackets from source before comparing.
+
+        Args:
+            section_content: Content extracted from managed section
+            source_content: Content from source file
+
+        Returns:
+            True if contents match
+        """
+        comparison_content = self._strip_json_outer_brackets(source_content)
+        return section_content.strip() == comparison_content.strip()
+
+    def has_managed_section(self, config_file: Path, comment_prefix: str = "#") -> bool:
         """Check if a config file has a managed section.
 
         Args:
             config_file: Path to the config file
+            comment_prefix: Comment prefix to use for markers
 
         Returns:
             True if a managed section exists
@@ -60,14 +129,18 @@ class ConfigManager:
         if not config_file.exists():
             return False
 
+        _, start_marker, end_marker = self._build_markers(comment_prefix)
         content = config_file.read_text()
-        return self.START_MARKER in content and self.END_MARKER in content
+        return start_marker in content and end_marker in content
 
-    def extract_managed_section(self, config_file: Path) -> ManagedSection | None:
+    def extract_managed_section(
+        self, config_file: Path, comment_prefix: str = "#"
+    ) -> ManagedSection | None:
         """Extract the managed section from a config file.
 
         Args:
             config_file: Path to the config file
+            comment_prefix: Comment prefix to use for markers
 
         Returns:
             ManagedSection if found, None otherwise
@@ -75,14 +148,15 @@ class ConfigManager:
         if not config_file.exists():
             return None
 
+        decoration, start_marker, end_marker = self._build_markers(comment_prefix)
         lines = config_file.read_text().splitlines(keepends=True)
         start_idx = None
         end_idx = None
 
         for i, line in enumerate(lines):
-            if self.START_MARKER in line:
+            if start_marker in line:
                 start_idx = i
-            elif self.END_MARKER in line and start_idx is not None:
+            elif end_marker in line and start_idx is not None:
                 end_idx = i
                 break
 
@@ -90,11 +164,11 @@ class ConfigManager:
             return None
 
         content_start = start_idx + 1
-        if content_start < len(lines) and self.START_DECORATION in lines[content_start]:
+        if content_start < len(lines) and decoration in lines[content_start]:
             content_start += 1
 
         content_end = end_idx
-        if content_end > 0 and self.END_DECORATION in lines[content_end - 1]:
+        if content_end > 0 and decoration in lines[content_end - 1]:
             content_end -= 1
 
         content_lines = lines[content_start:content_end]
@@ -124,6 +198,7 @@ class ConfigManager:
         content: str | None,
         dry_run: bool = False,
         shared_content: str | None = None,
+        comment_prefix: str = "#",
     ) -> tuple[OperationResult, str]:
         """Install or update a managed section in a config file.
 
@@ -132,6 +207,7 @@ class ConfigManager:
             content: Content to install (shell-specific content), or None for shared-only
             dry_run: If True, don't actually modify the file
             shared_content: Optional shared content to include before shell-specific content
+            comment_prefix: Comment prefix to use for markers
 
         Returns:
             Tuple of (result, message)
@@ -139,7 +215,7 @@ class ConfigManager:
         try:
             final_content = self.combine_content(shared_content, content)
 
-            existing_section = self.extract_managed_section(config_file)
+            existing_section = self.extract_managed_section(config_file, comment_prefix)
 
             if (
                 existing_section
@@ -174,13 +250,13 @@ class ConfigManager:
                 config_file.parent.mkdir(parents=True, exist_ok=True)
 
             if existing_section:
-                self._update_section(config_file, final_content)
+                self._update_section(config_file, final_content, comment_prefix)
                 return (
                     OperationResult.UPDATED,
                     f"Updated managed section in {config_file}{backup_msg}",
                 )
 
-            self._create_section(config_file, final_content)
+            self._create_section(config_file, final_content, comment_prefix)
             return (
                 OperationResult.CREATED,
                 f"Created managed section in {config_file}{backup_msg}",
@@ -226,39 +302,85 @@ class ConfigManager:
 
         return "\n".join(parts)
 
-    def _create_section(self, config_file: Path, content: str) -> None:
+    def _create_section(
+        self, config_file: Path, content: str, comment_prefix: str = "#"
+    ) -> None:
         """Create a new managed section in a config file.
 
         Args:
             config_file: Path to the config file
             content: Content to add
+            comment_prefix: Comment prefix to use for markers
         """
-        if config_file.exists():
-            existing_content = config_file.read_text()
-            if existing_content and not existing_content.endswith("\n"):
-                existing_content += "\n"
-        else:
-            existing_content = ""
+        decoration, start_marker, end_marker = self._build_markers(comment_prefix)
 
-        new_content = f"{existing_content}\n{self.START_DECORATION}\n{self.START_MARKER}\n{self.START_DECORATION}\n{content}\n{self.END_DECORATION}\n{self.END_MARKER}\n{self.END_DECORATION}\n"
+        if self._is_json_content(content):
+            lines = content.splitlines()
+            if not lines:
+                new_content = ""
+            else:
+                opening_idx = None
+                closing_idx = None
+
+                for i, line in enumerate(lines):
+                    stripped = line.strip()
+                    if opening_idx is None and stripped.startswith(("{", "[")):
+                        opening_idx = i
+                    if stripped.endswith(("}", "]")):
+                        closing_idx = i
+
+                if opening_idx is not None and closing_idx is not None:
+                    wrapped_lines = lines[: opening_idx + 1]
+                    wrapped_lines.extend(
+                        [
+                            f"    {decoration}",
+                            f"    {start_marker}",
+                            f"    {decoration}",
+                        ]
+                    )
+                    wrapped_lines.extend(lines[opening_idx + 1 : closing_idx])
+                    wrapped_lines.extend(
+                        [
+                            f"    {decoration}",
+                            f"    {end_marker}",
+                            f"    {decoration}",
+                        ]
+                    )
+                    wrapped_lines.extend(lines[closing_idx:])
+
+                    new_content = "\n".join(wrapped_lines) + "\n"
+                else:
+                    new_content = f"{decoration}\n{start_marker}\n{decoration}\n{content}\n{decoration}\n{end_marker}\n{decoration}\n"
+        else:
+            if config_file.exists():
+                existing_content = config_file.read_text()
+                if existing_content and not existing_content.endswith("\n"):
+                    existing_content += "\n"
+            else:
+                existing_content = ""
+            new_content = f"{existing_content}\n{decoration}\n{start_marker}\n{decoration}\n{content}\n{decoration}\n{end_marker}\n{decoration}\n"
 
         self._atomic_write(config_file, new_content)
 
-    def _update_section(self, config_file: Path, content: str) -> None:
+    def _update_section(
+        self, config_file: Path, content: str, comment_prefix: str = "#"
+    ) -> None:
         """Update an existing managed section in a config file.
 
         Args:
             config_file: Path to the config file
             content: New content
+            comment_prefix: Comment prefix to use for markers
         """
+        decoration, start_marker, end_marker = self._build_markers(comment_prefix)
         lines = config_file.read_text().splitlines(keepends=True)
         start_idx = None
         end_idx = None
 
         for i, line in enumerate(lines):
-            if self.START_MARKER in line:
+            if start_marker in line:
                 start_idx = i
-            elif self.END_MARKER in line and start_idx is not None:
+            elif end_marker in line and start_idx is not None:
                 end_idx = i
                 break
 
@@ -266,36 +388,88 @@ class ConfigManager:
             raise ValueError("Managed section markers not found")
 
         start_boundary = start_idx
-        if start_idx > 0 and self.START_DECORATION in lines[start_idx - 1]:
+        if start_idx > 0 and decoration in lines[start_idx - 1]:
             start_boundary = start_idx - 1
 
         end_boundary = end_idx
-        if end_idx < len(lines) - 1 and self.END_DECORATION in lines[end_idx + 1]:
+        if end_idx < len(lines) - 1 and decoration in lines[end_idx + 1]:
             end_boundary = end_idx + 1
 
-        new_section = [
-            f"{self.START_DECORATION}\n",
-            f"{self.START_MARKER}\n",
-            f"{self.START_DECORATION}\n",
-            f"{content}\n",
-            f"{self.END_DECORATION}\n",
-            f"{self.END_MARKER}\n",
-            f"{self.END_DECORATION}\n",
-        ]
+        if self._is_json_content(content):
+            content_lines = content.splitlines()
+            if not content_lines:
+                new_section: list[str] = []
+            else:
+                opening_idx = None
+                closing_idx = None
 
-        new_lines = lines[:start_boundary] + new_section + lines[end_boundary + 1 :]
-        new_content = "".join(new_lines)
+                for i, line in enumerate(content_lines):
+                    stripped = line.strip()
+                    if opening_idx is None and stripped.startswith(("{", "[")):
+                        opening_idx = i
+                    if stripped.endswith(("}", "]")):
+                        closing_idx = i
+
+                if opening_idx is not None and closing_idx is not None:
+                    new_section = []
+                    for line in content_lines[: opening_idx + 1]:
+                        new_section.append(f"{line}\n")
+                    new_section.extend(
+                        [
+                            f"    {decoration}\n",
+                            f"    {start_marker}\n",
+                            f"    {decoration}\n",
+                        ]
+                    )
+                    for line in content_lines[opening_idx + 1 : closing_idx]:
+                        new_section.append(f"{line}\n")
+                    new_section.extend(
+                        [
+                            f"    {decoration}\n",
+                            f"    {end_marker}\n",
+                            f"    {decoration}\n",
+                        ]
+                    )
+                    for line in content_lines[closing_idx:]:
+                        new_section.append(f"{line}\n")
+                else:
+                    new_section = [
+                        f"{decoration}\n",
+                        f"{start_marker}\n",
+                        f"{decoration}\n",
+                        f"{content}\n",
+                        f"{decoration}\n",
+                        f"{end_marker}\n",
+                        f"{decoration}\n",
+                    ]
+        else:
+            new_section = [
+                f"{decoration}\n",
+                f"{start_marker}\n",
+                f"{decoration}\n",
+                f"{content}\n",
+                f"{decoration}\n",
+                f"{end_marker}\n",
+                f"{decoration}\n",
+            ]
+
+        if self._is_json_content(content):
+            new_content = "".join(new_section)
+        else:
+            new_lines = lines[:start_boundary] + new_section + lines[end_boundary + 1 :]
+            new_content = "".join(new_lines)
 
         self._atomic_write(config_file, new_content)
 
     def uninstall_section(
-        self, config_file: Path, dry_run: bool = False
+        self, config_file: Path, dry_run: bool = False, comment_prefix: str = "#"
     ) -> tuple[OperationResult, str]:
         """Remove a managed section from a config file.
 
         Args:
             config_file: Path to the config file
             dry_run: If True, don't actually modify the file
+            comment_prefix: Comment prefix to use for markers
 
         Returns:
             Tuple of (result, message)
@@ -307,7 +481,7 @@ class ConfigManager:
                     f"{config_file} does not exist",
                 )
 
-            section = self.extract_managed_section(config_file)
+            section = self.extract_managed_section(config_file, comment_prefix)
             if not section:
                 return (
                     OperationResult.NOT_FOUND,

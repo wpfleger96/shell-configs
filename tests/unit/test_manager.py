@@ -21,8 +21,9 @@ class TestConfigManager:
         assert manager.extract_managed_section(config_file) is None
 
         managed_content = "alias test='echo test'"
+        _, start_marker, end_marker = manager._build_markers("#")
         config_file.write_text(
-            f"Some content\n{manager.START_MARKER}\n{managed_content}\n{manager.END_MARKER}\n"
+            f"Some content\n{start_marker}\n{managed_content}\n{end_marker}\n"
         )
         assert manager.has_managed_section(config_file)
 
@@ -255,9 +256,10 @@ class TestConfigManagerSharedConfig:
         assert result == OperationResult.CREATED
         assert config_file.exists()
 
+        _, start_marker, end_marker = manager._build_markers("#")
         content = config_file.read_text()
-        assert manager.START_MARKER in content
-        assert manager.END_MARKER in content
+        assert start_marker in content
+        assert end_marker in content
         assert manager.SHARED_SECTION_MARKER in content
         assert manager.SHELL_SPECIFIC_MARKER in content
         assert shared_content in content

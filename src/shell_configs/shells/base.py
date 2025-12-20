@@ -24,6 +24,7 @@ class AdditionalFile:
     name: str
     source_path: Path
     target_path: Path
+    comment_prefix: str | None = None
 
 
 class Shell(ABC):

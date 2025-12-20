@@ -1,7 +1,5 @@
 """Display utilities using Rich."""
 
-from pathlib import Path
-
 from rich.console import Console
 from rich.table import Table
 
@@ -65,35 +63,35 @@ def create_status_table() -> Table:
         Rich Table object
     """
     table = Table(show_header=True, header_style="bold")
-    table.add_column("Shell", style="cyan", no_wrap=True)
-    table.add_column("Config File", style="white")
-    table.add_column("Status", style="white")
+    table.add_column("Config", style="cyan", no_wrap=True)
+    table.add_column("File", style="white")
+    table.add_column("Status", style="white", no_wrap=True)
     return table
 
 
 def add_status_row(
-    table: Table, shell_name: str, config_file: Path, status: str
+    table: Table, shell_name: str, config_file: str, status: str
 ) -> None:
     """Add a row to a status table.
 
     Args:
         table: Table to add row to
         shell_name: Name of the shell
-        config_file: Path to the config file
+        config_file: Path string to the config file
         status: Status string
     """
-    table.add_row(shell_name, str(config_file), status)
+    table.add_row(shell_name, config_file, status)
 
 
-def add_additional_file_row(table: Table, file_path: Path, status: str) -> None:
+def add_additional_file_row(table: Table, file_path: str, status: str) -> None:
     """Add a row for an additional file to a status table.
 
     Args:
         table: Table to add row to
-        file_path: Path to the additional file
+        file_path: Path string to the additional file
         status: Status string
     """
-    table.add_row("", f"  └─ {file_path}", status)
+    table.add_row("", file_path, status)
 
 
 def get_status_indicator(synced: bool, exists: bool) -> str:

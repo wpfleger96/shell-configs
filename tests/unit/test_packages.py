@@ -10,15 +10,15 @@ from shell_configs.packages import (
     LinuxInstaller,
     Package,
     get_package_manager,
-    is_macos,
     load_packages,
 )
+from shell_configs.platform import Platform, detect_platform, is_platform
 
 
 def test_platform_detection() -> None:
-    """Test that platform detection returns a boolean."""
-    result = is_macos()
-    assert isinstance(result, bool)
+    """Test that platform detection returns a Platform enum."""
+    result = detect_platform()
+    assert isinstance(result, Platform)
 
 
 def test_load_packages_returns_list(tmp_path: Path) -> None:
@@ -96,10 +96,12 @@ def test_get_package_manager_returns_manager() -> None:
     """Test that get_package_manager finds available manager."""
     manager = get_package_manager()
 
-    if is_macos() and shutil.which("brew"):
+    if is_platform(Platform.MACOS) and shutil.which("brew"):
         assert manager is not None
         assert manager.name == "homebrew"
-    elif not is_macos() and (shutil.which("apt") or shutil.which("pip")):
+    elif not is_platform(Platform.MACOS) and (
+        shutil.which("apt") or shutil.which("pip")
+    ):
         assert manager is not None
         assert manager.name == "linux"
 
@@ -116,7 +118,7 @@ def test_homebrew_manager_binary_check_fallback() -> None:
     """Test that HomebrewManager uses binary check as fast path."""
     homebrew = HomebrewManager()
 
-    if not is_macos():
+    if not is_platform(Platform.MACOS):
         return
 
     pkg = Package(
@@ -131,7 +133,7 @@ def test_homebrew_manager_binary_check_fallback() -> None:
 
 def test_linux_installer_binary_check_fallback() -> None:
     """Test that LinuxInstaller uses binary check as fast path."""
-    if is_macos():
+    if is_platform(Platform.MACOS):
         return
 
     linux_installer = LinuxInstaller()
