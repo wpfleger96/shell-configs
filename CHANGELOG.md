@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.6.0 (2025-12-20)
+
+### Features
+
+- Add cursor configs ported from ai-rules
+  ([`013fc84`](https://github.com/wpfleger96/shell-configs/commit/013fc8491ab282a155df71851afb9d82bf7f9ac1))
+
+### Refactoring
+
+- Add platform autodetection module with per-env resolved config
+  ([`efcc953`](https://github.com/wpfleger96/shell-configs/commit/efcc9534b9ad4c7f0ea5e08f4afad94fead1c82f))
+
+
 ## v0.5.0 (2025-12-19)
 
 ### Features
