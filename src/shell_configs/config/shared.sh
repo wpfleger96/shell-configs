@@ -10,6 +10,11 @@ export PATH="$PATH:$HOME/.local/bin"
 export PATH="$PATH:$HOME/.rvm/bin"
 export PYPI="https://pypi.org/simple"
 
+# WSL: Use wslview to open URLs in Windows default browser
+if [[ -f /proc/version ]] && grep -qi microsoft /proc/version 2>/dev/null; then
+    export BROWSER=wslview
+fi
+
 ### Git - Aliases ###
 alias ga='git add'
 alias gaa="git add ."

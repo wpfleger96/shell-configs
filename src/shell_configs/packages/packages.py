@@ -109,7 +109,6 @@ def _uninstall_pwsh_module(name: str, dry_run: bool) -> tuple[bool, str]:
         return False, f"Unexpected error: {e}"
 
 
-# Methods that cannot be auto-uninstalled
 CANNOT_AUTO_UNINSTALL = frozenset({"script"})
 
 
@@ -339,11 +338,9 @@ class HomebrewManager(PackageManager):
         if not config:
             return False, f"No macOS config for {pkg.name}"
 
-        # Dispatch to pwsh handler
         if config.method == "pwsh":
             return _uninstall_pwsh_module(config.package or pkg.name, dry_run)
 
-        # Rest is brew-specific
         if config.method != "brew":
             return False, f"Cannot uninstall {pkg.name} (method: {config.method})"
 
