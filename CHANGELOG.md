@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.7.0 (2025-12-22)
+
+### Features
+
+- Add grename git alias
+  ([`1147aa7`](https://github.com/wpfleger96/shell-configs/commit/1147aa747bc98c591778485506122fe333dc4925))
+
+
 ## v0.6.0 (2025-12-20)
 
 ### Features
