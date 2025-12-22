@@ -66,6 +66,40 @@ git() {
     fi
 }
 
+grename() {
+    local new_repo="$1"
+    if [[ -z "$new_repo" ]]; then
+        echo "Usage: grename <new-repo-name>"
+        return 1
+    fi
+
+    local current_url
+    current_url=$(command git remote get-url origin 2>/dev/null)
+    if [[ -z "$current_url" ]]; then
+        echo "Error: No origin remote found"
+        return 1
+    fi
+
+    local username new_url
+    if [[ "$current_url" == git@github.com:* ]]; then
+        # SSH format: git@github.com:user/repo.git
+        username="${current_url#git@github.com:}"
+        username="${username%%/*}"
+        new_url="git@github.com:${username}/${new_repo}.git"
+    elif [[ "$current_url" == https://github.com/* ]]; then
+        # HTTPS format: https://github.com/user/repo.git
+        username="${current_url#https://github.com/}"
+        username="${username%%/*}"
+        new_url="https://github.com/${username}/${new_repo}.git"
+    else
+        echo "Error: Unsupported remote URL format: $current_url"
+        return 1
+    fi
+
+    echo "Updating origin: $current_url -> $new_url"
+    command git remote set-url origin "$new_url"
+}
+
 ### Git Worktree Management ###
 export WT_DIR=".worktrees"
 export WT_EDITOR="cursor"
