@@ -36,7 +36,6 @@ alias gwhatchanged='git log ORIG_HEAD.. --stat --no-merges'
 alias wtl='wt list'
 alias wta='wt add'
 alias wtr='wt rm'
-alias sync-fork="git checkout && git fetch upstream && git merge upstream/main"
 alias recent_commits="git for-each-ref --sort=-committerdate refs/heads/ --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(color:red)%(objectname:short)%(color:reset) - %(contents:subject) - %(authorname) (%(color:green)%(committerdate:relative)%(color:reset))'"
 alias safepull='git fetch origin $(git rev-parse --abbrev-ref HEAD) && git merge FETCH_HEAD'
 alias yeet="git commit -a --amend --no-edit"
@@ -98,6 +97,25 @@ grename() {
 
     echo "Updating origin: $current_url -> $new_url"
     command git remote set-url origin "$new_url"
+}
+
+sync-fork() {
+    local default_branch
+    default_branch=$(command git symbolic-ref refs/remotes/upstream/HEAD 2>/dev/null | sed 's@^refs/remotes/upstream/@@')
+
+    if [[ -z "$default_branch" ]]; then
+        # Fallback: check if upstream/main or upstream/master exists
+        if command git show-ref --verify --quiet refs/remotes/upstream/main 2>/dev/null; then
+            default_branch="main"
+        elif command git show-ref --verify --quiet refs/remotes/upstream/master 2>/dev/null; then
+            default_branch="master"
+        else
+            echo "Error: Could not determine upstream default branch"
+            return 1
+        fi
+    fi
+
+    git checkout && git fetch upstream && git merge "upstream/$default_branch"
 }
 
 ### Git Worktree Management ###
