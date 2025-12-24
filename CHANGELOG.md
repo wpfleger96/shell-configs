@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.7.1 (2025-12-24)
+
+### Bug Fixes
+
+- Sync-fork should respect default branch
+  ([`cdd8ae2`](https://github.com/wpfleger96/shell-configs/commit/cdd8ae27dcf2e06e765596e140e02130264f1ca8))
+
+
 ## v0.7.0 (2025-12-22)
 
 ### Features
