@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.8.0 (2026-01-06)
+
+### Features
+
+- Claude code aliases
+  ([`22458de`](https://github.com/wpfleger96/shell-configs/commit/22458dec8e9f86659b30c070ea2caafcd011ede1))
+
+
 ## v0.7.1 (2025-12-24)
 
 ### Bug Fixes
