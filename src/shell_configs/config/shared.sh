@@ -534,6 +534,8 @@ export NVM_DIR="$HOME/.nvm"
 alias docker_cleanup="docker builder prune -af && docker system prune -af"
 
 ### AI Tools - Aliases ###
+alias ccc="claude --continue"
+alias ccr="claude --resume"
 alias ccusage="npx -y ccusage@latest"
 alias ccviewer="uvx --from claude-code-viewer claude-viewer"
 alias run_claude_code_logger="unbuffer npx -y claude-code-logger@latest start -v"
