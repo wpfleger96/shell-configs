@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.9.0 (2026-01-08)
+
+### Features
+
+- Consolidate git configs and add SSH commit signing automation
+  ([`901ecdc`](https://github.com/wpfleger96/shell-configs/commit/901ecdc2330464080137ed46d417db2e8ba0fc20))
+
+
 ## v0.8.0 (2026-01-06)
 
 ### Features
