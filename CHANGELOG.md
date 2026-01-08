@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.10.0 (2026-01-08)
+
+### Features
+
+- Add corp SSL fix helper for Ruby scripts
+  ([`628197c`](https://github.com/wpfleger96/shell-configs/commit/628197c0a2b63ba595641dd7e20a06b2df3f2163))
+
+
 ## v0.9.0 (2026-01-08)
 
 ### Features
