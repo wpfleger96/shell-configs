@@ -1,8 +1,36 @@
 # Global gitignore patterns
-# This file is installed to ~/.config/git/ignore by shell-configs
+# Managed by shell-configs
 
-# Ignore PLAN__*.md files created by Claude Code /dev-docs slash command
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+*.sublime-*
+
+# Editors
+*.swp
+*.swo
+*~
+\#*\#
+
+# Ruby
+.bundle/
+.rbx/
+
+# Node
+node_modules/
+
+# Build artifacts
+/tags
+
+# Claude Code /dev-docs slash command
 PLAN__*.md
 
-# Ignore git worktrees directory
+# Git worktrees
 .worktrees/

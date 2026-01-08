@@ -361,6 +361,31 @@ def install(
         print_warning("No shells to install")
         return
 
+    if not dry_run:
+        pkg_manager = get_package_manager()
+        if pkg_manager:
+            try:
+                packages = load_packages()
+                required = [pkg for pkg in packages if pkg.required]
+                missing_required = [
+                    pkg for pkg in required if not pkg_manager.is_installed(pkg)
+                ]
+
+                if missing_required:
+                    console.print(
+                        f"[yellow]Installing {len(missing_required)} required package(s)...[/yellow]"
+                    )
+                    for pkg in missing_required:
+                        console.print(f"  Installing {pkg.name}...")
+                        success, message = pkg_manager.install(pkg, dry_run=False)
+                        if success:
+                            console.print(f"  [green]✓[/green] {pkg.name}")
+                        else:
+                            console.print(f"  [red]✗[/red] {pkg.name}: {message}")
+                    console.print()
+            except Exception as e:
+                print_warning(f"Error installing required packages: {e}")
+
     has_diffs = False
     if not force and not dry_run:
         has_diffs = _display_diffs_for_shells(selected_shells, config_reader, manager)
@@ -488,6 +513,42 @@ def install(
                     )
             except Exception as e:
                 console.print(f"\n[red]Error checking packages:[/red] {e}")
+
+        from shell_configs.signing import (
+            generate_allowed_signers_file,
+            validate_signing_setup,
+        )
+
+        console.print()
+        console.print("[yellow]Validating SSH signing setup...[/yellow]")
+        success, message = validate_signing_setup(auto_fix=False)
+        if success:
+            console.print(f"[green]✓[/green] {message}")
+        elif "not registered" in message:
+            console.print(f"[yellow]⚠[/yellow] {message}")
+            if force or Confirm.ask(
+                "Register SSH key for commit signing with GitHub?", default=True
+            ):
+                success, message = validate_signing_setup(auto_fix=True)
+                if success:
+                    console.print(f"[green]✓[/green] {message}")
+                else:
+                    console.print(f"[red]✗[/red] {message}")
+            else:
+                console.print(
+                    "[dim]Skipped. Run 'shell-configs signing --fix' later.[/dim]"
+                )
+        else:
+            console.print(f"[yellow]⚠[/yellow] {message}")
+
+        allowed_signers_path = Path.home() / ".config" / "git" / "allowed_signers"
+        signers_success, signers_msg = generate_allowed_signers_file(
+            allowed_signers_path
+        )
+        if signers_success:
+            console.print(f"[green]✓[/green] {signers_msg}")
+        else:
+            console.print(f"[yellow]⚠[/yellow] {signers_msg}")
 
 
 @cli.command()
@@ -704,6 +765,18 @@ def status(shells: list[str] | None) -> None:
 
     console.print()
 
+    console.print("[bold cyan]SSH Signing[/bold cyan]\n")
+
+    from shell_configs.signing import validate_signing_setup
+
+    success, message = validate_signing_setup(auto_fix=False)
+    if success:
+        console.print(f"  [green]✓[/green] {message}")
+    else:
+        console.print(f"  [yellow]⚠[/yellow] {message}")
+
+    console.print()
+
 
 @cli.command()
 @click.option(
@@ -794,6 +867,38 @@ def list_shells() -> None:
         print_warning(
             "No shell configurations found. Add config files to the config/ directory."
         )
+
+
+@cli.command()
+@click.option(
+    "--fix",
+    is_flag=True,
+    help="Auto-register SSH key if not registered for signing",
+)
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed key information")
+def signing(fix: bool, verbose: bool) -> None:
+    """Validate SSH signing key is registered with GitHub."""
+    from shell_configs.signing import get_signing_key_info, validate_signing_setup
+
+    success, message = validate_signing_setup(auto_fix=fix)
+    if success:
+        console.print(f"[green]✓[/green] {message}")
+
+        if verbose:
+            info = get_signing_key_info()
+            if info:
+                console.print()
+                console.print("[bold cyan]Signing Key Details[/bold cyan]")
+                console.print(f"  Key type:      {info['key_type']}")
+                console.print(f"  Fingerprint:   {info['fingerprint']}")
+                console.print(f"  GitHub title:  {info['github_title'] or 'N/A'}")
+                console.print(f"  Git name:      {info['git_name']}")
+                console.print(f"  Git email:     {info['git_email']}")
+                if info["comment"]:
+                    console.print(f"  Key comment:   {info['comment']}")
+    else:
+        console.print(f"[red]✗[/red] {message}")
+        sys.exit(1)
 
 
 @cli.command()

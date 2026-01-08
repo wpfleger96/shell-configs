@@ -121,6 +121,7 @@ class Package(BaseModel):
     name: str
     command: str | None = None
     description: str = ""
+    required: bool = False
     macos: InstallConfig | None = None
     linux: InstallConfig | None = None
 

@@ -74,6 +74,7 @@ packages:
   - name: gh
     command: gh
     description: "GitHub CLI"
+    required: true
     macos:
       method: brew
     linux:
@@ -125,3 +126,13 @@ packages:
     linux:
       method: apt
       package: sqlite3
+
+  - name: git-delta
+    command: delta
+    description: "Syntax-highlighting pager for git"
+    required: true
+    macos:
+      method: brew
+    linux:
+      method: apt
+      package: git-delta
