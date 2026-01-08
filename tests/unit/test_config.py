@@ -60,7 +60,8 @@ class TestConfigReader:
         shared_git.write_text("[alias]\n    st = status")
 
         shell_content = reader.get_shared_config_content("bash")
-        assert shell_content == "# Shared shell config\nalias ll='ls -la'"
+        expected_shell = f"export SHELL_CONFIGS_DIR=\"{test_repo / 'config'}\"\n\n# Shared shell config\nalias ll='ls -la'"
+        assert shell_content == expected_shell
 
         git_content = reader.get_shared_config_content("git")
         assert git_content == "[alias]\n    st = status"

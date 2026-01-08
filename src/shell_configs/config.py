@@ -75,6 +75,7 @@ class ConfigReader:
         This method:
         1. Loads the base shared config (shared.sh or shared.gitconfig)
         2. Appends platform-specific overlay if it exists
+        3. Prepends SHELL_CONFIGS_DIR export for shell configs (not git)
 
         Args:
             shell_name: Name of the shell (e.g., 'bash', 'zsh', 'git')
@@ -101,5 +102,9 @@ class ConfigReader:
             overlay = overlay_path.read_text().rstrip("\n")
             if overlay:
                 content = f"{content}\n\n### Platform-Specific ({platform.display_name}) ###\n{overlay}"
+
+        if shell_name != "git":
+            config_dir_export = f'export SHELL_CONFIGS_DIR="{self.config_dir}"'
+            content = f"{config_dir_export}\n\n{content}"
 
         return content

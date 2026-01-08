@@ -530,6 +530,24 @@ export NVM_DIR="$HOME/.nvm"
 ### Rust ###
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
+### Ruby ###
+# Ruby/bundle with corporate SSL fix (bypasses CRL checking issues)
+rubyssl() {
+    if [[ -z "$SHELL_CONFIGS_DIR" ]]; then
+        echo "Error: SHELL_CONFIGS_DIR not set. Run 'shell-configs install'." >&2
+        return 1
+    fi
+    RUBYOPT="-r $SHELL_CONFIGS_DIR/script/ssl_fix.rb" ruby "$@"
+}
+
+bundlessl() {
+    if [[ -z "$SHELL_CONFIGS_DIR" ]]; then
+        echo "Error: SHELL_CONFIGS_DIR not set. Run 'shell-configs install'." >&2
+        return 1
+    fi
+    RUBYOPT="-r $SHELL_CONFIGS_DIR/script/ssl_fix.rb" bundle "$@"
+}
+
 ### Docker ###
 alias docker_cleanup="docker builder prune -af && docker system prune -af"
 
