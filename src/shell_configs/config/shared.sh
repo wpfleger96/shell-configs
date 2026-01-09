@@ -510,6 +510,7 @@ wt() {
 }
 
 ### Python ###
+alias uvr="uv run"
 pytest_coverage() {
     uv run pytest --cov=src --cov-report=term-missing "$@"
 }
