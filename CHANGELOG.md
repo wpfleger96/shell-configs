@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.10.3 (2026-01-09)
+
+### Bug Fixes
+
+- Google chrome alias on mac
+  ([`2ec170c`](https://github.com/wpfleger96/shell-configs/commit/2ec170c72d488c0423991d34d8bd90b8b0cc2748))
+
+
 ## v0.10.2 (2026-01-09)
 
 ### Bug Fixes
