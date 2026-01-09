@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v0.10.1 (2026-01-09)
+
+### Bug Fixes
+
+- Git-delta install on WSL
+  ([`46fba81`](https://github.com/wpfleger96/shell-configs/commit/46fba81028c96fdb3c2254bf1eb20d1b5c4a4c67))
+
+- Wsl compatibility
+  ([`2d26aa3`](https://github.com/wpfleger96/shell-configs/commit/2d26aa37e725ab9f25b72f32f281279f19786dc7))
+
+
 ## v0.10.0 (2026-01-08)
 
 ### Features
