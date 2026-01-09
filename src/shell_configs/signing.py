@@ -1,9 +1,7 @@
 """SSH signing key validation and setup."""
 
-import os
 import shutil
 import subprocess
-import tempfile
 
 from pathlib import Path
 
@@ -77,70 +75,61 @@ def register_signing_key(key: str, auto_refresh_scope: bool = True) -> tuple[boo
     Returns:
         (success, message) tuple
     """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".pub", delete=False) as f:
-        f.write(key)
-        temp_path = f.name
+    result = subprocess.run(
+        [
+            "gh",
+            "api",
+            "/user/ssh_signing_keys",
+            "-f",
+            f"key={key}",
+            "-f",
+            "title=shell-configs signing key",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if result.returncode == 0:
+        return True, "SSH key registered for signing"
 
-    try:
-        result = subprocess.run(
+    error_msg = result.stderr.strip()
+
+    if auto_refresh_scope and "admin:ssh_signing_key" in error_msg:
+        refresh_result = subprocess.run(
             [
                 "gh",
-                "ssh-key",
-                "add",
-                temp_path,
-                "--type",
-                "signing",
-                "--title",
-                "shell-configs signing key",
+                "auth",
+                "refresh",
+                "-h",
+                "github.com",
+                "-s",
+                "admin:ssh_signing_key",
             ],
-            capture_output=True,
-            text=True,
-            timeout=30,
+            timeout=120,
         )
-        if result.returncode == 0:
-            return True, "SSH key registered for signing"
 
-        error_msg = result.stderr.strip()
-
-        if auto_refresh_scope and "admin:ssh_signing_key" in error_msg:
-            refresh_result = subprocess.run(
+        if refresh_result.returncode == 0:
+            retry_result = subprocess.run(
                 [
                     "gh",
-                    "auth",
-                    "refresh",
-                    "-h",
-                    "github.com",
-                    "-s",
-                    "admin:ssh_signing_key",
+                    "api",
+                    "/user/ssh_signing_keys",
+                    "-f",
+                    f"key={key}",
+                    "-f",
+                    "title=shell-configs signing key",
                 ],
-                timeout=120,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
+            if retry_result.returncode == 0:
+                return True, "SSH key registered for signing (after auth refresh)"
+            return False, retry_result.stderr.strip()
+        else:
+            return False, "Failed to refresh GitHub authentication scope"
 
-            if refresh_result.returncode == 0:
-                retry_result = subprocess.run(
-                    [
-                        "gh",
-                        "ssh-key",
-                        "add",
-                        temp_path,
-                        "--type",
-                        "signing",
-                        "--title",
-                        "shell-configs signing key",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                )
-                if retry_result.returncode == 0:
-                    return True, "SSH key registered for signing (after auth refresh)"
-                return False, retry_result.stderr.strip()
-            else:
-                return False, "Failed to refresh GitHub authentication scope"
-
-        return False, error_msg
-    finally:
-        os.unlink(temp_path)
+    return False, error_msg
 
 
 def validate_signing_setup(auto_fix: bool = False) -> tuple[bool, str]:
