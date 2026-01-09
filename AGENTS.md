@@ -173,6 +173,11 @@ Markers: `unit`, `integration`, `cli`, `bootstrap`
    - View issue: `gh issue view 123`
    - Check PR status: `gh pr checks`
    - **Never** use `curl https://api.github.com/...` directly
+10. **Local development vs installed tool** - **CRITICAL**: Always use `uv run shell-configs` when developing locally:
+   - **Local dev (from repo)**: `uv run shell-configs <command>` → runs YOUR local code changes directly
+   - **Installed tool (any directory)**: `shell-configs <command>` → runs installed version from `~/.local/share/uv/tools/`
+   - Running `shell-configs` without `uv run` will NOT reflect your local changes
+   - **NEVER use editable install** (`uv pip install -e .`) - risks conflicts with installed version, unnecessary complexity
 
 ## Key Files by Task
 
