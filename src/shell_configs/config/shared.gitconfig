@@ -117,7 +117,7 @@
 [merge]
     tool = vimdiff
     summary = true
-    conflictStyle = zdiff3
+    conflictStyle = diff3
 
 [rerere]
     enabled = true
