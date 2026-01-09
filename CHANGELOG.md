@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.10.4 (2026-01-09)
+
+### Bug Fixes
+
+- Uvr alias
+  ([`1d2338d`](https://github.com/wpfleger96/shell-configs/commit/1d2338dd191153d51e0b6488c519c2983bd57bc0))
+
+### Chores
+
+- Docs
+  ([`3cc899c`](https://github.com/wpfleger96/shell-configs/commit/3cc899c3c1616657a36d392ff543cb0052e196b6))
+
+
 ## v0.10.3 (2026-01-09)
 
 ### Bug Fixes
