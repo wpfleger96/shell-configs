@@ -134,5 +134,5 @@ packages:
     macos:
       method: brew
     linux:
-      method: apt
-      package: git-delta
+      method: script
+      install_cmd: "curl -sS https://webi.sh/delta | sh"
