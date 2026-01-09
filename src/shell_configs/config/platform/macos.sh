@@ -15,3 +15,7 @@ open_goose_recipe_desktop() {
     local deeplink=$(goose recipe deeplink "$recipe_name" | grep -o 'goose://recipe?config=[^ ]*')
     open "$deeplink"
 }
+
+chrome() {
+    open -a "Google Chrome" "$@"
+}
