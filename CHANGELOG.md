@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.10.2 (2026-01-09)
+
+### Bug Fixes
+
+- Use gh api for key registration for compatibility
+  ([`a6f9e67`](https://github.com/wpfleger96/shell-configs/commit/a6f9e67b6a45d01f753a5dcfb2681de6ef7e0e4c))
+
+
 ## v0.10.1 (2026-01-09)
 
 ### Bug Fixes
