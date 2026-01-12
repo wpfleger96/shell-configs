@@ -554,6 +554,7 @@ alias docker_cleanup="docker builder prune -af && docker system prune -af"
 
 ### AI Tools - Aliases ###
 alias ccc="claude --continue"
+alias cccf="claude --continue --fork-session"
 alias ccr="claude --resume"
 alias ccusage="npx -y ccusage@latest"
 alias ccviewer="uvx --from claude-code-viewer claude-viewer"
