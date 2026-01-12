@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.10.5 (2026-01-12)
+
+### Bug Fixes
+
+- Cc alias
+  ([`3155530`](https://github.com/wpfleger96/shell-configs/commit/31555300b0a7c32cea6cbf23c073705a15726382))
+
+
 ## v0.10.4 (2026-01-09)
 
 ### Bug Fixes
