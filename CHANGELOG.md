@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.10.6 (2026-01-18)
+
+### Bug Fixes
+
+- Duplicate error message
+  ([`2687e59`](https://github.com/wpfleger96/shell-configs/commit/2687e59505e2ddd47ac5e4654ee5abdc45b74ea9))
+
+
 ## v0.10.5 (2026-01-12)
 
 ### Bug Fixes
