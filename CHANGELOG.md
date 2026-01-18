@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v0.10.9 (2026-01-18)
+
+### Bug Fixes
+
+- Cursor test isolation issue on WSL
+  ([`03a430d`](https://github.com/wpfleger96/shell-configs/commit/03a430db8be87e6af4a282f756867bc7762d6beb))
+
+- Remove duplicates
+  ([`bc2a4df`](https://github.com/wpfleger96/shell-configs/commit/bc2a4df8e34cf5783fdd2833e8e74bc47df3c55d))
+
+
 ## v0.10.8 (2026-01-18)
 
 ### Bug Fixes
