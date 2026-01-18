@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.10.10 (2026-01-18)
+
+### Bug Fixes
+
+- Dont backup/overwrite files unnecessaily and show diffs before backup
+  ([`1e1dfde`](https://github.com/wpfleger96/shell-configs/commit/1e1dfdebc67809ee96c1a9d27bbbe65442dbfc0f))
+
+
 ## v0.10.9 (2026-01-18)
 
 ### Bug Fixes
