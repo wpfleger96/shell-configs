@@ -5,37 +5,17 @@ import logging
 import sys
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 
-from rich.prompt import Confirm
-from rich.syntax import Syntax
-
 from shell_configs import __version__
 from shell_configs.config import ConfigReader
-from shell_configs.display import (
-    add_additional_file_row,
-    add_status_row,
-    add_validation_row,
-    console,
-    create_status_table,
-    create_validation_table,
-    get_status_indicator,
-    print_error,
-    print_info,
-    print_operation_result,
-    print_warning,
-)
-from shell_configs.manager import ConfigManager, OperationResult
-from shell_configs.packages import (
-    get_package_manager,
-    load_packages,
-    sort_packages_for_install,
-    sort_packages_for_uninstall,
-)
-from shell_configs.platform import detect_platform
-from shell_configs.shells.base import Shell
-from shell_configs.shells.registry import ShellRegistry
+
+if TYPE_CHECKING:
+    from shell_configs.manager import ConfigManager
+    from shell_configs.shells.base import Shell
+    from shell_configs.shells.registry import ShellRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -70,11 +50,14 @@ def _background_update_check() -> None:
 
 def _check_pending_updates() -> None:
     """Check for and display pending update notifications."""
+    from rich.prompt import Confirm
+
     from shell_configs.bootstrap import (
         clear_all_pending_updates,
         get_tool_by_id,
         load_all_pending_updates,
     )
+    from shell_configs.display import console
 
     try:
         pending = load_all_pending_updates()
@@ -115,6 +98,8 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
     if not value or ctx.resilient_parsing:
         return
 
+    from shell_configs.display import console
+
     console.print(f"shell-configs, version {__version__}")
 
     try:
@@ -144,11 +129,11 @@ def parse_shell_filter(
 
 
 def _get_selected_shells(
-    registry: ShellRegistry,
+    registry: "ShellRegistry",
     shells_filter: list[str] | None = None,
     config_reader: ConfigReader | None = None,
     use_all: bool = False,
-) -> list[Shell]:
+) -> list["Shell"]:
     """Get selected shells based on filter or available configs.
 
     Args:
@@ -163,6 +148,8 @@ def _get_selected_shells(
     Raises:
         SystemExit: If invalid shell names provided
     """
+    from shell_configs.display import print_error, print_info
+
     if shells_filter:
         selected_shells, invalid = registry.filter_by_names(shells_filter)
         if invalid:
@@ -181,15 +168,19 @@ def _get_selected_shells(
 
 
 def _display_diffs_for_shells(
-    selected_shells: list[Shell],
+    selected_shells: list["Shell"],
     config_reader: ConfigReader,
-    manager: ConfigManager,
+    manager: "ConfigManager",
 ) -> bool:
     """Display diffs for selected shells before install.
 
     Returns:
         True if diffs were found and displayed, False otherwise
     """
+    from rich.syntax import Syntax
+
+    from shell_configs.display import console
+
     found_diffs = False
 
     for shell in selected_shells:
@@ -349,6 +340,18 @@ def install(
     shells: list[str] | None, dry_run: bool, force: bool, config_dir: Path | None
 ) -> None:
     """Install or update managed configuration sections."""
+    from rich.prompt import Confirm
+
+    from shell_configs.display import (
+        console,
+        print_info,
+        print_operation_result,
+        print_warning,
+    )
+    from shell_configs.manager import ConfigManager, OperationResult
+    from shell_configs.packages import get_package_manager, load_packages
+    from shell_configs.shells.registry import ShellRegistry
+
     config_reader = ConfigReader(config_dir=config_dir)
     manager = ConfigManager()
     registry = ShellRegistry()
@@ -561,6 +564,10 @@ def install(
 @click.option("--force", is_flag=True, help="Skip confirmation prompts")
 def uninstall(shells: list[str] | None, force: bool) -> None:
     """Remove managed configuration sections."""
+    from shell_configs.display import print_info, print_operation_result, print_warning
+    from shell_configs.manager import ConfigManager, OperationResult
+    from shell_configs.shells.registry import ShellRegistry
+
     manager = ConfigManager()
     registry = ShellRegistry()
 
@@ -622,6 +629,19 @@ def uninstall(shells: list[str] | None, force: bool) -> None:
 )
 def status(shells: list[str] | None) -> None:
     """Show the status of managed configurations."""
+    from shell_configs.display import (
+        add_additional_file_row,
+        add_status_row,
+        console,
+        create_status_table,
+        get_status_indicator,
+        print_warning,
+    )
+    from shell_configs.manager import ConfigManager
+    from shell_configs.packages import get_package_manager, load_packages
+    from shell_configs.platform import detect_platform
+    from shell_configs.shells.registry import ShellRegistry
+
     config_reader = ConfigReader()
     manager = ConfigManager()
     registry = ShellRegistry()
@@ -787,6 +807,10 @@ def status(shells: list[str] | None) -> None:
 )
 def diff(shells: list[str] | None) -> None:
     """Show differences between repository and installed configurations."""
+    from shell_configs.display import print_info, print_warning
+    from shell_configs.manager import ConfigManager
+    from shell_configs.shells.registry import ShellRegistry
+
     config_reader = ConfigReader()
     manager = ConfigManager()
     registry = ShellRegistry()
@@ -813,6 +837,16 @@ def diff(shells: list[str] | None) -> None:
 )
 def validate(shells: list[str] | None) -> None:
     """Validate configuration file syntax."""
+    from shell_configs.display import (
+        add_validation_row,
+        console,
+        create_validation_table,
+        print_error,
+        print_info,
+        print_warning,
+    )
+    from shell_configs.shells.registry import ShellRegistry
+
     config_reader = ConfigReader()
     registry = ShellRegistry()
 
@@ -853,6 +887,9 @@ def validate(shells: list[str] | None) -> None:
 @cli.command("list-shells")
 def list_shells() -> None:
     """List all available shell configurations."""
+    from shell_configs.display import console, print_warning
+    from shell_configs.shells.registry import ShellRegistry
+
     config_reader = ConfigReader()
     registry = ShellRegistry()
     all_shells = registry.get_all()
@@ -879,6 +916,7 @@ def list_shells() -> None:
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed key information")
 def signing(fix: bool, verbose: bool) -> None:
     """Validate SSH signing key is registered with GitHub."""
+    from shell_configs.display import console
     from shell_configs.signing import get_signing_key_info, validate_signing_setup
 
     success, message = validate_signing_setup(auto_fix=fix)
@@ -913,12 +951,15 @@ def upgrade(ctx: click.Context, check: bool, force: bool) -> None:
         shell-configs upgrade             # Check and install updates
         shell-configs upgrade --check     # Only check for updates
     """
+    from rich.prompt import Confirm
+
     from shell_configs.bootstrap import (
         UPDATABLE_TOOLS,
         check_tool_updates,
         perform_github_update,
     )
     from shell_configs.bootstrap.installer import GITHUB_REPO_URL
+    from shell_configs.display import console
 
     tools = [t for t in UPDATABLE_TOOLS if t.is_installed()]
 
@@ -1030,6 +1071,7 @@ def info() -> None:
         check_tool_updates,
     )
     from shell_configs.bootstrap.installer import get_tool_source
+    from shell_configs.display import console
 
     table = Table(title="shell-configs Installation Info", show_header=True)
     table.add_column("Tool", style="cyan")
@@ -1095,6 +1137,8 @@ def setup(
 
     Run this after installing with uvx: uvx shell-configs setup
     """
+    from rich.prompt import Confirm
+
     from shell_configs.bootstrap.installer import (
         get_tool_config_dir,
         install_tool,
@@ -1109,6 +1153,7 @@ def setup(
         get_supported_shells,
         install_completion,
     )
+    from shell_configs.display import console
 
     if not skip_packages:
         console.print("\n[bold cyan]Step 1/4: Install required packages[/bold cyan]")
@@ -1240,6 +1285,16 @@ def packages() -> None:
 @click.option("--force", is_flag=True, help="Skip confirmation prompts")
 def packages_install(dry_run: bool, force: bool) -> None:
     """Install required system packages."""
+    from rich.prompt import Confirm
+
+    from shell_configs.display import console, print_error, print_info
+    from shell_configs.packages import (
+        get_package_manager,
+        load_packages,
+        sort_packages_for_install,
+    )
+    from shell_configs.platform import detect_platform
+
     platform_name = detect_platform().display_name
     console.print(f"[dim]Platform:[/dim] {platform_name}")
 
@@ -1326,6 +1381,10 @@ def packages_install(dry_run: bool, force: bool) -> None:
 @packages.command(name="status")
 def packages_status() -> None:
     """Show status of required packages."""
+    from shell_configs.display import console, print_error, print_info
+    from shell_configs.packages import get_package_manager, load_packages
+    from shell_configs.platform import detect_platform
+
     platform_name = detect_platform().display_name
     console.print(f"[dim]Platform:[/dim] {platform_name}\n")
 
@@ -1377,6 +1436,16 @@ def packages_status() -> None:
 @click.option("--force", is_flag=True, help="Skip confirmation prompts")
 def packages_uninstall(dry_run: bool, force: bool) -> None:
     """Uninstall managed system packages."""
+    from rich.prompt import Confirm
+
+    from shell_configs.display import console, print_error, print_info
+    from shell_configs.packages import (
+        get_package_manager,
+        load_packages,
+        sort_packages_for_uninstall,
+    )
+    from shell_configs.platform import detect_platform
+
     platform_name = detect_platform().display_name
     console.print(f"[dim]Platform:[/dim] {platform_name}")
 
@@ -1490,6 +1559,7 @@ _SUPPORTED_SHELLS = list(get_supported_shells())
 def completions_bash() -> None:
     """Output bash completion script for manual installation."""
     from shell_configs.completions import generate_completion_script
+    from shell_configs.display import console
 
     try:
         script = generate_completion_script("bash")
@@ -1507,6 +1577,7 @@ def completions_bash() -> None:
 def completions_zsh() -> None:
     """Output zsh completion script for manual installation."""
     from shell_configs.completions import generate_completion_script
+    from shell_configs.display import console
 
     try:
         script = generate_completion_script("zsh")
@@ -1527,6 +1598,7 @@ def completions_zsh() -> None:
 def completions_install(shell: str | None) -> None:
     """Install shell completion to config file."""
     from shell_configs.completions import detect_shell, install_completion
+    from shell_configs.display import console
 
     if shell is None:
         shell = detect_shell()
@@ -1559,6 +1631,7 @@ def completions_uninstall(shell: str | None) -> None:
         find_config_file,
         uninstall_completion,
     )
+    from shell_configs.display import console
 
     if shell is None:
         shell = detect_shell()
@@ -1585,12 +1658,15 @@ def completions_uninstall(shell: str | None) -> None:
 @completions.command(name="status")
 def completions_status() -> None:
     """Show shell completion installation status."""
+    from rich.table import Table
+
     from shell_configs.completions import (
         detect_shell,
         find_config_file,
         get_supported_shells,
         is_completion_installed,
     )
+    from shell_configs.display import console
 
     detected_shell = detect_shell()
     console.print("[bold cyan]Shell Completions Status[/bold cyan]\n")
@@ -1599,8 +1675,6 @@ def completions_status() -> None:
         console.print(f"Detected shell: [cyan]{detected_shell}[/cyan]\n")
     else:
         console.print("[yellow]No supported shell detected[/yellow]\n")
-
-    from rich.table import Table
 
     table = Table(show_header=True)
     table.add_column("Shell")
