@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v0.10.7 (2026-01-18)
+
+### Bug Fixes
+
+- Dont overwrite/update files unnecessarily
+  ([`880d4cb`](https://github.com/wpfleger96/shell-configs/commit/880d4cbcf238dc392a4064ea35b53a6836486bb6))
+
+- Give SSH keys unique names
+  ([`caa63b3`](https://github.com/wpfleger96/shell-configs/commit/caa63b3ee5565555ac160a21f3e5bba0f1ce45b4))
+
+
 ## v0.10.6 (2026-01-18)
 
 ### Bug Fixes
