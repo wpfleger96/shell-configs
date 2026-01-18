@@ -99,8 +99,16 @@ def save_auto_update_config(
     config_path = get_config_path(package_name)
 
     try:
+        new_data = asdict(config)
+
+        if config_path.exists():
+            with open(config_path) as f:
+                existing_data = yaml.safe_load(f) or {}
+            if existing_data == new_data:
+                return
+
         with open(config_path, "w") as f:
-            yaml.dump(asdict(config), f, default_flow_style=False, sort_keys=False)
+            yaml.dump(new_data, f, default_flow_style=False, sort_keys=False)
     except OSError as e:
         logger.debug(f"Failed to save config to {config_path}: {e}")
 
@@ -213,8 +221,29 @@ def save_pending_update(info: UpdateInfo, tool_id: str = "shell-configs") -> Non
             "checked_at": datetime.now().isoformat(),
         }
 
-        with open(pending_path, "w") as f:
-            json.dump(data, f, indent=2)
+        should_write = True
+        if pending_path.exists():
+            try:
+                with open(pending_path) as f:
+                    existing_data = json.load(f)
+
+                fields_to_compare = [
+                    "has_update",
+                    "current_version",
+                    "latest_version",
+                    "source",
+                ]
+                if all(
+                    existing_data.get(field) == data[field]
+                    for field in fields_to_compare
+                ):
+                    should_write = False
+            except (json.JSONDecodeError, KeyError):
+                should_write = True
+
+        if should_write:
+            with open(pending_path, "w") as f:
+                json.dump(data, f, indent=2)
     except OSError as e:
         logger.debug(f"Failed to save pending update to {pending_path}: {e}")
 

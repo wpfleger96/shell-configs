@@ -200,10 +200,21 @@ def generate_allowed_signers_file(
         for key in agent_keys:
             lines.append(f"{email} {key}")
 
-    allowed_signers_path.parent.mkdir(parents=True, exist_ok=True)
-    allowed_signers_path.write_text("\n".join(lines) + "\n")
+    new_content = "\n".join(lines) + "\n"
 
-    return True, f"Generated allowed_signers with {len(agent_keys)} key(s)"
+    file_exists = allowed_signers_path.exists()
+    if file_exists:
+        existing_content = allowed_signers_path.read_text()
+        if existing_content == new_content:
+            return True, f"allowed_signers is up to date with {len(agent_keys)} key(s)"
+
+    allowed_signers_path.parent.mkdir(parents=True, exist_ok=True)
+    allowed_signers_path.write_text(new_content)
+
+    if file_exists:
+        return True, f"Updated allowed_signers with {len(agent_keys)} key(s)"
+    else:
+        return True, f"Generated allowed_signers with {len(agent_keys)} key(s)"
 
 
 def get_signing_key_info() -> dict[str, str] | None:

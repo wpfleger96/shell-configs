@@ -14,7 +14,7 @@ class ShellConfig:
     """Configuration for a supported shell."""
 
     name: str
-    config_files: list[str]  # Relative to home, in priority order
+    config_files: list[str]
 
     def get_config_candidates(self) -> list[Path]:
         """Get existing config file paths for this shell."""
@@ -186,6 +186,10 @@ def uninstall_completion(config_path: Path) -> tuple[bool, str]:
         if start_idx is not None and end_idx is not None:
             new_lines = lines[:start_idx] + lines[end_idx + 1 :]
             new_content = "\n".join(new_lines)
+
+            if content == new_content:
+                return True, f"Completion already not present in {config_path}"
+
             config_path.write_text(new_content)
             return True, f"Completion removed from {config_path}"
         else:
