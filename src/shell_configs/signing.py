@@ -1,9 +1,21 @@
 """SSH signing key validation and setup."""
 
+import getpass
 import shutil
+import socket
 import subprocess
 
 from pathlib import Path
+
+from shell_configs.platform import detect_platform
+
+
+def get_signing_key_title() -> str:
+    """Generate a unique title for the SSH signing key."""
+    user = getpass.getuser()
+    hostname = socket.gethostname()
+    platform = detect_platform().display_name
+    return f"shell-configs signing key ({user}@{hostname}, {platform})"
 
 
 def get_agent_keys() -> list[str]:
@@ -83,7 +95,7 @@ def register_signing_key(key: str, auto_refresh_scope: bool = True) -> tuple[boo
             "-f",
             f"key={key}",
             "-f",
-            "title=shell-configs signing key",
+            f"title={get_signing_key_title()}",
         ],
         capture_output=True,
         text=True,
@@ -117,7 +129,7 @@ def register_signing_key(key: str, auto_refresh_scope: bool = True) -> tuple[boo
                     "-f",
                     f"key={key}",
                     "-f",
-                    "title=shell-configs signing key",
+                    f"title={get_signing_key_title()}",
                 ],
                 capture_output=True,
                 text=True,
