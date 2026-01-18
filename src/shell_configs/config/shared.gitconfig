@@ -3,29 +3,12 @@
 
 [alias]
     # Quick shortcuts
-    a = add
     b = branch
-    c = commit -m
-    s = status
-    st = status
-    co = checkout
-    ci = commit
     cp = cherry-pick
-    br = branch
-    di = diff
-    dic = diff --cached
-    pl = pull
-    ps = push
     plre = pull --rebase
 
     # Useful commands
-    unstage = reset HEAD --
     last = log -1 HEAD
-    undo = reset --soft HEAD~1
-    amend = commit --amend --no-edit
-    nit = commit --amend --no-edit
-    pf = push --force-with-lease
-    publish = push -u
     praise = blame
     git = !exec git
     reauthor = commit --amend --reset-author -C HEAD
@@ -41,20 +24,16 @@
     lb = branch -v --sort=committerdate
 
     # Diff/status helpers
-    changed = diff --name-status -r
     ch = diff --name-status -r
     ignored = "!git ls-files --others --exclude-standard"
 
     # Branch/merge operations
     track = !sh -c 'git branch --track "$0" "origin/$0" && git checkout "$0"'
     cosu = !sh -c 'git checkout $0 && git submodule update --init'
-    touchdown = merge --no-ff
-    integrate = merge --no-ff
     td = merge --no-ff
     cleanup-branches = !sh -c 'git branch --merged | grep -v ^* | xargs -n 1 git branch -d'
 
     # Conflict helpers
-    add-unmerged = "!f() { git ls-files --unmerged | cut -f2 | sort -u ; }; git add `f`"
     au = "!f() { git ls-files --unmerged | cut -f2 | sort -u ; }; git add `f`"
 
 [core]
