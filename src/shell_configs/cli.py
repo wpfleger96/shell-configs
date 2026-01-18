@@ -423,13 +423,17 @@ def install(
             if content is None and shared_content is None:
                 continue
 
-            result, message = manager.install_section(
+            result, message, diff_text = manager.install_section(
                 config_file.path,
                 content,
                 dry_run=dry_run,
                 shared_content=shared_content,
             )
             print_operation_result(result, message)
+            if diff_text and result == OperationResult.UPDATED:
+                from shell_configs.display import print_diff
+
+                print_diff(diff_text)
             results[shell.name] = result
 
     for shell in selected_shells:
@@ -437,19 +441,23 @@ def install(
         for additional_file in additional_files:
             if additional_file.comment_prefix:
                 content = additional_file.source_path.read_text()
-                result, message = manager.install_section(
+                result, message, diff_text = manager.install_section(
                     additional_file.target_path,
                     content,
                     dry_run=dry_run,
                     comment_prefix=additional_file.comment_prefix,
                 )
             else:
-                result, message = manager.install_additional_file(
+                result, message, diff_text = manager.install_additional_file(
                     additional_file.source_path,
                     additional_file.target_path,
                     dry_run=dry_run,
                 )
             print_operation_result(result, message)
+            if diff_text and result == OperationResult.UPDATED:
+                from shell_configs.display import print_diff
+
+                print_diff(diff_text)
             additional_file_results[str(additional_file.target_path)] = result
 
     if dry_run:

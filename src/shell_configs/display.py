@@ -137,3 +137,18 @@ def add_validation_row(
     """
     status = "[green]✓[/green]" if valid else "[red]✗[/red]"
     table.add_row(shell_name, status, message if message else "-")
+
+
+def print_diff(diff_text: str | None) -> None:
+    """Print a unified diff with syntax highlighting.
+
+    Args:
+        diff_text: Unified diff text to display
+    """
+    if not diff_text or not diff_text.strip():
+        return
+
+    from rich.syntax import Syntax
+
+    syntax = Syntax(diff_text, "diff", theme="monokai")
+    console.print(syntax)

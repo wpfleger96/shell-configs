@@ -38,7 +38,7 @@ class TestConfigManager:
         config_file = temp_dir / "test.conf"
         content = "alias test='echo test'"
 
-        result, message = manager.install_section(config_file, content)
+        result, message, _ = manager.install_section(config_file, content)
 
         assert result == OperationResult.CREATED
         assert config_file.exists()
@@ -54,7 +54,7 @@ class TestConfigManager:
         config_file.write_text("Existing content\n")
         content = "alias test='echo test'"
 
-        result, message = manager.install_section(config_file, content)
+        result, message, _ = manager.install_section(config_file, content)
 
         assert result == OperationResult.CREATED
         assert "Existing content" in config_file.read_text()
@@ -71,7 +71,7 @@ class TestConfigManager:
         new_content = "alias new='echo new'"
 
         manager.install_section(config_file, old_content)
-        result, message = manager.install_section(config_file, new_content)
+        result, message, _ = manager.install_section(config_file, new_content)
 
         assert result == OperationResult.UPDATED
 
@@ -85,7 +85,7 @@ class TestConfigManager:
         content = "alias test='echo test'"
 
         manager.install_section(config_file, content)
-        result, message = manager.install_section(config_file, content)
+        result, message, _ = manager.install_section(config_file, content)
 
         assert result == OperationResult.ALREADY_SYNCED
 
@@ -94,7 +94,7 @@ class TestConfigManager:
         config_file = temp_dir / "test.conf"
         content = "alias test='echo test'"
 
-        result, message = manager.install_section(config_file, content, dry_run=True)
+        result, message, _ = manager.install_section(config_file, content, dry_run=True)
 
         assert result == OperationResult.CREATED
         assert not config_file.exists()
@@ -146,7 +146,7 @@ class TestConfigManagerAdditionalFiles:
         source_content = "# Test script\necho 'hello'"
         source_file.write_text(source_content)
 
-        result, message = manager.install_additional_file(source_file, target_file)
+        result, message, _ = manager.install_additional_file(source_file, target_file)
 
         assert result == OperationResult.CREATED
         assert target_file.exists()
@@ -162,7 +162,7 @@ class TestConfigManagerAdditionalFiles:
         target_file.write_text(original_content)
         source_file.write_text(new_content)
 
-        result, message = manager.install_additional_file(source_file, target_file)
+        result, message, _ = manager.install_additional_file(source_file, target_file)
 
         assert result == OperationResult.UPDATED
         assert target_file.read_text() == new_content
@@ -177,7 +177,7 @@ class TestConfigManagerAdditionalFiles:
         source_file.write_text(content)
         target_file.write_text(content)
 
-        result, message = manager.install_additional_file(source_file, target_file)
+        result, message, _ = manager.install_additional_file(source_file, target_file)
 
         assert result == OperationResult.ALREADY_SYNCED
 
@@ -186,7 +186,7 @@ class TestConfigManagerAdditionalFiles:
         source_file = temp_dir / "missing.sh"
         target_file = temp_dir / "target.sh"
 
-        result, message = manager.install_additional_file(source_file, target_file)
+        result, message, _ = manager.install_additional_file(source_file, target_file)
 
         assert result == OperationResult.ERROR
         assert "does not exist" in message
@@ -198,7 +198,7 @@ class TestConfigManagerAdditionalFiles:
 
         source_file.write_text("# Test content")
 
-        result, message = manager.install_additional_file(
+        result, message, _ = manager.install_additional_file(
             source_file, target_file, dry_run=True
         )
 
@@ -249,7 +249,7 @@ class TestConfigManagerSharedConfig:
         shared_content = "# Shared\nalias ll='ls -la'"
         shell_content = "# Shell\nexport PS1='> '"
 
-        result, message = manager.install_section(
+        result, message, _ = manager.install_section(
             config_file, shell_content, shared_content=shared_content
         )
 

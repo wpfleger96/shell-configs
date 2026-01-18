@@ -199,7 +199,7 @@ class ConfigManager:
         dry_run: bool = False,
         shared_content: str | None = None,
         comment_prefix: str = "#",
-    ) -> tuple[OperationResult, str]:
+    ) -> tuple[OperationResult, str, str | None]:
         """Install or update a managed section in a config file.
 
         Args:
@@ -210,20 +210,20 @@ class ConfigManager:
             comment_prefix: Comment prefix to use for markers
 
         Returns:
-            Tuple of (result, message)
+            Tuple of (result, message, diff_text)
         """
         try:
             final_content = self.combine_content(shared_content, content)
 
             existing_section = self.extract_managed_section(config_file, comment_prefix)
 
-            if (
-                existing_section
-                and existing_section.content.strip() == final_content.strip()
+            if existing_section and self.managed_content_matches(
+                existing_section.content, final_content
             ):
                 return (
                     OperationResult.ALREADY_SYNCED,
                     f"{config_file} is already synced",
+                    None,
                 )
 
             if dry_run:
@@ -231,17 +231,38 @@ class ConfigManager:
                     return (
                         OperationResult.UPDATED,
                         f"Would update managed section in {config_file}",
+                        None,
                     )
                 return (
                     OperationResult.CREATED,
                     f"Would create managed section in {config_file}",
+                    None,
                 )
+
+            diff_text = None
+            if existing_section:
+                import difflib
+
+                old_lines = existing_section.content.splitlines(keepends=True)
+                new_content = self._strip_json_outer_brackets(final_content)
+                new_lines = new_content.splitlines(keepends=True)
+                diff_lines = difflib.unified_diff(
+                    old_lines,
+                    new_lines,
+                    fromfile="Previous",
+                    tofile="Updated",
+                    lineterm="",
+                )
+                diff_text = "\n".join(diff_lines)
+                if not diff_text.strip():
+                    diff_text = None
 
             if config_file.exists():
                 if not os.access(config_file, os.W_OK):
                     return (
                         OperationResult.ERROR,
                         f"No write permission for {config_file}",
+                        None,
                     )
                 backup_path = self.create_backup(config_file)
                 backup_msg = f" (backup: {backup_path.name})"
@@ -254,16 +275,18 @@ class ConfigManager:
                 return (
                     OperationResult.UPDATED,
                     f"Updated managed section in {config_file}{backup_msg}",
+                    diff_text,
                 )
 
             self._create_section(config_file, final_content, comment_prefix)
             return (
                 OperationResult.CREATED,
                 f"Created managed section in {config_file}{backup_msg}",
+                None,
             )
 
         except Exception as e:
-            return (OperationResult.ERROR, f"Error installing section: {e}")
+            return (OperationResult.ERROR, f"Error installing section: {e}", None)
 
     def combine_content(
         self, shared_content: str | None, shell_content: str | None
@@ -518,7 +541,7 @@ class ConfigManager:
 
     def install_additional_file(
         self, source_path: Path, target_path: Path, dry_run: bool = False
-    ) -> tuple[OperationResult, str]:
+    ) -> tuple[OperationResult, str, str | None]:
         """Install or update an additional file.
 
         Args:
@@ -527,13 +550,14 @@ class ConfigManager:
             dry_run: If True, don't actually modify the file
 
         Returns:
-            Tuple of (result, message)
+            Tuple of (result, message, diff_text)
         """
         try:
             if not source_path.exists():
                 return (
                     OperationResult.ERROR,
                     f"Source file does not exist: {source_path}",
+                    None,
                 )
 
             source_content = source_path.read_text()
@@ -542,6 +566,7 @@ class ConfigManager:
                 return (
                     OperationResult.ALREADY_SYNCED,
                     f"{target_path} is already synced",
+                    None,
                 )
 
             if dry_run:
@@ -549,11 +574,30 @@ class ConfigManager:
                     return (
                         OperationResult.UPDATED,
                         f"Would update {target_path}",
+                        None,
                     )
                 return (
                     OperationResult.CREATED,
                     f"Would create {target_path}",
+                    None,
                 )
+
+            diff_text = None
+            if target_path.exists():
+                import difflib
+
+                old_lines = target_path.read_text().splitlines(keepends=True)
+                new_lines = source_content.splitlines(keepends=True)
+                diff_lines = difflib.unified_diff(
+                    old_lines,
+                    new_lines,
+                    fromfile="Previous",
+                    tofile="Updated",
+                    lineterm="",
+                )
+                diff_text = "\n".join(diff_lines)
+                if not diff_text.strip():
+                    diff_text = None
 
             backup_msg = ""
             if target_path.exists():
@@ -566,14 +610,16 @@ class ConfigManager:
                 return (
                     OperationResult.UPDATED,
                     f"Updated {target_path}{backup_msg}",
+                    diff_text,
                 )
             return (
                 OperationResult.CREATED,
                 f"Created {target_path}",
+                None,
             )
 
         except Exception as e:
-            return (OperationResult.ERROR, f"Error installing file: {e}")
+            return (OperationResult.ERROR, f"Error installing file: {e}", None)
 
     def uninstall_additional_file(
         self, target_path: Path, dry_run: bool = False
