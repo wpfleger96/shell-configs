@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.10.8 (2026-01-18)
+
+### Bug Fixes
+
+- Lazyify imports for completion performance
+  ([`b24462c`](https://github.com/wpfleger96/shell-configs/commit/b24462c931d85f8b1147c25e0818935e92dd8097))
+
+
 ## v0.10.7 (2026-01-18)
 
 ### Bug Fixes
