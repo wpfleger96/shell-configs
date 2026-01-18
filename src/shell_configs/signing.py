@@ -187,7 +187,7 @@ def generate_allowed_signers_file(
     """
     agent_keys = get_agent_keys()
     if not agent_keys:
-        return False, "No SSH keys in ssh-agent"
+        return False, "No SSH keys in ssh-agent - run 'ssh-add'"
 
     if emails is None:
         emails = [

@@ -541,14 +541,15 @@ def install(
         else:
             console.print(f"[yellow]⚠[/yellow] {message}")
 
-        allowed_signers_path = Path.home() / ".config" / "git" / "allowed_signers"
-        signers_success, signers_msg = generate_allowed_signers_file(
-            allowed_signers_path
-        )
-        if signers_success:
-            console.print(f"[green]✓[/green] {signers_msg}")
-        else:
-            console.print(f"[yellow]⚠[/yellow] {signers_msg}")
+        if success or "not registered" in message:
+            allowed_signers_path = Path.home() / ".config" / "git" / "allowed_signers"
+            signers_success, signers_msg = generate_allowed_signers_file(
+                allowed_signers_path
+            )
+            if signers_success:
+                console.print(f"[green]✓[/green] {signers_msg}")
+            else:
+                console.print(f"[yellow]⚠[/yellow] {signers_msg}")
 
 
 @cli.command()
