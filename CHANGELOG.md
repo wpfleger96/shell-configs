@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.10.11 (2026-01-19)
+
+### Bug Fixes
+
+- Auto clean up old backup files
+  ([`a8bb7fa`](https://github.com/wpfleger96/shell-configs/commit/a8bb7faebbd51d49830a3cab88673bea92f90d34))
+
+
 ## v0.10.10 (2026-01-18)
 
 ### Bug Fixes
