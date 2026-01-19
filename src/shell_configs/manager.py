@@ -36,13 +36,26 @@ class ConfigManager:
     SHARED_SECTION_MARKER = "### Shared Config ###"
     SHELL_SPECIFIC_MARKER = "### Shell-Specific Config ###"
 
-    def __init__(self, backup_suffix: str = "shell-configs-backup"):
+    def __init__(
+        self,
+        backup_suffix: str = "shell-configs-backup",
+        backup_retention: int | None = None,
+    ):
         """Initialize the config manager.
 
         Args:
             backup_suffix: Suffix to use for backup files
+            backup_retention: Number of backup files to keep per config.
+                            If None, uses default from AutoUpdateConfig.
         """
+        from shell_configs.bootstrap.config import AutoUpdateConfig
+
         self.backup_suffix = backup_suffix
+        self.backup_retention = (
+            backup_retention
+            if backup_retention is not None
+            else AutoUpdateConfig().backup_retention
+        )
 
     def _build_markers(self, prefix: str) -> tuple[str, str, str]:
         """Build marker strings with given comment prefix.
@@ -176,21 +189,70 @@ class ConfigManager:
 
         return ManagedSection(content=content, start_line=start_idx, end_line=end_idx)
 
-    def create_backup(self, config_file: Path) -> Path:
+    def create_backup(self, config_file: Path) -> tuple[Path, list[Path]]:
         """Create a timestamped backup of a config file.
 
         Args:
             config_file: Path to the config file
 
         Returns:
-            Path to the backup file
+            Tuple of (backup_path, removed_files)
         """
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         backup_path = config_file.with_suffix(
             f"{config_file.suffix}.{self.backup_suffix}.{timestamp}"
         )
         shutil.copy2(config_file, backup_path)
-        return backup_path
+
+        removed_files = self.cleanup_old_backups(
+            config_file, keep=self.backup_retention
+        )
+
+        return backup_path, removed_files
+
+    def find_backup_files(self, config_file: Path) -> list[Path]:
+        """Find all shell-configs backup files for a given config file.
+
+        Args:
+            config_file: Path to the config file
+
+        Returns:
+            List of backup file paths, sorted by timestamp (newest first)
+        """
+        if not config_file.parent.exists():
+            return []
+
+        pattern = f"{config_file.name}.{self.backup_suffix}.*"
+        backup_files = list(config_file.parent.glob(pattern))
+
+        return sorted(backup_files, reverse=True)
+
+    def cleanup_old_backups(self, config_file: Path, keep: int = 5) -> list[Path]:
+        """Remove old backup files, keeping the N most recent.
+
+        Args:
+            config_file: Path to the config file
+            keep: Number of most recent backups to keep
+
+        Returns:
+            List of removed backup file paths
+        """
+        backup_files = self.find_backup_files(config_file)
+
+        if len(backup_files) <= keep:
+            return []
+
+        files_to_remove = backup_files[keep:]
+        removed = []
+
+        for backup_file in files_to_remove:
+            try:
+                backup_file.unlink()
+                removed.append(backup_file)
+            except OSError:
+                pass
+
+        return removed
 
     def install_section(
         self,
@@ -264,8 +326,10 @@ class ConfigManager:
                         f"No write permission for {config_file}",
                         None,
                     )
-                backup_path = self.create_backup(config_file)
+                backup_path, removed_files = self.create_backup(config_file)
                 backup_msg = f" (backup: {backup_path.name})"
+                if removed_files:
+                    backup_msg += f"; removed {len(removed_files)} old backup(s)"
             else:
                 backup_msg = ""
                 config_file.parent.mkdir(parents=True, exist_ok=True)
@@ -517,7 +581,7 @@ class ConfigManager:
                     f"Would remove managed section from {config_file}",
                 )
 
-            backup_path = self.create_backup(config_file)
+            backup_path, removed_files = self.create_backup(config_file)
             lines = config_file.read_text().splitlines(keepends=True)
 
             new_lines = lines[: section.start_line] + lines[section.end_line + 1 :]
@@ -531,9 +595,13 @@ class ConfigManager:
             new_content = "".join(new_lines)
             self._atomic_write(config_file, new_content)
 
+            backup_msg = f" (backup: {backup_path.name})"
+            if removed_files:
+                backup_msg += f"; removed {len(removed_files)} old backup(s)"
+
             return (
                 OperationResult.REMOVED,
-                f"Removed managed section from {config_file} (backup: {backup_path.name})",
+                f"Removed managed section from {config_file}{backup_msg}",
             )
 
         except Exception as e:
@@ -601,8 +669,10 @@ class ConfigManager:
 
             backup_msg = ""
             if target_path.exists():
-                backup_path = self.create_backup(target_path)
+                backup_path, removed_files = self.create_backup(target_path)
                 backup_msg = f" (backup: {backup_path.name})"
+                if removed_files:
+                    backup_msg += f"; removed {len(removed_files)} old backup(s)"
 
             self._atomic_write(target_path, source_content)
 
@@ -646,12 +716,16 @@ class ConfigManager:
                     f"Would remove {target_path}",
                 )
 
-            backup_path = self.create_backup(target_path)
+            backup_path, removed_files = self.create_backup(target_path)
             target_path.unlink()
+
+            backup_msg = f" (backup: {backup_path.name})"
+            if removed_files:
+                backup_msg += f"; removed {len(removed_files)} old backup(s)"
 
             return (
                 OperationResult.REMOVED,
-                f"Removed {target_path} (backup: {backup_path.name})",
+                f"Removed {target_path}{backup_msg}",
             )
 
         except Exception as e:

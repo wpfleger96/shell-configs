@@ -30,6 +30,7 @@ class AutoUpdateConfig:
     frequency: str = "daily"  # daily, weekly, never
     last_check: str | None = None  # ISO format timestamp
     notify_only: bool = False
+    backup_retention: int = 5  # Number of backup files to keep per config
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AutoUpdateConfig":

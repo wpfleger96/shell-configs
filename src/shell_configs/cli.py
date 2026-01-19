@@ -342,6 +342,7 @@ def install(
     """Install or update managed configuration sections."""
     from rich.prompt import Confirm
 
+    from shell_configs.bootstrap import load_auto_update_config
     from shell_configs.display import (
         console,
         print_info,
@@ -352,8 +353,9 @@ def install(
     from shell_configs.packages import get_package_manager, load_packages
     from shell_configs.shells.registry import ShellRegistry
 
+    auto_update_config = load_auto_update_config()
     config_reader = ConfigReader(config_dir=config_dir)
-    manager = ConfigManager()
+    manager = ConfigManager(backup_retention=auto_update_config.backup_retention)
     registry = ShellRegistry()
 
     selected_shells = _get_selected_shells(
@@ -572,11 +574,13 @@ def install(
 @click.option("--force", is_flag=True, help="Skip confirmation prompts")
 def uninstall(shells: list[str] | None, force: bool) -> None:
     """Remove managed configuration sections."""
+    from shell_configs.bootstrap import load_auto_update_config
     from shell_configs.display import print_info, print_operation_result, print_warning
     from shell_configs.manager import ConfigManager, OperationResult
     from shell_configs.shells.registry import ShellRegistry
 
-    manager = ConfigManager()
+    auto_update_config = load_auto_update_config()
+    manager = ConfigManager(backup_retention=auto_update_config.backup_retention)
     registry = ShellRegistry()
 
     selected_shells = _get_selected_shells(registry, shells, use_all=True)
@@ -637,6 +641,7 @@ def uninstall(shells: list[str] | None, force: bool) -> None:
 )
 def status(shells: list[str] | None) -> None:
     """Show the status of managed configurations."""
+    from shell_configs.bootstrap import load_auto_update_config
     from shell_configs.display import (
         add_additional_file_row,
         add_status_row,
@@ -650,8 +655,9 @@ def status(shells: list[str] | None) -> None:
     from shell_configs.platform import detect_platform
     from shell_configs.shells.registry import ShellRegistry
 
+    auto_update_config = load_auto_update_config()
     config_reader = ConfigReader()
-    manager = ConfigManager()
+    manager = ConfigManager(backup_retention=auto_update_config.backup_retention)
     registry = ShellRegistry()
 
     selected_shells = _get_selected_shells(
@@ -815,12 +821,14 @@ def status(shells: list[str] | None) -> None:
 )
 def diff(shells: list[str] | None) -> None:
     """Show differences between repository and installed configurations."""
+    from shell_configs.bootstrap import load_auto_update_config
     from shell_configs.display import print_info, print_warning
     from shell_configs.manager import ConfigManager
     from shell_configs.shells.registry import ShellRegistry
 
+    auto_update_config = load_auto_update_config()
     config_reader = ConfigReader()
-    manager = ConfigManager()
+    manager = ConfigManager(backup_retention=auto_update_config.backup_retention)
     registry = ShellRegistry()
 
     selected_shells = _get_selected_shells(
@@ -946,6 +954,117 @@ def signing(fix: bool, verbose: bool) -> None:
     else:
         console.print(f"[red]✗[/red] {message}")
         sys.exit(1)
+
+
+@cli.command()
+@click.option(
+    "--dry-run", is_flag=True, help="Show what would be deleted without deleting"
+)
+@click.option("--keep", type=int, help="Number of backups to keep per config file")
+@click.option("--force", is_flag=True, help="Skip confirmation prompt")
+def cleanup(dry_run: bool, keep: int | None, force: bool) -> None:
+    """Clean up old backup files created by shell-configs."""
+    from collections import defaultdict
+
+    from rich.prompt import Confirm
+    from rich.table import Table
+
+    from shell_configs.bootstrap import load_auto_update_config
+    from shell_configs.display import console, print_info
+    from shell_configs.manager import ConfigManager
+    from shell_configs.shells.registry import ShellRegistry
+
+    config = load_auto_update_config()
+    retention = keep if keep is not None else config.backup_retention
+
+    manager = ConfigManager(backup_retention=config.backup_retention)
+    registry = ShellRegistry()
+    all_shells = registry.get_all()
+
+    console.print("[cyan]Scanning for shell-configs backup files...[/cyan]\n")
+
+    backup_by_config = defaultdict(list)
+
+    for shell in all_shells:
+        for config_file in shell.get_config_files():
+            if config_file.path.exists():
+                backups = manager.find_backup_files(config_file.path)
+                if backups:
+                    backup_by_config[config_file.path].extend(backups)
+
+        for additional_file in shell.get_additional_files():
+            if additional_file.target_path.exists():
+                backups = manager.find_backup_files(additional_file.target_path)
+                if backups:
+                    backup_by_config[additional_file.target_path].extend(backups)
+
+    if not backup_by_config:
+        print_info("No backup files found")
+        return
+
+    total_backups = sum(len(backups) for backups in backup_by_config.values())
+    to_keep_count = 0
+    to_remove_count = 0
+
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Config File", style="cyan")
+    table.add_column("Backup File", style="white")
+    table.add_column("Action", style="white")
+
+    home = str(Path.home())
+
+    for config_path in sorted(backup_by_config.keys()):
+        backups = sorted(backup_by_config[config_path], reverse=True)
+        config_display = str(config_path).replace(home, "~")
+
+        for i, backup in enumerate(backups):
+            action = "keep" if i < retention else "remove"
+            if action == "keep":
+                to_keep_count += 1
+                action_display = "[green]keep[/green]"
+            else:
+                to_remove_count += 1
+                action_display = "[yellow]remove[/yellow]"
+
+            backup_display = backup.name
+            table.add_row(
+                config_display if i == 0 else "", backup_display, action_display
+            )
+
+    console.print(table)
+    console.print()
+
+    if to_remove_count == 0:
+        print_info(
+            f"All {total_backups} backup files are within retention ({retention})"
+        )
+        return
+
+    console.print(
+        f"Found {total_backups} backup files: "
+        f"[green]{to_keep_count} to keep[/green], "
+        f"[yellow]{to_remove_count} to remove[/yellow]"
+    )
+    console.print()
+
+    if dry_run:
+        print_info(f"Dry run: would remove {to_remove_count} backup files")
+        return
+
+    if not force:
+        if not Confirm.ask(f"Remove {to_remove_count} old backup files?", default=True):
+            print_info("Cleanup cancelled")
+            return
+
+    removed_count = 0
+    for config_path in backup_by_config:
+        removed = manager.cleanup_old_backups(config_path, keep=retention)
+        removed_count += len(removed)
+
+    console.print(
+        f"[green]✓[/green] Removed {removed_count} backup files "
+        f"(kept {retention} most recent per config)"
+    )
 
 
 @cli.command()
