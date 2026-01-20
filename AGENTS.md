@@ -1,6 +1,6 @@
 # AGENTS.md
 
-CLI tool to manage shell configurations (bash, zsh, git) by installing "managed sections" into user config files while preserving existing content.
+Python CLI tool for managing shell configuration files (bash, zsh, git) across machines with version control, non-destructive installation via managed sections.
 
 ## Application Commands
 
@@ -63,37 +63,34 @@ just cli-validate      # Test validate command
 
 ```
 src/shell_configs/
-├── cli.py              # Click CLI entry point
-├── config.py           # ConfigReader for reading configs
-├── manager.py          # ConfigManager for install/uninstall operations
-├── display.py          # Rich console output utilities
-├── completions.py      # Shell completion management (install/uninstall)
-├── shells/
-│   ├── base.py         # Abstract Shell base class
-│   ├── bash.py         # Bash implementation
-│   ├── zsh.py          # Zsh implementation
-│   ├── git.py          # Git config implementation
-│   └── registry.py     # ShellRegistry for shell lookup
-├── bootstrap/          # System-wide install & auto-update
-│   ├── installer.py    # uv tool install utilities
-│   ├── updater.py      # GitHub update checking
-│   ├── version.py      # Version comparison
-│   └── config.py       # Auto-update config management
-└── config/             # Bundled config files
-    ├── bash/
-    │   └── bashrc      # Main bash config
-    ├── zsh/
-    │   └── zshrc       # Main zsh config
-    ├── git/
-    │   └── ignore      # Global gitignore
-    ├── shared-scripts/
-    │   └── git-prompt.sh  # Git prompt script (vendored)
-    ├── shared.sh       # Shared shell config (bash/zsh)
-    └── shared.gitconfig   # Shared git config
+├── cli.py                      # Click CLI commands (install, status, diff, etc.)
+├── manager.py                  # ConfigManager - insert/remove managed sections
+├── config.py                   # ConfigReader - reads config/ directory
+├── display.py                  # Rich console output formatting
+├── signing.py                  # SSH signing key validation/setup
+├── completions.py              # Shell completion generation
+├── platform.py                 # Platform detection (Linux/macOS/WSL)
+├── shells/                     # Shell implementations
+│   ├── base.py                 # Shell ABC (ConfigFile, validation interface)
+│   ├── bash.py, zsh.py         # Bash/Zsh shell implementations
+│   ├── git.py                  # Git config handler
+│   ├── cursor.py               # Cursor IDE WSL config
+│   └── registry.py             # ShellRegistry for shell discovery
+├── bootstrap/                  # Bootstrap/auto-update system
+│   ├── config.py               # AutoUpdateConfig (backup retention)
+│   ├── installer.py            # Tool installation via uv
+│   ├── updater.py              # Update checking/installation
+│   └── version.py              # Version comparison
+├── packages/                   # Package management
+│   └── packages.py             # Tool package definitions
+└── config/                     # Managed shell configs (installed by tool)
+    ├── bash/bashrc, zsh/zshrc  # Shell-specific configs
+    ├── shared.sh               # Shared shell config
+    └── shared.gitconfig        # Shared git config
 tests/
-├── conftest.py         # Fixtures: temp_dir, mock_home, test_repo, cli_runner
-├── unit/               # Unit tests (-m unit)
-└── integration/        # Integration tests (-m integration, -m cli)
+├── conftest.py         # Fixtures (mock_home, test_repo, cli_runner)
+├── unit/               # Fast unit tests (mock filesystem)
+└── integration/        # Integration tests (real files)
 ```
 
 ## Bundled Shell Utilities
@@ -126,67 +123,123 @@ wt orphans                                   # List orphaned worktrees
 
 ## Tech Stack
 
-- Python 3.10+ (src layout)
-- uv (package manager)
-- click (CLI), rich (output), pyyaml
-- mypy (strict mode), ruff (lint+format), pytest
+- **Python 3.13** (requires >=3.10)
+- **CLI:** Click 8.1+
+- **Output:** Rich 13.0+ (console formatting)
+- **Config:** PyYAML 6.0+, Pydantic 2.12+
+- **Package manager:** uv
+- **Task runner:** just
+- **Linting:** ruff (isort, pyflakes, pyupgrade, bugbear)
+- **Type checking:** mypy (strict mode)
+- **Testing:** pytest + pytest-cov
+- **Shell linting:** shellcheck + shfmt
 
 ## Key Patterns
 
-**Shell implementations:** Extend `Shell` base class in `src/shell_configs/shells/base.py`. Implement: `name`, `display_name`, `get_config_files()`, `_get_validation_command()`, `_get_temp_suffix()`.
-
-**Registry pattern:** Register shells in `src/shell_configs/shells/registry.py`.
-
-**Marker-based sections:** Managed content uses markers:
-```
+**Managed Section Pattern:**
+ConfigManager inserts/removes config sections delimited by markers:
+```bash
 ##### shell-configs Managed Config #####
-<content>
+# User config preserved above
+<managed content>
 ##### End shell-configs Managed Config #####
 ```
 
-**Test fixtures:** Use `mock_home` for HOME isolation, `test_repo` for config mocking.
+**Shell Abstraction:**
+Each shell (bash, zsh, git) implements `Shell` ABC from `shells/base.py`:
+- `get_config_files()` → list of ConfigFile (name, path, repo_config_name)
+- `validate_syntax(content)` → (is_valid, error_message)
+- Uses abstract `_get_validation_command()` for shell-specific validation
+
+**Registry Pattern:**
+`ShellRegistry` auto-discovers shell implementations:
+```python
+from shell_configs.shells.registry import get_registry
+registry = get_registry()
+selected_shells, invalid = registry.filter_by_names(["bash", "zsh"])
+```
+
+**Test Isolation:**
+`mock_home` fixture patches BOTH `HOME` env var AND `Path.home()` to ensure full isolation (conftest.py:38-52).
+
+**Backup Management:**
+Timestamped backups with retention limit (default 5, see `AutoUpdateConfig`).
 
 ## Testing
 
 ```bash
-just test              # All tests (default: with coverage)
-just test-unit         # uv run pytest -m unit
-just test-integration  # uv run pytest -m integration
-just test-cli          # uv run pytest -m cli
-just test-nocov        # Without coverage overhead
+# Run all tests
+just test                            # Coverage enabled by default
+
+# Run by marker
+just test-unit                       # -m unit
+just test-integration                # -m integration
+just test-cli                        # -m cli
+
+# Run specific tests
+uv run pytest tests/unit/test_manager.py::test_insert_section
+uv run pytest -k "test_install"      # Match by name
+uv run pytest -v                     # Verbose output
 ```
 
-Markers: `unit`, `integration`, `cli`, `bootstrap`
+**Test structure:**
+- `unit/` - Fast tests with mocked filesystem (marker: `@pytest.mark.unit`)
+- `integration/` - Real filesystem operations (marker: `@pytest.mark.integration`)
+- Fixtures in `conftest.py`: `mock_home`, `test_repo`, `cli_runner`, `temp_dir`
 
 ## Common Gotchas
 
-1. **Mock HOME properly:** Tests use `mock_home` fixture which patches `HOME` env var
+1. **Mock HOME completely:** Tests use `mock_home` fixture which patches BOTH `HOME` env var AND `Path.home()` staticmethod. Only mocking environ is insufficient if code uses `Path.home()` directly (conftest.py:38-52).
+
 2. **Config directory mocking:** Use `test_repo` fixture - it patches `get_config_dir()`
-3. **Shell formatting:** `shfmt` excludes `git-prompt.sh` (vendored file)
+
+3. **Shell formatting:** `shfmt` excludes `git-prompt.sh` (vendored file via justfile:19,25). Don't modify it.
+
 4. **CLI runner width:** Tests set `COLUMNS=200` to prevent output wrapping
+
 5. **Type checking:** mypy strict mode enabled - full type hints required
+
 6. **Installation method:** Package is private - install via `uv tool install git+ssh://git@github.com/wpfleger96/shell-configs.git` (not PyPI)
+
 7. **Shell linting:** `shellcheck` and `shfmt` both exclude `git-prompt.sh` automatically via justfile grep filter
+
 8. **Worktree auto-prune removed:** `wt add` no longer auto-prunes worktrees. New branches created from main won't be immediately deleted. Use `wt list` to see `[MERGED]` and `[ORPHAN]` markers, then run `wt prune` manually when needed. Implementation: Orphan detection is consolidated in `_wt_is_orphan()` helper (used by `_wt_ls`, `_wt_prune`, `_wt_orphans`)
+
 9. **GitHub CLI Required (Private Repo):** This repository is PRIVATE. All GitHub operations (PRs, issues, releases, checks) MUST use `gh` CLI commands with authentication. Standard GitHub API calls will fail. Examples:
    - Create PR: `gh pr create --title "..." --body "..."`
    - View issue: `gh issue view 123`
    - Check PR status: `gh pr checks`
    - **Never** use `curl https://api.github.com/...` directly
+
 10. **Local development vs installed tool** - **CRITICAL**: Always use `uv run shell-configs` when developing locally:
    - **Local dev (from repo)**: `uv run shell-configs <command>` → runs YOUR local code changes directly
    - **Installed tool (any directory)**: `shell-configs <command>` → runs installed version from `~/.local/share/uv/tools/`
    - Running `shell-configs` without `uv run` will NOT reflect your local changes
    - **NEVER use editable install** (`uv pip install -e .`) - risks conflicts with installed version, unnecessary complexity
 
+11. **WSL platform detection:** Tests force Platform.LINUX (conftest.py:12-28) to prevent accidental Windows file modifications. Test WSL-specific code with explicit platform mocks.
+
+12. **Backup retention:** Default 5 backups per config (AutoUpdateConfig). Old backups auto-cleaned after operations.
+
+13. **Validation before install:** All configs validated via shell-specific commands (bash -n, zsh -n, git config --list) before installation.
+
+14. **JSON config handling:** ConfigManager strips outer brackets for JSON/JSONC files when comparing managed sections (manager.py:86-100).
+
+15. **uv sync required:** Run `just sync` or `uv sync` after pulling to ensure dependencies match lockfile.
+
 ## Key Files by Task
 
 | Task | Files |
 |------|-------|
 | Add CLI command | `src/shell_configs/cli.py` |
-| Add shell type | `src/shell_configs/shells/` + `registry.py` |
-| Change install behavior | `src/shell_configs/manager.py` |
-| Add bundled config | `src/shell_configs/config/{shell}/` |
+| Modify config installation logic | `src/shell_configs/manager.py` (ConfigManager) |
+| Add new shell support | `src/shell_configs/shells/` (new class extends Shell ABC) |
+| Change config reading | `src/shell_configs/config.py` (ConfigReader) |
+| Modify output formatting | `src/shell_configs/display.py` |
+| Add SSH signing logic | `src/shell_configs/signing.py` |
+| Change auto-update behavior | `src/shell_configs/bootstrap/updater.py` |
+| Add package definitions | `src/shell_configs/packages/packages.py` |
+| Modify test fixtures | `tests/conftest.py` |
+| Add shell configs | `src/shell_configs/config/{bash,zsh,git}/` |
 | Modify shell utilities (wt, extract, etc.) | `src/shell_configs/config/shared.sh` |
 | Modify completion logic | `src/shell_configs/completions.py` |
-| Fix test fixtures | `tests/conftest.py` |

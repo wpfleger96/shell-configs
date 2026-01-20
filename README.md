@@ -74,7 +74,8 @@ choco install just
 | `validate` | Validate configuration file syntax | `uv run shell-configs validate` |
 | `list-shells` | List all available shell configurations | `uv run shell-configs list-shells` |
 | `info` | Show installation source and version info | `shell-configs info` |
-| `upgrade` | Check for and install available updates | `shell-configs upgrade` |
+| `upgrade` | Check for and install available updates (shows changelog) | `shell-configs upgrade` |
+| `cleanup` | Clean up old backup files (keeps 5 most recent per config) | `shell-configs cleanup` |
 | `completions` | Manage shell tab completion (bash, zsh, install, uninstall) | `shell-configs completions install` |
 
 ### Common Options
@@ -82,6 +83,15 @@ choco install just
 - `--shells bash,zsh` - Operate on specific shells only
 - `--dry-run` - Preview changes without applying
 - `--force` - Skip confirmation prompts
+
+### Backup Management
+
+shell-configs automatically creates timestamped backups before modifying configs. By default, it keeps the 5 most recent backups per file and auto-removes older ones.
+
+**Cleanup options:**
+- `--keep N` - Keep N most recent backups (overrides default)
+- `--dry-run` - Show what would be deleted
+- `--force` - Skip confirmation
 
 ## Included Utilities
 
