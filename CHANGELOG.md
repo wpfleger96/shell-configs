@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v0.10.12 (2026-01-20)
+
+### Bug Fixes
+
+- Remove auto background update feature since it's causing bugs
+  ([`0b55f1a`](https://github.com/wpfleger96/shell-configs/commit/0b55f1abad1d7fc6db978d2a8bf7869a0cdb054d))
+
+- Show changelogs during upgrade
+  ([`2460396`](https://github.com/wpfleger96/shell-configs/commit/2460396adf303f8619f16b4331f64880ec0afe36))
+
+- Tweak git log aliases
+  ([`674834b`](https://github.com/wpfleger96/shell-configs/commit/674834b20b294498f1bfe3dbdae17c82f5ec7840))
+
+### Chores
+
+- Docs
+  ([`5e169f6`](https://github.com/wpfleger96/shell-configs/commit/5e169f6d36788956353ed6a7b576ae4eaa21a77a))
+
+
 ## v0.10.11 (2026-01-19)
 
 ### Bug Fixes
