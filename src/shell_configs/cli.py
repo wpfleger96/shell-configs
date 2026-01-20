@@ -20,79 +20,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _background_update_check() -> None:
-    """Run update check in background thread for all registered tools.
-
-    This runs silently and saves results for display on next CLI invocation.
-    """
-    from datetime import datetime
-
-    from shell_configs.bootstrap import (
-        UPDATABLE_TOOLS,
-        check_tool_updates,
-        load_auto_update_config,
-        save_auto_update_config,
-        save_pending_update,
-    )
-
-    try:
-        for tool in UPDATABLE_TOOLS:
-            update_info = check_tool_updates(tool)
-            if update_info and update_info.has_update:
-                save_pending_update(update_info, tool.tool_id)
-
-        config = load_auto_update_config()
-        config.last_check = datetime.now().isoformat()
-        save_auto_update_config(config)
-    except Exception as e:
-        logger.debug(f"Background update check failed: {e}")
-
-
-def _check_pending_updates() -> None:
-    """Check for and display pending update notifications."""
-    from rich.prompt import Confirm
-
-    from shell_configs.bootstrap import (
-        clear_all_pending_updates,
-        get_tool_by_id,
-        load_all_pending_updates,
-    )
-    from shell_configs.display import console
-
-    try:
-        pending = load_all_pending_updates()
-        if not pending:
-            return
-
-        updates = []
-        for tid, info in pending.items():
-            tool = get_tool_by_id(tid)
-            if tool:
-                updates.append(
-                    f"{tool.display_name} {info.current_version} → {info.latest_version}"
-                )
-
-        if not updates:
-            return
-
-        update_label = "Update available" if len(updates) == 1 else "Updates available"
-        console.print(f"\n[cyan]{update_label}:[/cyan] {', '.join(updates)}")
-
-        if sys.stdin.isatty() and sys.stdout.isatty():
-            prompt = "Install now?" if len(updates) == 1 else "Install all updates?"
-            if Confirm.ask(prompt, default=False):
-                ctx = click.get_current_context()
-                ctx.invoke(upgrade, check=False, force=False)
-            else:
-                console.print("[dim]Run 'shell-configs upgrade' when ready[/dim]")
-        else:
-            console.print("[dim]Run 'shell-configs upgrade' to install[/dim]")
-
-        clear_all_pending_updates()
-    except Exception as e:
-        logger.debug(f"Failed to check pending updates: {e}")
-
-
 def version_callback(ctx: click.Context, param: click.Parameter, value: bool) -> None:
     """Custom version callback that also checks for updates."""
     if not value or ctx.resilient_parsing:
@@ -303,21 +230,7 @@ def _display_diffs_for_shells(
 )
 def cli() -> None:
     """Manage shell configuration files across machines."""
-    import os
-    import threading
-
-    from shell_configs.bootstrap import load_auto_update_config, should_check_now
-
-    _check_pending_updates()
-
-    try:
-        if "PYTEST_CURRENT_TEST" not in os.environ:
-            config = load_auto_update_config()
-            if config.enabled and should_check_now(config):
-                thread = threading.Thread(target=_background_update_check, daemon=True)
-                thread.start()
-    except Exception:
-        pass
+    pass
 
 
 @cli.command()

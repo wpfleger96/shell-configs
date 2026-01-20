@@ -10,17 +10,10 @@ Designed to be self-contained and easily extractable for use in other projects.
 
 from .config import (
     AutoUpdateConfig,
-    clear_all_pending_updates,
-    clear_pending_update,
     get_config_dir,
     get_config_path,
-    get_pending_update_path,
-    load_all_pending_updates,
     load_auto_update_config,
-    load_pending_update,
     save_auto_update_config,
-    save_pending_update,
-    should_check_now,
 )
 from .installer import (
     UV_NOT_FOUND_ERROR,
@@ -58,15 +51,8 @@ __all__ = [
     "get_tool_by_id",
     "perform_github_update",
     "AutoUpdateConfig",
-    "clear_all_pending_updates",
-    "clear_pending_update",
     "get_config_dir",
     "get_config_path",
-    "get_pending_update_path",
-    "load_all_pending_updates",
     "load_auto_update_config",
-    "load_pending_update",
     "save_auto_update_config",
-    "save_pending_update",
-    "should_check_now",
 ]

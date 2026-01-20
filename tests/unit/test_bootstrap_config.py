@@ -1,23 +1,14 @@
 """Tests for auto-update configuration management."""
 
-from datetime import datetime, timedelta
-from pathlib import Path
-
 import pytest
 
 from shell_configs.bootstrap.config import (
     AutoUpdateConfig,
-    clear_pending_update,
     get_config_dir,
     get_config_path,
-    get_pending_update_path,
     load_auto_update_config,
-    load_pending_update,
     save_auto_update_config,
-    save_pending_update,
-    should_check_now,
 )
-from shell_configs.bootstrap.updater import UpdateInfo
 
 
 @pytest.mark.unit
@@ -50,24 +41,6 @@ class TestGetConfigPath:
 
 @pytest.mark.unit
 @pytest.mark.bootstrap
-class TestGetPendingUpdatePath:
-    """Tests for get_pending_update_path function."""
-
-    def test_returns_pending_json_path_for_shell_configs(self, mock_home):
-        """Test that shell-configs uses legacy pending_update.json filename."""
-        pending_path = get_pending_update_path("shell-configs")
-        assert pending_path.name == "pending_update.json"
-        assert pending_path.parent == mock_home / ".shell-configs"
-
-    def test_returns_tool_specific_path_for_other_tools(self, mock_home):
-        """Test that other tools use pending_{tool_id}_update.json format."""
-        pending_path = get_pending_update_path("statusline")
-        assert pending_path.name == "pending_statusline_update.json"
-        assert pending_path.parent == mock_home / ".shell-configs"
-
-
-@pytest.mark.unit
-@pytest.mark.bootstrap
 class TestLoadAutoUpdateConfig:
     """Tests for load_auto_update_config function."""
 
@@ -75,18 +48,14 @@ class TestLoadAutoUpdateConfig:
         """Test loading valid configuration file."""
         config_file = mock_home / ".shell-configs" / "update_config.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
-        config_file.write_text(
-            "enabled: true\nfrequency: weekly\nlast_check: 2024-01-01T12:00:00\nnotify_only: false\n"
-        )
+        config_file.write_text("backup_retention: 10\n")
 
         monkeypatch.setattr(
             "shell_configs.bootstrap.config.get_config_path",
             lambda pkg="shell-configs": config_file,
         )
         config = load_auto_update_config()
-        assert config.enabled is True
-        assert config.frequency == "weekly"
-        assert config.notify_only is False
+        assert config.backup_retention == 10
 
     def test_load_missing_config_returns_defaults(self, mock_home, monkeypatch):
         """Test that missing config returns default values."""
@@ -97,10 +66,7 @@ class TestLoadAutoUpdateConfig:
         )
 
         config = load_auto_update_config()
-        assert config.enabled is True
-        assert config.frequency == "daily"
-        assert config.last_check is None
-        assert config.notify_only is False
+        assert config.backup_retention == 5
 
     @pytest.mark.parametrize(
         "error_type",
@@ -126,7 +92,7 @@ class TestLoadAutoUpdateConfig:
         )
 
         config = load_auto_update_config()
-        assert config.enabled is True
+        assert config.backup_retention == 5
 
 
 @pytest.mark.unit
@@ -144,12 +110,7 @@ class TestSaveAutoUpdateConfig:
             lambda pkg="shell-configs": config_file,
         )
 
-        config = AutoUpdateConfig(
-            enabled=True,
-            frequency="daily",
-            last_check=None,
-            notify_only=True,
-        )
+        config = AutoUpdateConfig(backup_retention=10)
         save_auto_update_config(config)
 
         assert config_file.exists()
@@ -157,8 +118,7 @@ class TestSaveAutoUpdateConfig:
 
         with open(config_file) as f:
             saved_data = yaml.safe_load(f)
-        assert saved_data["enabled"] is True
-        assert saved_data["frequency"] == "daily"
+        assert saved_data["backup_retention"] == 10
 
     def test_save_with_oserror_logs_debug(self, mock_home, monkeypatch):
         """Test that OSError logs debug message."""
@@ -175,207 +135,5 @@ class TestSaveAutoUpdateConfig:
         )
         monkeypatch.setattr("shell_configs.bootstrap.config.logger", mock_logger)
 
-        config = AutoUpdateConfig(
-            enabled=True, frequency="weekly", last_check=None, notify_only=False
-        )
+        config = AutoUpdateConfig(backup_retention=5)
         save_auto_update_config(config)
-
-
-@pytest.mark.unit
-@pytest.mark.bootstrap
-class TestShouldCheckNow:
-    """Tests for should_check_now function."""
-
-    def test_never_checked_returns_true(self):
-        """Test that first check returns True."""
-        config = AutoUpdateConfig(
-            enabled=True, frequency="weekly", last_check=None, notify_only=False
-        )
-        assert should_check_now(config) is True
-
-    def test_disabled_returns_false(self):
-        """Test that disabled config returns False."""
-        config = AutoUpdateConfig(
-            enabled=False, frequency="weekly", last_check=None, notify_only=False
-        )
-        assert should_check_now(config) is False
-
-    def test_checked_recently_returns_false(self):
-        """Test that recent check returns False."""
-        recent_check = (datetime.now() - timedelta(days=3)).isoformat()
-        config = AutoUpdateConfig(
-            enabled=True,
-            frequency="weekly",
-            last_check=recent_check,
-            notify_only=False,
-        )
-        assert should_check_now(config) is False
-
-    def test_checked_long_ago_returns_true(self):
-        """Test that old check returns True."""
-        old_check = (datetime.now() - timedelta(days=10)).isoformat()
-        config = AutoUpdateConfig(
-            enabled=True,
-            frequency="weekly",
-            last_check=old_check,
-            notify_only=False,
-        )
-        assert should_check_now(config) is True
-
-    def test_exactly_at_frequency_returns_true(self):
-        """Test that check at exactly frequency days returns True."""
-        exact_check = (datetime.now() - timedelta(days=7, hours=1)).isoformat()
-        config = AutoUpdateConfig(
-            enabled=True,
-            frequency="weekly",
-            last_check=exact_check,
-            notify_only=False,
-        )
-        assert should_check_now(config) is True
-
-
-@pytest.mark.unit
-@pytest.mark.bootstrap
-class TestLoadPendingUpdate:
-    """Tests for load_pending_update function."""
-
-    def test_load_valid_pending_update(self, mock_home, monkeypatch):
-        """Test loading valid pending update."""
-        pending_file = mock_home / ".shell-configs" / "pending_update.json"
-        pending_file.parent.mkdir(parents=True, exist_ok=True)
-        import json
-
-        pending_data = {
-            "has_update": True,
-            "current_version": "1.0.0",
-            "latest_version": "1.1.0",
-            "source": "pypi",
-        }
-        pending_file.write_text(json.dumps(pending_data))
-
-        monkeypatch.setattr(
-            "shell_configs.bootstrap.config.get_pending_update_path",
-            lambda pkg="shell-configs": pending_file,
-        )
-
-        update_info = load_pending_update()
-        assert update_info is not None
-        assert update_info.has_update is True
-        assert update_info.current_version == "1.0.0"
-        assert update_info.latest_version == "1.1.0"
-        assert update_info.source == "pypi"
-
-    def test_load_missing_pending_update_returns_none(self, mock_home, monkeypatch):
-        """Test that missing file returns None."""
-        pending_file = mock_home / ".shell-configs" / "pending_update.json"
-        monkeypatch.setattr(
-            "shell_configs.bootstrap.config.get_pending_update_path",
-            lambda pkg="shell-configs": pending_file,
-        )
-
-        assert load_pending_update() is None
-
-    def test_load_invalid_json_returns_none(self, mock_home, monkeypatch):
-        """Test that invalid JSON returns None."""
-        pending_file = mock_home / ".shell-configs" / "pending_update.json"
-        pending_file.parent.mkdir(parents=True, exist_ok=True)
-        pending_file.write_text('{"invalid": "json"')
-
-        monkeypatch.setattr(
-            "shell_configs.bootstrap.config.get_pending_update_path",
-            lambda pkg="shell-configs": pending_file,
-        )
-
-        assert load_pending_update() is None
-
-
-@pytest.mark.unit
-@pytest.mark.bootstrap
-class TestSavePendingUpdate:
-    """Tests for save_pending_update function."""
-
-    def test_save_pending_update_writes_json(self, mock_home, monkeypatch):
-        """Test that pending update is saved as JSON."""
-        pending_file = mock_home / ".shell-configs" / "pending_update.json"
-        pending_file.parent.mkdir(parents=True, exist_ok=True)
-
-        monkeypatch.setattr(
-            "shell_configs.bootstrap.config.get_pending_update_path",
-            lambda pkg="shell-configs": pending_file,
-        )
-
-        update_info = UpdateInfo(
-            has_update=True,
-            current_version="1.0.0",
-            latest_version="1.1.0",
-            source="pypi",
-        )
-        save_pending_update(update_info)
-
-        assert pending_file.exists()
-        import json
-
-        with open(pending_file) as f:
-            saved_data = json.load(f)
-        assert saved_data["has_update"] is True
-        assert saved_data["current_version"] == "1.0.0"
-
-    def test_save_with_oserror_logs_debug(self, mock_home, monkeypatch):
-        """Test that OSError logs debug message."""
-        pending_file = mock_home / ".shell-configs" / "pending_update.json"
-
-        def mock_open_error(*args, **kwargs):
-            raise OSError("Permission denied")
-
-        mock_logger = type("MockLogger", (), {"debug": lambda *args: None})()
-        monkeypatch.setattr("builtins.open", mock_open_error)
-        monkeypatch.setattr(
-            "shell_configs.bootstrap.config.get_pending_update_path",
-            lambda pkg="shell-configs": pending_file,
-        )
-        monkeypatch.setattr("shell_configs.bootstrap.config.logger", mock_logger)
-
-        update_info = UpdateInfo(
-            has_update=True,
-            current_version="1.0.0",
-            latest_version="1.1.0",
-            source="pypi",
-        )
-        save_pending_update(update_info)
-
-
-@pytest.mark.unit
-@pytest.mark.bootstrap
-class TestClearPendingUpdate:
-    """Tests for clear_pending_update function."""
-
-    def test_clear_pending_update_deletes_file(self, mock_home, monkeypatch):
-        """Test that clear removes the file."""
-        pending_file = mock_home / ".shell-configs" / "pending_update.json"
-        pending_file.parent.mkdir(parents=True, exist_ok=True)
-        pending_file.write_text("{}")
-
-        monkeypatch.setattr(
-            "shell_configs.bootstrap.config.get_pending_update_path",
-            lambda pkg="shell-configs": pending_file,
-        )
-
-        clear_pending_update()
-        assert not pending_file.exists()
-
-    def test_clear_with_oserror_logs_debug(self, mock_home, monkeypatch):
-        """Test that OSError during delete logs debug message."""
-        pending_file = mock_home / ".shell-configs" / "pending_update.json"
-
-        def mock_unlink(self, missing_ok=False):
-            raise OSError("Permission denied")
-
-        mock_logger = type("MockLogger", (), {"debug": lambda *args: None})()
-        monkeypatch.setattr(Path, "unlink", mock_unlink)
-        monkeypatch.setattr(
-            "shell_configs.bootstrap.config.get_pending_update_path",
-            lambda pkg="shell-configs": pending_file,
-        )
-        monkeypatch.setattr("shell_configs.bootstrap.config.logger", mock_logger)
-
-        clear_pending_update()

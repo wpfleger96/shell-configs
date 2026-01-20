@@ -1,36 +1,22 @@
 """Auto-update configuration management."""
 
 import dataclasses
-import json
 import logging
-import re
 
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from .updater import UpdateInfo
-
 logger = logging.getLogger(__name__)
-
-
-def _validate_tool_id(tool_id: str) -> bool:
-    """Validate tool_id contains only safe characters."""
-    return bool(re.match(r"^[a-z0-9][a-z0-9_-]*$", tool_id))
 
 
 @dataclass
 class AutoUpdateConfig:
-    """Configuration for automatic update checks."""
+    """Configuration for backup retention."""
 
-    enabled: bool = True
-    frequency: str = "daily"  # daily, weekly, never
-    last_check: str | None = None  # ISO format timestamp
-    notify_only: bool = False
-    backup_retention: int = 5  # Number of backup files to keep per config
+    backup_retention: int = 5
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AutoUpdateConfig":
@@ -112,180 +98,3 @@ def save_auto_update_config(
             yaml.dump(new_data, f, default_flow_style=False, sort_keys=False)
     except OSError as e:
         logger.debug(f"Failed to save config to {config_path}: {e}")
-
-
-def should_check_now(config: AutoUpdateConfig) -> bool:
-    """Determine if update check is due based on frequency.
-
-    Args:
-        config: Auto-update configuration
-
-    Returns:
-        True if check should be performed, False otherwise
-    """
-    if not config.enabled:
-        return False
-
-    if config.frequency == "never":
-        return False
-
-    if not config.last_check:
-        return True
-
-    try:
-        last_check = datetime.fromisoformat(config.last_check)
-        now = datetime.now()
-
-        if config.frequency == "daily":
-            return now - last_check > timedelta(days=1)
-        elif config.frequency == "weekly":
-            return now - last_check > timedelta(days=7)
-
-    except (ValueError, TypeError):
-        return True
-
-    return False
-
-
-def get_pending_update_path(tool_id: str = "shell-configs") -> Path:
-    """Get path to pending update cache file for a specific tool.
-
-    Args:
-        tool_id: Tool identifier (e.g., "shell-configs")
-
-    Returns:
-        Path to pending update JSON file
-
-    Raises:
-        ValueError: If tool_id contains invalid characters
-    """
-    if not _validate_tool_id(tool_id):
-        raise ValueError(f"Invalid tool_id: {tool_id}")
-
-    if tool_id == "shell-configs":
-        filename = "pending_update.json"
-    else:
-        filename = f"pending_{tool_id}_update.json"
-
-    return get_config_dir("shell-configs") / filename
-
-
-def load_pending_update(tool_id: str = "shell-configs") -> UpdateInfo | None:
-    """Load cached update info from previous background check.
-
-    Args:
-        tool_id: Tool identifier (e.g., "shell-configs")
-
-    Returns:
-        UpdateInfo if available, None otherwise
-    """
-    if not _validate_tool_id(tool_id):
-        return None
-
-    pending_path = get_pending_update_path(tool_id)
-
-    if not pending_path.exists():
-        return None
-
-    try:
-        with open(pending_path) as f:
-            data = json.load(f)
-
-        return UpdateInfo(
-            has_update=data.get("has_update", False),
-            current_version=data["current_version"],
-            latest_version=data["latest_version"],
-            source=data["source"],
-        )
-    except (json.JSONDecodeError, KeyError, OSError):
-        return None
-
-
-def save_pending_update(info: UpdateInfo, tool_id: str = "shell-configs") -> None:
-    """Save update info for next session.
-
-    Args:
-        info: Update information to save
-        tool_id: Tool identifier (e.g., "shell-configs")
-    """
-    if not _validate_tool_id(tool_id):
-        return
-
-    pending_path = get_pending_update_path(tool_id)
-
-    try:
-        data = {
-            "has_update": info.has_update,
-            "current_version": info.current_version,
-            "latest_version": info.latest_version,
-            "source": info.source,
-            "checked_at": datetime.now().isoformat(),
-        }
-
-        should_write = True
-        if pending_path.exists():
-            try:
-                with open(pending_path) as f:
-                    existing_data = json.load(f)
-
-                fields_to_compare = [
-                    "has_update",
-                    "current_version",
-                    "latest_version",
-                    "source",
-                ]
-                if all(
-                    existing_data.get(field) == data[field]
-                    for field in fields_to_compare
-                ):
-                    should_write = False
-            except (json.JSONDecodeError, KeyError):
-                should_write = True
-
-        if should_write:
-            with open(pending_path, "w") as f:
-                json.dump(data, f, indent=2)
-    except OSError as e:
-        logger.debug(f"Failed to save pending update to {pending_path}: {e}")
-
-
-def clear_pending_update(tool_id: str = "shell-configs") -> None:
-    """Clear pending update after user action.
-
-    Args:
-        tool_id: Tool identifier (e.g., "shell-configs")
-    """
-    if not _validate_tool_id(tool_id):
-        return
-
-    pending_path = get_pending_update_path(tool_id)
-
-    try:
-        pending_path.unlink(missing_ok=True)
-    except OSError as e:
-        logger.debug(f"Failed to delete pending update at {pending_path}: {e}")
-
-
-def load_all_pending_updates() -> dict[str, UpdateInfo]:
-    """Load pending updates for all tools.
-
-    Returns:
-        Dictionary mapping tool_id to UpdateInfo for tools with pending updates
-    """
-    from .updater import UPDATABLE_TOOLS
-
-    result = {}
-    for tool in UPDATABLE_TOOLS:
-        pending = load_pending_update(tool.tool_id)
-        if pending and pending.has_update:
-            result[tool.tool_id] = pending
-
-    return result
-
-
-def clear_all_pending_updates() -> None:
-    """Clear pending updates for all tools."""
-    from .updater import UPDATABLE_TOOLS
-
-    for tool in UPDATABLE_TOOLS:
-        clear_pending_update(tool.tool_id)
