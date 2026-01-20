@@ -1051,6 +1051,15 @@ def upgrade(ctx: click.Context, check: bool, force: bool) -> None:
                     f"{update_info.current_version} → {update_info.latest_version}"
                 )
 
+                if update_info.changelog_entries:
+                    console.print()
+                    for version, notes in update_info.changelog_entries:
+                        console.print(f"  [bold]v{version}[/bold]")
+                        for line in notes.strip().split("\n"):
+                            if line.strip():
+                                console.print(f"    {line.strip()}")
+                    console.print()
+
     if check:
         if tool_updates:
             console.print("\nRun [bold]shell-configs upgrade[/bold] to install")

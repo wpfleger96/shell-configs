@@ -18,6 +18,88 @@ logger = logging.getLogger(__name__)
 GITHUB_REPO = "wpfleger96/shell-configs"
 
 
+def fetch_changelog_entries(
+    repo: str,
+    current_version: str,
+    latest_version: str,
+    timeout: int = 10,
+) -> list[tuple[str, str]]:
+    """Fetch changelog entries for versions between current and latest.
+
+    Uses GitHub CLI for private repo authentication.
+
+    Args:
+        repo: GitHub repository in format "owner/repo"
+        current_version: Currently installed version
+        latest_version: Latest available version
+        timeout: Request timeout in seconds (default: 10)
+
+    Returns:
+        List of (version, notes) tuples for each version in the range.
+        Returns empty list on any error (private repo, network failure, etc).
+    """
+    try:
+        if not is_command_available("gh"):
+            return []
+
+        result = subprocess.run(
+            [
+                "gh",
+                "api",
+                f"repos/{repo}/contents/CHANGELOG.md",
+                "-H",
+                "Accept: application/vnd.github.raw",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+
+        if result.returncode != 0:
+            logger.debug(f"Changelog fetch failed: {result.stderr.strip()}")
+            return []
+
+        changelog_content = result.stdout
+
+        entries: list[tuple[str, str]] = []
+        current_entry_version: str | None = None
+        current_entry_lines: list[str] = []
+
+        for line in changelog_content.split("\n"):
+            version_match = re.match(r"^##\s+v?(\d+\.\d+\.\d+)", line)
+            if version_match:
+                if current_entry_version and current_entry_lines:
+                    version_obj = current_entry_version
+                    if is_newer(version_obj, current_version) and (
+                        version_obj == latest_version
+                        or not is_newer(version_obj, latest_version)
+                    ):
+                        entries.append(
+                            (current_entry_version, "\n".join(current_entry_lines))
+                        )
+
+                current_entry_version = version_match.group(1)
+                current_entry_lines = []
+            elif current_entry_version and line.strip():
+                current_entry_lines.append(line)
+
+        if current_entry_version and current_entry_lines:
+            if is_newer(current_entry_version, current_version) and (
+                current_entry_version == latest_version
+                or not is_newer(current_entry_version, latest_version)
+            ):
+                entries.append((current_entry_version, "\n".join(current_entry_lines)))
+
+        return entries
+
+    except subprocess.TimeoutExpired:
+        logger.debug(f"Changelog fetch timed out after {timeout} seconds")
+        return []
+    except Exception as e:
+        logger.debug(f"Changelog fetch failed: {e}")
+        return []
+
+
 @dataclass
 class UpdateInfo:
     """Information about available updates."""
@@ -26,6 +108,7 @@ class UpdateInfo:
     current_version: str
     latest_version: str
     source: str
+    changelog_entries: list[tuple[str, str]] | None = None
 
 
 def check_github_updates(
@@ -87,11 +170,18 @@ def check_github_updates(
 
         has_update = is_newer(latest_version, current_version)
 
+        changelog_entries = None
+        if has_update:
+            changelog_entries = fetch_changelog_entries(
+                repo, current_version, latest_version, timeout
+            )
+
         return UpdateInfo(
             has_update=has_update,
             current_version=current_version,
             latest_version=latest_version,
             source="github",
+            changelog_entries=changelog_entries,
         )
 
     except subprocess.TimeoutExpired:
