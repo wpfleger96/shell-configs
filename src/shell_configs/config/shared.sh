@@ -16,6 +16,8 @@ alias gaa="git add ."
 alias gc='git commit'
 alias gd='git diff'
 alias gds='git diff --staged'
+alias gdu='git -c delta.side-by-side=false diff'
+alias gdsu='git -c delta.side-by-side=false diff --staged'
 alias gl='git log --graph --decorate --max-count 15 --pretty=format:"%C(yellow)%h%Creset %C(green)%ad%Creset [%C(bold blue)%an%Creset] | %s%C(bold red)%d%Creset" --date=short'
 alias gla='git log --graph --decorate --pretty=format:"%C(yellow)%h%Creset %C(green)%ad%Creset [%C(bold blue)%an%Creset] | %s%C(bold red)%d%Creset" --date=short'
 alias gf='git fetch'
