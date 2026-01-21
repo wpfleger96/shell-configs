@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.10.13 (2026-01-21)
+
+### Bug Fixes
+
+- Add unified diff aliases for deleted/added files
+  ([`d79851c`](https://github.com/wpfleger96/shell-configs/commit/d79851ca507bb3df7c82ede898c5d04a1997311c))
+
+
 ## v0.10.12 (2026-01-20)
 
 ### Bug Fixes
