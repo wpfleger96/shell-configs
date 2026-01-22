@@ -14,7 +14,7 @@ class TestInstallCommand:
     def test_install_all_shells(self, test_repo, mock_home, cli_runner, monkeypatch):
         monkeypatch.chdir(test_repo)
 
-        result = cli_runner.invoke(cli, ["install", "--force"])
+        result = cli_runner.invoke(cli, ["install", "-y"])
 
         assert result.exit_code == 0
 
@@ -32,7 +32,7 @@ class TestInstallCommand:
     ):
         monkeypatch.chdir(test_repo)
 
-        result = cli_runner.invoke(cli, ["install", "--shells", "bash,zsh", "--force"])
+        result = cli_runner.invoke(cli, ["install", "--shells", "bash,zsh", "-y"])
 
         assert result.exit_code == 0
 
@@ -65,8 +65,8 @@ class TestUninstallCommand:
     def test_uninstall_all_shells(self, test_repo, mock_home, cli_runner, monkeypatch):
         monkeypatch.chdir(test_repo)
 
-        cli_runner.invoke(cli, ["install", "--force"])
-        result = cli_runner.invoke(cli, ["uninstall", "--force"])
+        cli_runner.invoke(cli, ["install", "-y"])
+        result = cli_runner.invoke(cli, ["uninstall", "-y"])
 
         assert result.exit_code == 0
 
@@ -88,8 +88,8 @@ class TestUninstallCommand:
         existing_content = "# Existing config\nalias old='echo old'\n"
         bashrc.write_text(existing_content)
 
-        cli_runner.invoke(cli, ["install", "--force"])
-        cli_runner.invoke(cli, ["uninstall", "--force"])
+        cli_runner.invoke(cli, ["install", "-y"])
+        cli_runner.invoke(cli, ["uninstall", "-y"])
 
         final_content = bashrc.read_text()
         assert "Existing config" in final_content
@@ -122,9 +122,9 @@ class TestStatusCommand:
         monkeypatch.chdir(test_repo)
 
         if setup_action == "install":
-            cli_runner.invoke(cli, ["install", "--force"])
+            cli_runner.invoke(cli, ["install", "-y"])
         elif setup_action == "install_and_modify":
-            cli_runner.invoke(cli, ["install", "--force"])
+            cli_runner.invoke(cli, ["install", "-y"])
             manager = ConfigManager()
             bashrc = mock_home / ".bashrc"
             manager.install_section(bashrc, "# Different content\n")
@@ -161,9 +161,9 @@ class TestDiffCommand:
         monkeypatch.chdir(test_repo)
 
         if setup_action == "install":
-            cli_runner.invoke(cli, ["install", "--force"])
+            cli_runner.invoke(cli, ["install", "-y"])
         elif setup_action == "install_and_modify":
-            cli_runner.invoke(cli, ["install", "--force"])
+            cli_runner.invoke(cli, ["install", "-y"])
             manager = ConfigManager()
             bashrc = mock_home / ".bashrc"
             manager.install_section(bashrc, "# Different content\n")
@@ -230,7 +230,7 @@ class TestAdditionalFiles:
         bash_helper_file = test_repo / "config" / "bash" / "bash-helper.sh"
         bash_helper_file.write_text("# Bash helper script")
 
-        result = cli_runner.invoke(cli, ["install", "--shells", "bash", "--force"])
+        result = cli_runner.invoke(cli, ["install", "--shells", "bash", "-y"])
 
         assert result.exit_code == 0
 
@@ -254,7 +254,7 @@ class TestAdditionalFiles:
         git_prompt_file = shared_scripts_dir / "git-prompt.sh"
         git_prompt_file.write_text("# Git prompt script")
 
-        cli_runner.invoke(cli, ["install", "--shells", "bash", "--force"])
+        cli_runner.invoke(cli, ["install", "--shells", "bash", "-y"])
 
         result = cli_runner.invoke(cli, ["status", "--shells", "bash"])
 
@@ -275,7 +275,7 @@ class TestSharedConfigSupport:
         shared_sh = test_repo / "config" / "shared.sh"
         shared_sh.write_text("# Shared config\nalias ll='ls -la'")
 
-        result = cli_runner.invoke(cli, ["install", "--shells", "bash", "--force"])
+        result = cli_runner.invoke(cli, ["install", "--shells", "bash", "-y"])
 
         assert result.exit_code == 0
 
@@ -295,7 +295,7 @@ class TestSharedConfigSupport:
         shared_sh = test_repo / "config" / "shared.sh"
         shared_sh.write_text("# Shared\nalias shared='echo shared'")
 
-        result = cli_runner.invoke(cli, ["install", "--shells", "bash,zsh", "--force"])
+        result = cli_runner.invoke(cli, ["install", "--shells", "bash,zsh", "-y"])
 
         assert result.exit_code == 0
 

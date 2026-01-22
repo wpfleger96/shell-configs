@@ -82,7 +82,7 @@ choco install just
 
 - `--shells bash,zsh` - Operate on specific shells only
 - `--dry-run` - Preview changes without applying
-- `--force` - Skip confirmation prompts
+- `-y` / `--yes` - Auto-confirm without prompting
 
 ### Backup Management
 
@@ -91,7 +91,7 @@ shell-configs automatically creates timestamped backups before modifying configs
 **Cleanup options:**
 - `--keep N` - Keep N most recent backups (overrides default)
 - `--dry-run` - Show what would be deleted
-- `--force` - Skip confirmation
+- `-y` / `--yes` - Auto-confirm without prompting
 
 ## Included Utilities
 

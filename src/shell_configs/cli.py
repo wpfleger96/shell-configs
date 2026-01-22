@@ -242,7 +242,7 @@ def cli() -> None:
 @click.option(
     "--dry-run", is_flag=True, help="Show what would be done without doing it"
 )
-@click.option("--force", is_flag=True, help="Skip confirmation prompts")
+@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
 @click.option(
     "--config-dir",
     type=click.Path(exists=True, path_type=Path),
@@ -250,7 +250,7 @@ def cli() -> None:
     help="Override config directory path (for setup command)",
 )
 def install(
-    shells: list[str] | None, dry_run: bool, force: bool, config_dir: Path | None
+    shells: list[str] | None, dry_run: bool, yes: bool, config_dir: Path | None
 ) -> None:
     """Install or update managed configuration sections."""
     from rich.prompt import Confirm
@@ -305,7 +305,7 @@ def install(
                 print_warning(f"Error installing required packages: {e}")
 
     has_diffs = False
-    if not force and not dry_run:
+    if not yes and not dry_run:
         has_diffs = _display_diffs_for_shells(selected_shells, config_reader, manager)
 
         if has_diffs:
@@ -408,7 +408,7 @@ def install(
                         f"[yellow]⚠[/yellow] {len(missing)}/{len(packages)} packages missing"
                     )
 
-                    if force or Confirm.ask("Install missing packages?", default=True):
+                    if yes or Confirm.ask("Install missing packages?", default=True):
                         console.print()
                         total = len(missing)
                         for i, pkg in enumerate(missing, start=1):
@@ -452,7 +452,7 @@ def install(
             console.print(f"[green]✓[/green] {message}")
         elif "not registered" in message:
             console.print(f"[yellow]⚠[/yellow] {message}")
-            if force or Confirm.ask(
+            if yes or Confirm.ask(
                 "Register SSH key for commit signing with GitHub?", default=True
             ):
                 success, message = validate_signing_setup(auto_fix=True)
@@ -484,8 +484,8 @@ def install(
     callback=parse_shell_filter,
     help="Comma-separated list of shells to uninstall",
 )
-@click.option("--force", is_flag=True, help="Skip confirmation prompts")
-def uninstall(shells: list[str] | None, force: bool) -> None:
+@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
+def uninstall(shells: list[str] | None, yes: bool) -> None:
     """Remove managed configuration sections."""
     from shell_configs.bootstrap import load_auto_update_config
     from shell_configs.display import print_info, print_operation_result, print_warning
@@ -502,7 +502,7 @@ def uninstall(shells: list[str] | None, force: bool) -> None:
         print_warning("No shells to uninstall")
         return
 
-    if not force:
+    if not yes:
         shell_names = ", ".join([s.display_name for s in selected_shells])
         if not click.confirm(
             f"Remove managed sections from {shell_names} configurations?"
@@ -874,8 +874,8 @@ def signing(fix: bool, verbose: bool) -> None:
     "--dry-run", is_flag=True, help="Show what would be deleted without deleting"
 )
 @click.option("--keep", type=int, help="Number of backups to keep per config file")
-@click.option("--force", is_flag=True, help="Skip confirmation prompt")
-def cleanup(dry_run: bool, keep: int | None, force: bool) -> None:
+@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
+def cleanup(dry_run: bool, keep: int | None, yes: bool) -> None:
     """Clean up old backup files created by shell-configs."""
     from collections import defaultdict
 
@@ -964,7 +964,7 @@ def cleanup(dry_run: bool, keep: int | None, force: bool) -> None:
         print_info(f"Dry run: would remove {to_remove_count} backup files")
         return
 
-    if not force:
+    if not yes:
         if not Confirm.ask(f"Remove {to_remove_count} old backup files?", default=True):
             print_info("Cleanup cancelled")
             return
@@ -983,13 +983,17 @@ def cleanup(dry_run: bool, keep: int | None, force: bool) -> None:
 @cli.command()
 @click.option("--check", is_flag=True, help="Check for updates without installing")
 @click.option("--force", is_flag=True, help="Force reinstall even if up to date")
+@click.option(
+    "-y", "--yes", is_flag=True, help="Auto-confirm installation without prompting"
+)
 @click.pass_context
-def upgrade(ctx: click.Context, check: bool, force: bool) -> None:
+def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
     """Upgrade shell-configs to the latest version from GitHub.
 
     Examples:
         shell-configs upgrade             # Check and install updates
         shell-configs upgrade --check     # Only check for updates
+        shell-configs upgrade -y          # Auto-confirm installation
     """
     from rich.prompt import Confirm
 
@@ -1065,7 +1069,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool) -> None:
             console.print("\nRun [bold]shell-configs upgrade[/bold] to install")
         return
 
-    if not force:
+    if not force and not yes:
         if len(tool_updates) == 1:
             prompt = f"\nInstall {tool_updates[0][0].display_name} update?"
         else:
@@ -1103,7 +1107,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool) -> None:
     if upgraded_tools:
         console.print()
         console.print("[cyan]Installing updated configurations...[/cyan]")
-        ctx.invoke(install, force=True)
+        ctx.invoke(install, yes=True)
 
 
 @cli.command()
@@ -1161,7 +1165,7 @@ def info() -> None:
 
 
 @cli.command()
-@click.option("--force", is_flag=True, help="Skip confirmation prompts")
+@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
 @click.option("--dry-run", is_flag=True, help="Show what would be done")
 @click.option(
     "--shells",
@@ -1173,7 +1177,7 @@ def info() -> None:
 @click.pass_context
 def setup(
     ctx: click.Context,
-    force: bool,
+    yes: bool,
     dry_run: bool,
     shells: list[str] | None,
     skip_completions: bool,
@@ -1209,7 +1213,7 @@ def setup(
         console.print(
             "[dim]Installing system packages needed by shell configurations.[/dim]\n"
         )
-        ctx.invoke(packages_install, dry_run=dry_run, force=force)
+        ctx.invoke(packages_install, dry_run=dry_run, yes=yes)
 
     console.print(
         "\n[bold cyan]Step 2/4: Install shell-configs system-wide[/bold cyan]"
@@ -1231,7 +1235,7 @@ def setup(
                     )
                     tool_install_success = True
                 else:
-                    if not force and not Confirm.ask(
+                    if not yes and not Confirm.ask(
                         f"Upgrade shell-configs {update_info.current_version} → {update_info.latest_version}?",
                         default=True,
                     ):
@@ -1258,12 +1262,12 @@ def setup(
             tool_install_success = False
 
     if not tool_install_success:
-        if not force and not dry_run:
+        if not yes and not dry_run:
             if not Confirm.ask("Install shell-configs permanently?", default=True):
                 console.print("[yellow]Setup cancelled[/yellow]")
                 sys.exit(0)
 
-        success, message = install_tool(force=force, dry_run=dry_run)
+        success, message = install_tool(force=yes, dry_run=dry_run)
 
         if not success:
             console.print(f"[red]Error:[/red] {message}")
@@ -1285,7 +1289,7 @@ def setup(
         install,
         shells=shells,
         dry_run=dry_run,
-        force=force,
+        yes=yes,
         config_dir=config_dir,
     )
 
@@ -1300,7 +1304,7 @@ def setup(
             )
             console.print("[dim]Skipping completion installation[/dim]")
         else:
-            if not force and not dry_run:
+            if not yes and not dry_run:
                 if not Confirm.ask(f"Install {shell} tab completion?", default=True):
                     console.print("[dim]Skipping completion installation[/dim]")
                 else:
@@ -1331,8 +1335,8 @@ def packages() -> None:
 
 @packages.command(name="install")
 @click.option("--dry-run", is_flag=True, help="Show what would be installed")
-@click.option("--force", is_flag=True, help="Skip confirmation prompts")
-def packages_install(dry_run: bool, force: bool) -> None:
+@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
+def packages_install(dry_run: bool, yes: bool) -> None:
     """Install required system packages."""
     from rich.prompt import Confirm
 
@@ -1391,7 +1395,7 @@ def packages_install(dry_run: bool, force: bool) -> None:
         desc = f" - {pkg.description}" if pkg.description else ""
         console.print(f"  {pkg.name}{desc}")
 
-    if not force and not dry_run:
+    if not yes and not dry_run:
         if not Confirm.ask("\nInstall these packages?", default=True):
             print_info("Installation cancelled")
             return
@@ -1482,8 +1486,8 @@ def packages_status() -> None:
 
 @packages.command(name="uninstall")
 @click.option("--dry-run", is_flag=True, help="Show what would be uninstalled")
-@click.option("--force", is_flag=True, help="Skip confirmation prompts")
-def packages_uninstall(dry_run: bool, force: bool) -> None:
+@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
+def packages_uninstall(dry_run: bool, yes: bool) -> None:
     """Uninstall managed system packages."""
     from rich.prompt import Confirm
 
@@ -1549,7 +1553,7 @@ def packages_uninstall(dry_run: bool, force: bool) -> None:
         desc = f" - {pkg.description}" if pkg.description else ""
         console.print(f"  {pkg.name}{desc}")
 
-    if not force and not dry_run:
+    if not yes and not dry_run:
         if not Confirm.ask("\nUninstall these packages?", default=False):
             print_info("Uninstall cancelled")
             return

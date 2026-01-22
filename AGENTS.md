@@ -20,7 +20,7 @@ Python CLI tool for managing shell configuration files (bash, zsh, git) across m
 | `completions zsh` | Output zsh completion script | `shell-configs completions zsh` |
 | `completions uninstall` | Remove shell completion | `shell-configs completions uninstall` |
 
-**Common options:** `--shells bash,zsh`, `--dry-run`, `--force`
+**Common options:** `--shells bash,zsh`, `--dry-run`, `-y` / `--yes`
 
 ## Development Commands
 
