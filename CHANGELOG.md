@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.10.15 (2026-01-22)
+
+### Bug Fixes
+
+- Standardize --yes vs --force flags
+  ([`0548540`](https://github.com/wpfleger96/shell-configs/commit/0548540df9dc9e99406da935423fe0bba82d2e52))
+
+
 ## v0.10.14 (2026-01-22)
 
 ### Bug Fixes
