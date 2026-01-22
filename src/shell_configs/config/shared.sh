@@ -121,7 +121,7 @@ sync-fork() {
 }
 
 ### Git Worktree Management ###
-export WT_DIR=".worktrees"
+export WT_DIR=".git/worktrees"
 export WT_EDITOR="cursor"
 
 __wt_ps1() {
@@ -483,7 +483,7 @@ Commands:
   help                                      Show this help message
 
 Environment Variables:
-  WT_DIR                 Directory name for worktrees (default: .worktrees)
+  WT_DIR                 Directory name for worktrees (default: .git/worktrees)
   WT_EDITOR              Editor to open worktrees (default: cursor)
 
 Examples:

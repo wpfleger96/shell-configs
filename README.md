@@ -112,9 +112,9 @@ wt prune                      # Remove merged worktrees
 wt prune --orphans            # Also remove orphaned/stale worktrees
 ```
 
-Worktrees stored in `.worktrees/` (auto-gitignored). Prompt shows `[wt]` and git status when in worktree. Tab completion for branches and commands.
+Worktrees stored in `.git/worktrees/`. Prompt shows `[wt]` and git status when in worktree. Tab completion for branches and commands.
 
-**Customize:** Set `WT_DIR` (default: `.worktrees`) and `WT_EDITOR` (default: `cursor`).
+**Customize:** Set `WT_DIR` (default: `.git/worktrees`) and `WT_EDITOR` (default: `cursor`).
 
 ### Git Aliases
 

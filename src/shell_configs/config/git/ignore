@@ -32,5 +32,3 @@ node_modules/
 # Claude Code /dev-docs slash command
 PLAN__*.md
 
-# Git worktrees
-.worktrees/
