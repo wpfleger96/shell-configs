@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.10.14 (2026-01-22)
+
+### Bug Fixes
+
+- Autoload SSH key for git commit signing in WSL
+  ([`550ef51`](https://github.com/wpfleger96/shell-configs/commit/550ef511fce37d3a767095ca4875871d3e3ef8fd))
+
+
 ## v0.10.13 (2026-01-21)
 
 ### Bug Fixes
