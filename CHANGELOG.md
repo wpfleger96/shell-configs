@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.11.0 (2026-01-23)
+
+### Features
+
+- Gchp alias
+  ([`310403c`](https://github.com/wpfleger96/shell-configs/commit/310403c15deb0e4bcef4689bfc9f7f3510e1f14e))
+
+
 ## v0.10.15 (2026-01-22)
 
 ### Bug Fixes
