@@ -64,19 +64,13 @@ choco install just
 
 ## Commands
 
-| Command | Description | Example |
-|---------|-------------|---------|
-| `setup` | Install shell-configs permanently (with auto-upgrade check) | `uv run shell-configs setup` |
-| `install` | Install or update managed sections | `uv run shell-configs install` |
-| `status` | Show sync status (✓ Synced, ⚠ Outdated, ✗ Not installed) | `uv run shell-configs status` |
-| `diff` | Show differences between repository and installed configs | `uv run shell-configs diff` |
-| `uninstall` | Remove managed sections | `uv run shell-configs uninstall` |
-| `validate` | Validate configuration file syntax | `uv run shell-configs validate` |
-| `list-shells` | List all available shell configurations | `uv run shell-configs list-shells` |
-| `info` | Show installation source and version info | `shell-configs info` |
-| `upgrade` | Check for and install available updates (shows changelog) | `shell-configs upgrade` |
-| `cleanup` | Clean up old backup files (keeps 5 most recent per config) | `shell-configs cleanup` |
-| `completions` | Manage shell tab completion (bash, zsh, install, uninstall) | `shell-configs completions install` |
+See [CLI Reference](docs/CLI_REFERENCE.md) for complete command documentation.
+
+**Quick start examples:**
+- `uv run shell-configs setup` - Install shell-configs permanently (with auto-upgrade check)
+- `uv run shell-configs install` - Install or update managed sections
+- `uv run shell-configs status` - Show sync status (✓ Synced, ⚠ Outdated, ✗ Not installed)
+- `shell-configs upgrade` - Check for and install available updates (shows changelog)
 
 ### Common Options
 

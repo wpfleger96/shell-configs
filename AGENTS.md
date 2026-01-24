@@ -4,21 +4,7 @@ Python CLI tool for managing shell configuration files (bash, zsh, git) across m
 
 ## Application Commands
 
-| Command | Description | Example |
-|---------|-------------|---------|
-| `setup` | First-time setup (sync deps + install git hooks) | `uv run shell-configs setup` |
-| `install` | Install or update managed sections | `uv run shell-configs install` |
-| `status` | Show sync status (✓ Synced, ⚠ Outdated, ✗ Not installed) | `uv run shell-configs status` |
-| `diff` | Show differences between repository and installed configs | `uv run shell-configs diff` |
-| `uninstall` | Remove managed sections | `uv run shell-configs uninstall` |
-| `validate` | Validate configuration file syntax | `uv run shell-configs validate` |
-| `list-shells` | List all available shell configurations | `uv run shell-configs list-shells` |
-| `info` | Show installation source and version info | `shell-configs info` |
-| `upgrade` | Check for and install available updates | `shell-configs upgrade` |
-| `completions install` | Install shell tab completion | `shell-configs completions install` |
-| `completions bash` | Output bash completion script | `shell-configs completions bash` |
-| `completions zsh` | Output zsh completion script | `shell-configs completions zsh` |
-| `completions uninstall` | Remove shell completion | `shell-configs completions uninstall` |
+See [CLI Reference](docs/CLI_REFERENCE.md) for complete command documentation.
 
 **Common options:** `--shells bash,zsh`, `--dry-run`, `-y` / `--yes`
 
