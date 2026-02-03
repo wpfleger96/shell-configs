@@ -44,6 +44,25 @@ alias safepull='git fetch origin $(git rev-parse --abbrev-ref HEAD) && git merge
 alias yeet="git commit -a --amend --no-edit"
 alias yeet_to_github="git commit -a --amend --no-edit && git push --force-with-lease"
 
+### Difit - Aliases ###
+alias gdif='npx -y difit'
+alias gdifw='npx -y difit working'
+alias gdifs='npx -y difit staged'
+alias gdifa='npx -y difit .'
+alias gdift='npx -y difit --tui'
+alias gdifn='npx -y difit --no-open'
+alias gdifu='npx -y difit . --include-untracked'
+
+gdifm() {
+    local default_branch
+    default_branch=$(_git_default_branch)
+    if [[ -z "$default_branch" ]]; then
+        echo "Error: Could not determine default branch."
+        return 1
+    fi
+    npx -y difit @ "$default_branch"
+}
+
 ### Git - Configuration ###
 export GIT_PS1_SHOWDIRTYSTATE=true
 export GIT_PS1_SHOWSTASHSTATE=true
@@ -53,10 +72,15 @@ GPG_TTY=$(tty)
 export GPG_TTY
 
 ### Git - Functions ###
+_git_default_branch() {
+    local remote="${1:-origin}"
+    command git symbolic-ref "refs/remotes/$remote/HEAD" 2>/dev/null | sed "s@^refs/remotes/$remote/@@"
+}
+
 git() {
     if [[ "$1" == "checkout" && -z "$2" ]]; then
         local default_branch
-        default_branch=$(command git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+        default_branch=$(_git_default_branch)
         if [[ -n "$default_branch" ]]; then
             command git checkout "$default_branch"
         else
@@ -104,7 +128,7 @@ grename() {
 
 sync-fork() {
     local default_branch
-    default_branch=$(command git symbolic-ref refs/remotes/upstream/HEAD 2>/dev/null | sed 's@^refs/remotes/upstream/@@')
+    default_branch=$(_git_default_branch upstream)
 
     if [[ -z "$default_branch" ]]; then
         # Fallback: check if upstream/main or upstream/master exists
@@ -132,13 +156,10 @@ __wt_ps1() {
     fi
 }
 
-_wt_main_branch() {
-    command git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/@@' || echo "origin/main"
-}
-
 _wt_branch_status() {
     local branch="$1"
-    local main_branch=$(_wt_main_branch)
+    local default=$(_git_default_branch)
+    local main_branch="origin/${default:-main}"
     local branch_head merge_base unique_count
 
     branch_head=$(command git rev-parse "refs/heads/$branch" 2>/dev/null) || return 1
@@ -258,7 +279,10 @@ _wt_add() {
         fi
         echo "Created worktree for '$branch' at $worktree_path"
     else
-        [[ -z "$base_branch" ]] && base_branch=$(_wt_main_branch)
+        if [[ -z "$base_branch" ]]; then
+            local default=$(_git_default_branch)
+            base_branch="origin/${default:-main}"
+        fi
         if ! command git worktree add -b "$branch" "$worktree_path" "$base_branch"; then
             echo "Error: Failed to create worktree and branch '$branch' from '$base_branch'"
             return 1

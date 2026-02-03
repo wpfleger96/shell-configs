@@ -145,6 +145,21 @@ recent_commits    # Formatted log by date
 
 **Git config aliases** (also available): `st`, `co`, `br`, `ci`, `unstage`, `last`, `lg`, `amend`
 
+### Local Diff Viewer (difit)
+
+View git diffs in a GitHub-style web interface:
+
+```bash
+gdif              # View HEAD commit
+gdifa             # All uncommitted changes (staged + unstaged)
+gdifs / gdifw     # Staged only / unstaged only
+gdifm             # Compare HEAD with default branch
+gdift             # Terminal UI (no browser)
+gdifu             # Include untracked files
+```
+
+Uses `npx -y difit` - auto-downloads on first use if not installed.
+
 ### Development Tools
 
 ```bash

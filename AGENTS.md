@@ -93,6 +93,18 @@ wt prune [--force] [--orphans]               # Clean up merged/orphan worktrees
 wt orphans                                   # List orphaned worktrees
 ```
 
+**Difit - Local Git Diff Viewer (`gdif*` aliases):**
+```bash
+gdif                 # View HEAD commit in browser (GitHub-style UI)
+gdifa                # All uncommitted changes (staged + unstaged)
+gdifs / gdifw        # Staged only / unstaged (working) only
+gdifm                # Compare HEAD with default branch (auto-detects main/master)
+gdift                # Terminal UI mode (no browser)
+gdifn                # Start server without opening browser
+gdifu                # All changes including untracked files
+```
+Uses `npx -y difit` - auto-downloads on first use if not installed.
+
 **Python/Node Utilities:**
 - `pytest_coverage` - Run pytest with coverage
 - `python_package_versions <pkg>` - Check PyPI versions
