@@ -160,20 +160,40 @@ _wt_branch_status() {
     local branch="$1"
     local default=$(_git_default_branch)
     local main_branch="origin/${default:-main}"
-    local branch_head merge_base unique_count
+    local branch_head merge_base
 
-    branch_head=$(command git rev-parse "refs/heads/$branch" 2>/dev/null) || return 1
-    merge_base=$(command git merge-base "$branch" "$main_branch" 2>/dev/null) || return 1
+    command git rev-parse "refs/heads/$branch" &>/dev/null || return 1
+    command git rev-parse "$main_branch" &>/dev/null || return 1
+
+    branch_head=$(command git rev-parse "$branch" 2>/dev/null)
+    merge_base=$(command git merge-base "$branch" "$main_branch" 2>/dev/null)
+
+    local has_remote=false
+    if command git show-ref --verify --quiet "refs/remotes/origin/$branch" 2>/dev/null; then
+        has_remote=true
+    fi
 
     if [[ "$branch_head" == "$merge_base" ]]; then
+        if [[ "$has_remote" == true ]] && command git merge-base --is-ancestor "$branch" "$main_branch" 2>/dev/null; then
+            echo "MERGED"
+            return 0
+        fi
         echo "NEW"
         return 0
     fi
 
-    unique_count=$(command git rev-list --count "$main_branch..$branch" 2>/dev/null)
-    if [[ "$unique_count" == "0" ]]; then
-        echo "MERGED"
-        return 0
+    if [[ "$has_remote" == true ]]; then
+        if command git merge-base --is-ancestor "$branch" "$main_branch" 2>/dev/null; then
+            echo "MERGED"
+            return 0
+        fi
+
+        local unmerged_patches
+        unmerged_patches=$(command git cherry "$main_branch" "$branch" 2>/dev/null | grep -c '^+' || echo "0")
+        if [[ "$unmerged_patches" == "0" ]]; then
+            echo "MERGED"
+            return 0
+        fi
     fi
 
     return 1
@@ -409,6 +429,12 @@ _wt_prune() {
     done
 
     repo_root=$(_wt_repo_root) || return 0
+
+    local default_branch
+    default_branch=$(_git_default_branch)
+    if [[ -n "$default_branch" ]]; then
+        command git fetch origin "$default_branch" --quiet 2>/dev/null
+    fi
 
     while IFS= read -r line; do
         wt_path="${line%% *}"
