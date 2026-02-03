@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.12.0 (2026-02-03)
+
+### Documentation
+
+- Add automated full CLI reference docs
+  ([`da99f00`](https://github.com/wpfleger96/shell-configs/commit/da99f002a6e140167b38289da65acd7715405734))
+
+### Features
+
+- Add shell aliases for difit local git diff viewing
+  ([`42b360f`](https://github.com/wpfleger96/shell-configs/commit/42b360f96481231038ad493df94112265dc44790))
+
+
 ## v0.11.0 (2026-01-23)
 
 ### Features
