@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.12.1 (2026-02-03)
+
+### Bug Fixes
+
+- Worktree pruning should also detect squash/rebase merged worktree branches
+  ([`2a21103`](https://github.com/wpfleger96/shell-configs/commit/2a211039032dbd6ef8d3f2f0c5c82a663d8256ba))
+
+
 ## v0.12.0 (2026-02-03)
 
 ### Documentation
