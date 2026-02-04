@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.12.2 (2026-02-04)
+
+### Bug Fixes
+
+- Ignore local/repo-level Claude Code configs
+  ([`246fbb2`](https://github.com/wpfleger96/shell-configs/commit/246fbb25a205fcc7b321415b974c0e2ea5aec54f))
+
+
 ## v0.12.1 (2026-02-03)
 
 ### Bug Fixes
