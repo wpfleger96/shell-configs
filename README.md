@@ -133,6 +133,7 @@ gstp              # git stash pop
 gundo / gunstage  # Undo last commit / unstage files
 grecover          # Reset to ORIG_HEAD (undo rebase/merge)
 safepull          # Safe pull (fetch + merge, no rebase)
+gpm / gpr         # Pull default branch into current via merge / rebase (worktree-safe)
 sync-fork         # Sync fork with upstream/main
 yeet              # Amend last commit (no edit)
 yeet_to_github    # Amend + force push with lease

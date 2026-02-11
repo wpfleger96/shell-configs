@@ -41,6 +41,8 @@ alias wta='wt add'
 alias wtr='wt rm'
 alias recent_commits="git for-each-ref --sort=-committerdate refs/heads/ --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(color:red)%(objectname:short)%(color:reset) - %(contents:subject) - %(authorname) (%(color:green)%(committerdate:relative)%(color:reset))'"
 alias safepull='git fetch origin $(git rev-parse --abbrev-ref HEAD) && git merge FETCH_HEAD'
+alias gpm='command git pull --no-rebase origin $(_git_default_branch)'
+alias gpr='command git pull --rebase origin $(_git_default_branch)'
 alias yeet="git commit -a --amend --no-edit"
 alias yeet_to_github="git commit -a --amend --no-edit && git push --force-with-lease"
 
