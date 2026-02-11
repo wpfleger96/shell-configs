@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.12.3 (2026-02-11)
+
+### Bug Fixes
+
+- Add pull/rebase helper aliases
+  ([`ef0fa98`](https://github.com/wpfleger96/shell-configs/commit/ef0fa984d20311fbe3d2559d76615f8ac2e7a7ea))
+
+
 ## v0.12.2 (2026-02-04)
 
 ### Bug Fixes
