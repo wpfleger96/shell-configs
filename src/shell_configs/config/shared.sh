@@ -427,14 +427,13 @@ _wt_ls() {
 
 _wt_cd() {
     local branch="$1"
-
-    if [[ -z "$branch" ]]; then
-        echo "Usage: wt cd <branch>"
-        return 1
-    fi
-
     local repo_root
     repo_root=$(_wt_repo_root) || return 1
+
+    if [[ -z "$branch" ]]; then
+        cd "$repo_root" || return 1
+        return 0
+    fi
 
     local dir_name
     dir_name=$(_wt_sanitize_dirname "$branch")
@@ -569,7 +568,7 @@ Commands:
   add <branch> [--open] [--base <branch>]  Create a new worktree for the branch
   rm <branch> [--force]                     Remove a worktree (--force if uncommitted changes)
   list                                      List all worktrees with status
-  cd <branch>                               Navigate to a worktree
+  cd [branch]                               Navigate to a worktree (or repo root if no branch)
   prune [--force] [--orphans]               Remove merged worktrees (--orphans includes stale)
   orphans                                   List stale/orphaned worktrees
   help                                      Show this help message
@@ -582,6 +581,7 @@ Examples:
   wt add feature-auth --open    # Create worktree and open in editor
   wt list                       # List all worktrees
   wt cd feature-auth            # Navigate to worktree
+  wt cd                         # Return to repo root
   wt prune                      # Clean up merged worktrees
   wt rm feature-auth            # Remove a worktree
 EOF
