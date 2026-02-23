@@ -41,8 +41,13 @@ alias wta='wt add'
 alias wtr='wt rm'
 alias recent_commits="git for-each-ref --sort=-committerdate refs/heads/ --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(color:red)%(objectname:short)%(color:reset) - %(contents:subject) - %(authorname) (%(color:green)%(committerdate:relative)%(color:reset))'"
 alias safepull='git fetch origin $(git rev-parse --abbrev-ref HEAD) && git merge FETCH_HEAD'
-alias gpm='command git pull --no-rebase origin $(_git_default_branch)'
-alias gpr='command git pull --rebase origin $(_git_default_branch)'
+gpm() {
+    _git_smart_pull merge
+}
+
+gpr() {
+    _git_smart_pull rebase
+}
 alias yeet="git commit -a --amend --no-edit"
 alias yeet_to_github="git commit -a --amend --no-edit && git push --force-with-lease"
 
@@ -77,6 +82,40 @@ export GPG_TTY
 _git_default_branch() {
     local remote="${1:-origin}"
     command git symbolic-ref "refs/remotes/$remote/HEAD" 2>/dev/null | sed "s@^refs/remotes/$remote/@@"
+}
+
+_git_smart_pull() {
+    local mode="$1" # "rebase" or "merge"
+    local default_branch
+    default_branch=$(_git_default_branch)
+    if [[ -z "$default_branch" ]]; then
+        echo "Error: Could not determine default branch."
+        return 1
+    fi
+
+    command git fetch origin "$default_branch" || return 1
+
+    local git_dir
+    git_dir=$(command git rev-parse --git-dir 2>/dev/null)
+    if [[ -d "$git_dir/rebase-merge" ]] || [[ -d "$git_dir/rebase-apply" ]]; then
+        command git rebase --abort
+    elif [[ -f "$git_dir/MERGE_HEAD" ]]; then
+        command git merge --abort
+    fi
+
+    local diverged_commits
+    diverged_commits=$(command git rev-list --count HEAD "^origin/$default_branch" 2>/dev/null || echo "0")
+    if [[ "$diverged_commits" -gt 0 ]] && command git diff "origin/$default_branch" --quiet 2>/dev/null; then
+        echo "Branch has $diverged_commits commit(s) already on $default_branch — resetting"
+        command git reset --hard "origin/$default_branch"
+        return 0
+    fi
+
+    if [[ "$mode" == "rebase" ]]; then
+        command git rebase "origin/$default_branch"
+    else
+        command git merge "origin/$default_branch"
+    fi
 }
 
 git() {
