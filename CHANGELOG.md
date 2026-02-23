@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.13.1 (2026-02-23)
+
+### Bug Fixes
+
+- Wt cd forward/backward
+  ([`ff6970a`](https://github.com/wpfleger96/shell-configs/commit/ff6970a4c5c49972d2a7faf01c4863dce533b32d))
+
+
 ## v0.13.0 (2026-02-23)
 
 ### Features
