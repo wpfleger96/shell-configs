@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.13.0 (2026-02-23)
+
+### Features
+
+- Make gpr/gpm auto-reset stale branches
+  ([`5416efc`](https://github.com/wpfleger96/shell-configs/commit/5416efc866948b17df1ccc182062e3b32c9bf36c))
+
+Rebasing a branch whose commits are already on main (squash-merged or otherwise superseded) causes
+  spurious conflicts with no real fix. Revives the detection logic from the old pull_rebase_master
+  script: if the branch diverges from main but has no actual file differences, reset to origin/main
+  instead of rebasing.
+
+Also handles re-running gpr during a failed rebase — aborts the in-progress state before detection
+  runs.
+
+
 ## v0.12.4 (2026-02-12)
 
 ### Bug Fixes
