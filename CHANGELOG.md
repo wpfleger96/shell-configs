@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.13.2 (2026-02-24)
+
+### Bug Fixes
+
+- Resolve main repo root from inside worktrees
+  ([`4032ecd`](https://github.com/wpfleger96/shell-configs/commit/4032ecdf67b4ba6c96a619703e37538062ec44b1))
+
+
 ## v0.13.1 (2026-02-23)
 
 ### Bug Fixes
