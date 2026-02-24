@@ -256,13 +256,13 @@ _wt_is_orphan() {
 }
 
 _wt_repo_root() {
-    local root
-    root=$(command git rev-parse --show-toplevel 2>/dev/null)
-    if [[ -z "$root" ]]; then
+    local git_common_dir
+    git_common_dir=$(command git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+    if [[ -z "$git_common_dir" ]]; then
         echo "Error: Not in a git repository" >&2
         return 1
     fi
-    echo "$root"
+    echo "${git_common_dir%/.git}"
 }
 
 _wt_remove() {
