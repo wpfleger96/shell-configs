@@ -23,6 +23,7 @@ alias gla='git log --graph --decorate --pretty=format:"%C(yellow)%h%Creset %C(gr
 alias gf='git fetch'
 alias gp='git pull'
 alias gpu='git push'
+alias gpuf='git push --force-with-lease'
 alias gs='git status'
 alias gst='git stash'
 alias gstu='git stash -u'
