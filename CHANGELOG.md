@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.14.0 (2026-02-25)
+
+### Features
+
+- Add gpuf alias
+  ([`16b5e83`](https://github.com/wpfleger96/shell-configs/commit/16b5e83e64aa356f956cc01f3e88c8bed245f326))
+
+
 ## v0.13.2 (2026-02-24)
 
 ### Bug Fixes
