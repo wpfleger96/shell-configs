@@ -19,3 +19,7 @@ open_goose_recipe_desktop() {
 chrome() {
     open -a "Google Chrome" "$@"
 }
+
+nosleep() {
+    caffeinate -disu -t "${1:-9200}"
+}

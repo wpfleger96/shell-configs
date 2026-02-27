@@ -70,9 +70,14 @@ src/shell_configs/
 ├── packages/                   # Package management
 │   └── packages.py             # Tool package definitions
 └── config/                     # Managed shell configs (installed by tool)
-    ├── bash/bashrc, zsh/zshrc  # Shell-specific configs
-    ├── shared.sh               # Shared shell config
-    └── shared.gitconfig        # Shared git config
+    ├── shared.sh               # Cross-platform shell config (aliases, functions)
+    ├── shared.gitconfig        # Cross-platform git config
+    ├── bash/bashrc             # Bash-specific (history, prompt, completions)
+    ├── zsh/zshrc               # Zsh-specific (history, keybindings, prompt, completions)
+    ├── platform/
+    │   ├── macos.sh            # macOS-only (caffeinate, xattr, open commands)
+    │   └── wsl.sh              # WSL-only (SSH agent, browser, Windows paths)
+    └── shared-scripts/         # Vendored scripts (do not modify)
 tests/
 ├── conftest.py         # Fixtures (mock_home, test_repo, cli_runner)
 ├── unit/               # Fast unit tests (mock filesystem)
@@ -225,6 +230,13 @@ uv run pytest -v                     # Verbose output
 
 15. **uv sync required:** Run `just sync` or `uv sync` after pulling to ensure dependencies match lockfile.
 
+16. **Config file placement — platform vs shell vs shared:**
+   - `shared.sh` → Cross-platform code that works on BOTH macOS and Linux/WSL
+   - `platform/macos.sh` → macOS-only tools (`caffeinate`, `open`, `xattr`, Homebrew)
+   - `platform/wsl.sh` → WSL-only tools (Windows paths, `wslpath`, SSH agent bridge)
+   - `zsh/zshrc` / `bash/bashrc` → Shell-specific settings (history, keybindings, prompt, completions)
+   - **Decision rule:** Does the command exist on all platforms? → `shared.sh`. Only macOS? → `platform/macos.sh`. Only WSL? → `platform/wsl.sh`. Shell syntax differences? → respective shell file.
+
 ## Key Files by Task
 
 | Task | Files |
@@ -238,6 +250,9 @@ uv run pytest -v                     # Verbose output
 | Change auto-update behavior | `src/shell_configs/bootstrap/updater.py` |
 | Add package definitions | `src/shell_configs/packages/packages.py` |
 | Modify test fixtures | `tests/conftest.py` |
-| Add shell configs | `src/shell_configs/config/{bash,zsh,git}/` |
-| Modify shell utilities (wt, extract, etc.) | `src/shell_configs/config/shared.sh` |
+| Add cross-platform alias/function | `src/shell_configs/config/shared.sh` |
+| Add macOS-only alias/function | `src/shell_configs/config/platform/macos.sh` |
+| Add WSL-only alias/function | `src/shell_configs/config/platform/wsl.sh` |
+| Add zsh-specific config | `src/shell_configs/config/zsh/zshrc` |
+| Add bash-specific config | `src/shell_configs/config/bash/bashrc` |
 | Modify completion logic | `src/shell_configs/completions.py` |
