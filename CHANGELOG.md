@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.15.0 (2026-02-27)
+
+### Features
+
+- Nosleep function
+  ([`b404f6a`](https://github.com/wpfleger96/shell-configs/commit/b404f6a7ef793df6191e5b4ffdf9b2bc1bb69444))
+
+
 ## v0.14.0 (2026-02-25)
 
 ### Features
