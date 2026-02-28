@@ -703,4 +703,13 @@ extract() {
     fi
 }
 
+runlog() {
+    local outfile="$1"
+    shift
+    (
+        set -x
+        "$@"
+    ) 2>&1 | tee "$outfile"
+}
+
 [ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env"
