@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.16.0 (2026-02-28)
+
+### Features
+
+- Runlog function
+  ([`c5dd9c3`](https://github.com/wpfleger96/shell-configs/commit/c5dd9c3f19dbf1557f62be1f413bbe525e235459))
+
+
 ## v0.15.0 (2026-02-27)
 
 ### Features
