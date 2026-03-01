@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.16.1 (2026-03-01)
+
+### Bug Fixes
+
+- Installs on fresh WSL machine
+  ([`d113404`](https://github.com/wpfleger96/shell-configs/commit/d1134045e87efce2f50d01331d62e47988bd7204))
+
+
 ## v0.16.0 (2026-02-28)
 
 ### Features
