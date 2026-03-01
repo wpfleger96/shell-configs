@@ -389,7 +389,11 @@ class LinuxInstaller(PackageManager):
 
     def is_available(self) -> bool:
         """Check if we can install packages on Linux."""
-        return shutil.which("apt") is not None or shutil.which("pip") is not None
+        return (
+            shutil.which("apt") is not None
+            or shutil.which("pip") is not None
+            or shutil.which("uv") is not None
+        )
 
     def is_installed(self, pkg: Package) -> bool:
         """Check if package is installed."""
@@ -436,6 +440,8 @@ class LinuxInstaller(PackageManager):
             return self._install_apt(pkg, config, dry_run)
         elif config.method == "pip":
             return self._install_pip(pkg, config, dry_run)
+        elif config.method == "uv_tool":
+            return self._install_uv_tool(pkg, config, dry_run)
         elif config.method == "script":
             return self._install_script(pkg, config, dry_run)
         elif config.method == "pwsh":
@@ -538,6 +544,36 @@ class LinuxInstaller(PackageManager):
         except Exception as e:
             return False, f"Unexpected error: {e}"
 
+    def _install_uv_tool(
+        self, pkg: Package, config: InstallConfig, dry_run: bool
+    ) -> tuple[bool, str]:
+        """Install a package via uv tool."""
+        if not shutil.which("uv"):
+            return False, "uv is not available"
+
+        name = config.package or pkg.name
+
+        if dry_run:
+            return True, f"Would install {name} via uv tool"
+
+        try:
+            result = subprocess.run(
+                ["uv", "tool", "install", name],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+
+            if result.returncode == 0:
+                return True, f"Successfully installed {name}"
+
+            return False, result.stderr.strip() or "Installation failed"
+
+        except subprocess.TimeoutExpired:
+            return False, "Installation timed out after 5 minutes"
+        except Exception as e:
+            return False, f"Unexpected error: {e}"
+
     def _install_script(
         self, pkg: Package, config: InstallConfig, dry_run: bool
     ) -> tuple[bool, str]:
@@ -580,6 +616,8 @@ class LinuxInstaller(PackageManager):
             return self._uninstall_apt(pkg, config, dry_run)
         elif config.method == "pip":
             return self._uninstall_pip(pkg, config, dry_run)
+        elif config.method == "uv_tool":
+            return self._uninstall_uv_tool(pkg, config, dry_run)
         elif config.method == "pwsh":
             return _uninstall_pwsh_module(config.package or pkg.name, dry_run)
         elif config.method in CANNOT_AUTO_UNINSTALL:
@@ -632,6 +670,36 @@ class LinuxInstaller(PackageManager):
         try:
             result = subprocess.run(
                 ["pip", "uninstall", "-y", name],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+
+            if result.returncode == 0:
+                return True, f"Successfully uninstalled {name}"
+
+            return False, result.stderr.strip() or "Uninstall failed"
+
+        except subprocess.TimeoutExpired:
+            return False, "Uninstall timed out"
+        except Exception as e:
+            return False, f"Unexpected error: {e}"
+
+    def _uninstall_uv_tool(
+        self, pkg: Package, config: InstallConfig, dry_run: bool
+    ) -> tuple[bool, str]:
+        """Uninstall a package via uv tool."""
+        if not shutil.which("uv"):
+            return False, "uv is not available"
+
+        name = config.package or pkg.name
+
+        if dry_run:
+            return True, f"Would uninstall {name} via uv tool"
+
+        try:
+            result = subprocess.run(
+                ["uv", "tool", "uninstall", name],
                 capture_output=True,
                 text=True,
                 timeout=120,

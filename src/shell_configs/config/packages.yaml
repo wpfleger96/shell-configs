@@ -60,7 +60,7 @@ packages:
     macos:
       method: brew
     linux:
-      method: pip
+      method: uv_tool
 
   - name: ansible-lint
     command: ansible-lint
@@ -68,7 +68,7 @@ packages:
     macos:
       method: brew
     linux:
-      method: pip
+      method: uv_tool
 
   # Development Tools
   - name: gh
@@ -92,7 +92,7 @@ packages:
       method: brew
     linux:
       method: script
-      install_cmd: "curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/bin"
+      install_cmd: "curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin"
 
   - name: powershell
     command: pwsh

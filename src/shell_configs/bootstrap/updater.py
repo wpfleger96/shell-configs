@@ -10,6 +10,7 @@ from importlib.metadata import version
 
 from .installer import (
     UV_NOT_FOUND_ERROR,
+    get_tool_version,
     is_command_available,
 )
 from .version import is_newer
@@ -287,7 +288,7 @@ UPDATABLE_TOOLS: list[ToolSpec] = [
         package_name="shell-configs",
         display_name="shell-configs",
         get_version=lambda: version("shell-configs"),
-        is_installed=lambda: True,
+        is_installed=lambda: get_tool_version("shell-configs") is not None,
     ),
 ]
 

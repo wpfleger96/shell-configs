@@ -100,7 +100,7 @@ def test_get_package_manager_returns_manager() -> None:
         assert manager is not None
         assert manager.name == "homebrew"
     elif not is_platform(Platform.MACOS) and (
-        shutil.which("apt") or shutil.which("pip")
+        shutil.which("apt") or shutil.which("pip") or shutil.which("uv")
     ):
         assert manager is not None
         assert manager.name == "linux"

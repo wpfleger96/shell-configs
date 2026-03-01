@@ -1279,6 +1279,19 @@ def setup(
     if not tool_install_success:
         sys.exit(1)
 
+    # Check if ~/.local/bin is in PATH
+    if not dry_run:
+        import os
+
+        local_bin = os.path.expanduser("~/.local/bin")
+        path_dirs = os.environ.get("PATH", "").split(os.pathsep)
+        if local_bin not in path_dirs:
+            console.print(
+                f"\n[yellow]⚠[/yellow] {local_bin} is not in your PATH. "
+                "Add it to use shell-configs from anywhere:"
+            )
+            console.print('  export PATH="$HOME/.local/bin:$PATH"\n')
+
     config_dir = get_tool_config_dir("shell-configs") if not dry_run else None
 
     console.print(
