@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.16.2 (2026-03-06)
+
+### Bug Fixes
+
+- Set correct upstream tracking in _wt_add for new branches
+  ([`b71fb89`](https://github.com/wpfleger96/shell-configs/commit/b71fb8972b7228b72ef193bc0eb92f42e2c6ece9))
+
+
 ## v0.16.1 (2026-03-01)
 
 ### Bug Fixes
