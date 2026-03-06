@@ -349,6 +349,7 @@ _wt_add() {
             echo "Error: Failed to create worktree and branch '$branch' from '$base_branch'"
             return 1
         fi
+        git -C "$worktree_path" branch --set-upstream-to="origin/$branch" 2>/dev/null
         echo "Created worktree with new branch '$branch' (based on $base_branch) at $worktree_path"
     fi
 
