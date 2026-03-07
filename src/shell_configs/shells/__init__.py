@@ -5,6 +5,7 @@ from shell_configs.shells.bash import BashShell
 from shell_configs.shells.cursor import CursorShell
 from shell_configs.shells.git import GitShell
 from shell_configs.shells.registry import ShellRegistry
+from shell_configs.shells.vscode import VSCodeShell
 from shell_configs.shells.xdg import XdgShell
 from shell_configs.shells.zsh import ZshShell
 
@@ -15,5 +16,6 @@ __all__ = [
     "GitShell",
     "XdgShell",
     "CursorShell",
+    "VSCodeShell",
     "ShellRegistry",
 ]

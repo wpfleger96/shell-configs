@@ -4,6 +4,7 @@ from shell_configs.shells.base import Shell
 from shell_configs.shells.bash import BashShell
 from shell_configs.shells.cursor import CursorShell
 from shell_configs.shells.git import GitShell
+from shell_configs.shells.vscode import VSCodeShell
 from shell_configs.shells.xdg import XdgShell
 from shell_configs.shells.zsh import ZshShell
 
@@ -23,6 +24,7 @@ class ShellRegistry:
         self.register(GitShell())
         self.register(XdgShell())
         self.register(CursorShell())
+        self.register(VSCodeShell())
 
     def register(self, shell: Shell) -> None:
         """Register a shell implementation.

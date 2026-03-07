@@ -16,7 +16,7 @@ class TestCursorWSLPaths:
             lambda p: p == Platform.WSL,
         )
         monkeypatch.setattr(
-            "shell_configs.shells.cursor._get_windows_username",
+            "shell_configs.shells.cursor.get_windows_username",
             lambda: "testuser",
         )
 
@@ -32,7 +32,7 @@ class TestCursorWSLPaths:
             lambda p: p == Platform.WSL,
         )
         monkeypatch.setattr(
-            "shell_configs.shells.cursor._get_windows_username",
+            "shell_configs.shells.cursor.get_windows_username",
             lambda: "",
         )
 
