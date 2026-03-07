@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.17.0 (2026-03-07)
+
+### Features
+
+- Add VS Code editor support
+  ([`e35c722`](https://github.com/wpfleger96/shell-configs/commit/e35c72210f85b1088ef1852eb3220ab57b843b34))
+
+
 ## v0.16.2 (2026-03-06)
 
 ### Bug Fixes
