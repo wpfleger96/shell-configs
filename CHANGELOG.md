@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.17.1 (2026-03-10)
+
+### Bug Fixes
+
+- Check current branch's remote tracking ref after checking default branch to ensure
+  --force-with-lease has accurate info for subsequent pushes
+  ([`445f935`](https://github.com/wpfleger96/shell-configs/commit/445f935645764f7d3c62f5f997e5f59eb6f5a01c))
+
+
 ## v0.17.0 (2026-03-07)
 
 ### Features
