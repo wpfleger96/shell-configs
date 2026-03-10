@@ -96,6 +96,12 @@ _git_smart_pull() {
 
     command git fetch origin "$default_branch" || return 1
 
+    local current_branch
+    current_branch=$(command git symbolic-ref --short HEAD 2>/dev/null)
+    if [[ -n "$current_branch" && "$current_branch" != "$default_branch" ]]; then
+        command git fetch origin "$current_branch" 2>/dev/null || true
+    fi
+
     local git_dir
     git_dir=$(command git rev-parse --git-dir 2>/dev/null)
     if [[ -d "$git_dir/rebase-merge" ]] || [[ -d "$git_dir/rebase-apply" ]]; then
