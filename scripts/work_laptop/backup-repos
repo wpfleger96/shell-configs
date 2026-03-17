@@ -1,0 +1,20 @@
+#!/usr/bin/env zsh
+
+DEVELOPMENT_DIR="$HOME/Development"
+BACKUP_DIR="$HOME/Backups"
+BACKUP_FILE="git_repos.backup"
+
+mkdir -p "$BACKUP_DIR"
+BACKUP_FILE="$BACKUP_DIR/$BACKUP_FILE"
+
+echo "Backing up all repos in $DEVELOPMENT_DIR to $BACKUP_FILE"
+
+for dir in "$DEVELOPMENT_DIR"/*; do
+    if [ -d "$dir/.git" ]; then
+        cd "$dir"
+        git remote get-url origin >> "$BACKUP_FILE"
+        cd - > /dev/null
+    fi
+done
+
+echo "Completed backing up all repos"

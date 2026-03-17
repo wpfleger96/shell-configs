@@ -1,0 +1,42 @@
+#!/usr/bin/env zsh
+
+# Set hostname
+sudo scutil --set HostName "$(whoami)-macbook-pro"
+sudo scutil --set LocalHostName "$(whoami)-macbook-pro"
+sudo scutil --set ComputerName "$(whoami)-macbook-pro"
+
+# Bootstrap
+/usr/bin/curl -fsSL https://artifactory.global.square/artifactory/devenv/bootstrap/sq-bootstrap | /bin/bash
+
+# Clone config_files
+mkdir -p ~/Development
+git clone org-49461806@github.com:squareup/config_files.git ~/Development/config_files
+cd ~/Development/config_files
+./install.sh
+
+# Make compost happy
+brew uninstall --force nginx
+rvm install ruby-3.2.3
+
+# Useful stuff
+echo "alias COMPOST=\"$HOME/Development/topsoil/compost backend\"" >> ~/.zshrc
+echo "export POLICE_RUBY_VERSION=2.7.6" >> ~/.zshrc
+echo "export PATH=$PATH:~/Development/wpfleger-scripts:~/Development/p2-deploy-wrappers" >> ~/.zshrc
+git config --global --add --bool push.autoSetupRemote true
+
+# Clone and run compost
+git clone --branch green org-49461806@github.com:squareup/topsoil.git ~/Development/topsoil
+cd ~/Development/topsoil
+sudo echo "caching sudo creds for long run without attention"
+COMPOST backend
+
+# Install gcloud CLI 
+curl https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-469.0.0-darwin-arm.tar.gz -o ~/Downloads/google-cloud-sdk.tar.gz
+tar xvzf ~/Downloads/google-cloud-sdk.tar.gz
+~/Downloads/google-cloud-sdk/install.sh
+source ~/.zshrc
+
+# Ruby stuff - only if you're really broken
+rvm get stable
+rvm autolibs enable
+rvm reinstall all --force

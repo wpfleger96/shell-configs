@@ -1,0 +1,11 @@
+#!/usr/bin/env zsh
+
+set -x
+
+sudo -v &&
+brew update &&
+brew upgrade &&
+echo 'y' | gcloud components update &&
+gem update --system &&
+sudo managedsoftwareupdate --auto &&
+"$HOME/Development/topsoil/compost" backend

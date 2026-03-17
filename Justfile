@@ -10,7 +10,7 @@ sync:
 
 # Documentation
 docs:
-    uv run python scripts/generate_cli_docs.py
+    uv run python script/generate_cli_docs.py
 
 # Code Quality - Check variants
 type-check:
@@ -20,13 +20,13 @@ lint-python-check:
     uvx ruff check .
 
 lint-shell-check:
-    shfmt -f . | grep -v git-prompt.sh | xargs shellcheck
+    shfmt -f . | grep -v git-prompt.sh | grep -v '^scripts/' | xargs shellcheck
 
 format-python-check:
     uvx ruff format . --check
 
 format-shell-check:
-    shfmt -f . | grep -v git-prompt.sh | xargs shfmt -d
+    shfmt -f . | grep -v git-prompt.sh | grep -v '^scripts/' | xargs shfmt -d
 
 # Code Quality - Fix variants
 lint-python:
@@ -36,7 +36,7 @@ format-python:
     uvx ruff format .
 
 format-shell:
-    shfmt -f . | grep -v git-prompt.sh | xargs shfmt -w
+    shfmt -f . | grep -v git-prompt.sh | grep -v '^scripts/' | xargs shfmt -w
 
 # Composite quality checks
 check: sync type-check lint-python-check lint-shell-check format-python-check format-shell-check

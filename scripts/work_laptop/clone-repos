@@ -1,0 +1,18 @@
+#!/usr/bin/env zsh
+
+DEVELOPMENT_DIR="$HOME/Development"
+BACKUP_DIR="$HOME/Backups"
+BACKUP_FILE="git_repos.backup"
+
+mkdir -p "$BACKUP_DIR"
+REPO_LIST="$BACKUP_DIR/$BACKUP_FILE"
+
+cd "${DEVELOPMENT_DIR}"
+
+while IFS= read -r repo; do
+	echo "Cloning ${repo} into ${DEVELOPMENT_DIR}"
+  	git clone "${repo}"
+  	echo "Completed cloning ${repo}"
+done < "${REPO_LIST}"
+
+echo "Completed cloning all repos"
