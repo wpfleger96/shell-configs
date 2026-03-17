@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.18.0 (2026-03-17)
+
+### Features
+
+- Port over work laptop scripts
+  ([`541c9cc`](https://github.com/wpfleger96/shell-configs/commit/541c9cc283c2be257531cb454ba33d8bc46ae87c))
+
+
 ## v0.17.1 (2026-03-10)
 
 ### Bug Fixes
