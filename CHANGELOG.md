@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.19.0 (2026-03-26)
+
+### Features
+
+- Disable expensive git prompt options in large repos
+  ([`972ed40`](https://github.com/wpfleger96/shell-configs/commit/972ed4069643f7bcb1994d9032a0e2ab3d1d2741))
+
+__git_ps1 with SHOWDIRTYSTATE, SHOWSTASHSTATE, SHOWUNTRACKEDFILES, and SHOWUPSTREAM runs four git
+  operations per prompt render. In monorepos like cash-server (118k+ files) this adds ~640ms+ per
+  prompt even with fsmonitor enabled. Configurable LARGE_REPO_PATTERNS array disables these flags
+  via chpwd/PROMPT_COMMAND hooks when inside matched paths.
+
+
 ## v0.18.0 (2026-03-17)
 
 ### Features
