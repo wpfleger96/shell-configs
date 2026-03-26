@@ -72,10 +72,32 @@ gdifm() {
 }
 
 ### Git - Configuration ###
-export GIT_PS1_SHOWDIRTYSTATE=true
-export GIT_PS1_SHOWSTASHSTATE=true
-export GIT_PS1_SHOWUNTRACKEDFILES=true
-export GIT_PS1_SHOWUPSTREAM="auto"
+# Large repos where expensive git prompt status checks should be disabled
+LARGE_REPO_PATTERNS=(
+    "*/cash-server"
+    "*/cash-server/*"
+)
+
+_tune_git_prompt() {
+    for pattern in "${LARGE_REPO_PATTERNS[@]}"; do
+        # shellcheck disable=SC2254 # intentional glob matching
+        case "$PWD" in
+            $pattern)
+                export GIT_PS1_SHOWDIRTYSTATE=
+                export GIT_PS1_SHOWSTASHSTATE=
+                export GIT_PS1_SHOWUNTRACKEDFILES=
+                export GIT_PS1_SHOWUPSTREAM=
+                return
+                ;;
+        esac
+    done
+    export GIT_PS1_SHOWDIRTYSTATE=true
+    export GIT_PS1_SHOWSTASHSTATE=true
+    export GIT_PS1_SHOWUNTRACKEDFILES=true
+    export GIT_PS1_SHOWUPSTREAM="auto"
+}
+
+_tune_git_prompt
 GPG_TTY=$(tty)
 export GPG_TTY
 

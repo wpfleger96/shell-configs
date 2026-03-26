@@ -80,3 +80,7 @@ if [ -f ~/.zsh/git-prompt.sh ]; then
     setopt prompt_subst
     PROMPT='%F{251}%~%F{reset}%B%F{cyan}$(__git_ps1 " %s")%F{yellow}$(__wt_ps1)%F{reset}%b '
 fi
+
+### Git Prompt Performance ###
+autoload -U add-zsh-hook
+add-zsh-hook chpwd _tune_git_prompt
