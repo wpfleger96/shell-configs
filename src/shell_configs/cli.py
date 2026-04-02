@@ -2,6 +2,7 @@
 
 import difflib
 import logging
+import subprocess
 import sys
 
 from pathlib import Path
@@ -1141,7 +1142,16 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
     if upgraded_tools:
         console.print()
         console.print("[cyan]Installing updated configurations...[/cyan]")
-        ctx.invoke(install, yes=True)
+        # Run install in a new process so the upgraded code handles it.
+        # ctx.invoke would use stale in-memory modules from the pre-upgrade
+        # version, which may be incompatible with the new on-disk config files.
+        import shutil
+
+        shell_configs_bin = shutil.which("shell-configs")
+        if shell_configs_bin:
+            subprocess.run([shell_configs_bin, "install", "--yes"])
+        else:
+            ctx.invoke(install, yes=True)
 
 
 @cli.command()
