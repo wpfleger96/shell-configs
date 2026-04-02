@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.20.0 (2026-04-02)
+
+### Features
+
+- Add claude code experimental features
+  ([`eb0cbc1`](https://github.com/wpfleger96/shell-configs/commit/eb0cbc1c48d1fe047a13e3e15adb81cbdbdbb579))
+
+
 ## v0.19.0 (2026-03-26)
 
 ### Features
