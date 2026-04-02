@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.21.1 (2026-04-02)
+
+### Bug Fixes
+
+- Run post-upgrade install in new process to avoid stale code
+  ([`c9f8b2e`](https://github.com/wpfleger96/shell-configs/commit/c9f8b2e55afe0ef5304facf27dbcaf9a727c9375))
+
+The upgrade command called ctx.invoke(install) in the same Python process after installing the new
+  package. Python's module cache meant the old version's code ran against the new version's config
+  files, which caused destructive behavior when config file formats changed (e.g., editor settings
+  consolidation wrote {} as VSCode settings).
+
+Spawning shell-configs as a subprocess ensures fresh module imports from the upgraded package on
+  disk.
+
+
 ## v0.21.0 (2026-04-02)
 
 ### Features
