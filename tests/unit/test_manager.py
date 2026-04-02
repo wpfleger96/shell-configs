@@ -240,6 +240,85 @@ class TestConfigManagerAdditionalFiles:
 
 
 @pytest.mark.unit
+class TestConfigManagerAdditionalFilesFromContent:
+    """Test ConfigManager install_additional_file_from_content and content_matches."""
+
+    def test_install_from_content_new(self, temp_dir):
+        manager = ConfigManager()
+        target_file = temp_dir / "target.json"
+        content = '{"key": "value"}\n'
+
+        result, message, _ = manager.install_additional_file_from_content(
+            content, target_file
+        )
+
+        assert result == OperationResult.CREATED
+        assert target_file.exists()
+        assert target_file.read_text() == content
+
+    def test_install_from_content_update_existing(self, temp_dir):
+        manager = ConfigManager()
+        target_file = temp_dir / "target.json"
+        target_file.write_text('{"old": true}\n')
+
+        new_content = '{"new": true}\n'
+        result, message, diff_text = manager.install_additional_file_from_content(
+            new_content, target_file
+        )
+
+        assert result == OperationResult.UPDATED
+        assert target_file.read_text() == new_content
+        assert "backup:" in message
+        assert diff_text is not None
+
+    def test_install_from_content_already_synced(self, temp_dir):
+        manager = ConfigManager()
+        target_file = temp_dir / "target.json"
+        content = '{"key": "value"}\n'
+        target_file.write_text(content)
+
+        result, message, _ = manager.install_additional_file_from_content(
+            content, target_file
+        )
+
+        assert result == OperationResult.ALREADY_SYNCED
+
+    def test_install_from_content_dry_run(self, temp_dir):
+        manager = ConfigManager()
+        target_file = temp_dir / "target.json"
+        content = '{"key": "value"}\n'
+
+        result, message, _ = manager.install_additional_file_from_content(
+            content, target_file, dry_run=True
+        )
+
+        assert result == OperationResult.CREATED
+        assert "Would create" in message
+        assert not target_file.exists()
+
+    def test_content_matches_identical(self, temp_dir):
+        manager = ConfigManager()
+        target_file = temp_dir / "target.json"
+        content = '{"key": "value"}\n'
+        target_file.write_text(content)
+
+        assert manager.content_matches(content, target_file)
+
+    def test_content_matches_different(self, temp_dir):
+        manager = ConfigManager()
+        target_file = temp_dir / "target.json"
+        target_file.write_text('{"old": true}\n')
+
+        assert not manager.content_matches('{"new": true}\n', target_file)
+
+    def test_content_matches_missing_file(self, temp_dir):
+        manager = ConfigManager()
+        missing = temp_dir / "missing.json"
+
+        assert not manager.content_matches("anything", missing)
+
+
+@pytest.mark.unit
 class TestConfigManagerSharedConfig:
     """Test ConfigManager shared config functionality."""
 

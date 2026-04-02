@@ -1,10 +1,11 @@
 """Base shell configuration interface."""
 
+import json
 import subprocess
 import tempfile
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -25,6 +26,38 @@ class AdditionalFile:
     source_path: Path
     target_path: Path
     comment_prefix: str | None = None
+    base_source_path: Path | None = field(default=None)
+
+
+def merge_json_files(base_path: Path, override_path: Path) -> str:
+    """Shallow-merge two JSON files. Override keys win.
+
+    This is a top-level-only merge: if both files contain the same
+    top-level key, the override's value replaces the base's entirely
+    (nested objects are NOT recursively merged). Override files should
+    only contain keys unique to that editor (e.g., cursor.* namespace).
+
+    Args:
+        base_path: Path to the base JSON file
+        override_path: Path to the override JSON file
+
+    Returns:
+        Formatted JSON string with trailing newline
+    """
+    try:
+        base = json.loads(base_path.read_text()) if base_path.exists() else {}
+    except Exception:
+        base = {}
+
+    try:
+        override = (
+            json.loads(override_path.read_text()) if override_path.exists() else {}
+        )
+    except Exception:
+        override = {}
+
+    merged = {**base, **override}
+    return json.dumps(merged, indent=4, ensure_ascii=False) + "\n"
 
 
 class Shell(ABC):

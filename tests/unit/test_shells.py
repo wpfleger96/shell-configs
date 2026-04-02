@@ -1,8 +1,13 @@
 """Unit tests for shell implementations."""
 
+import json
+
 import pytest
 
 from shell_configs.shells import BashShell, GitShell, ShellRegistry, ZshShell
+from shell_configs.shells.base import merge_json_files
+from shell_configs.shells.cursor import CursorShell
+from shell_configs.shells.vscode import VSCodeShell
 
 
 @pytest.mark.unit
@@ -192,3 +197,130 @@ class TestShellRegistry:
         if expected_shell_count > 0:
             valid_names = [name for name in input_names if name not in expected_invalid]
             assert {s.name for s in shells} == set(valid_names)
+
+
+@pytest.mark.unit
+class TestMergeJsonFiles:
+    """Test merge_json_files shallow merge behavior."""
+
+    def test_merge_base_with_empty_override(self, temp_dir):
+        base = temp_dir / "base.json"
+        override = temp_dir / "override.json"
+        base.write_text('{"a": 1, "b": 2}')
+        override.write_text("{}")
+
+        result = json.loads(merge_json_files(base, override))
+
+        assert result == {"a": 1, "b": 2}
+
+    def test_override_keys_win(self, temp_dir):
+        base = temp_dir / "base.json"
+        override = temp_dir / "override.json"
+        base.write_text('{"theme": "dark", "font": 14}')
+        override.write_text('{"theme": "light"}')
+
+        result = json.loads(merge_json_files(base, override))
+
+        assert result["theme"] == "light"
+        assert result["font"] == 14
+
+    def test_override_adds_new_keys(self, temp_dir):
+        base = temp_dir / "base.json"
+        override = temp_dir / "override.json"
+        base.write_text('{"shared": true}')
+        override.write_text('{"cursor.specific": false}')
+
+        result = json.loads(merge_json_files(base, override))
+
+        assert result == {"shared": True, "cursor.specific": False}
+
+    def test_output_ends_with_newline(self, temp_dir):
+        base = temp_dir / "base.json"
+        override = temp_dir / "override.json"
+        base.write_text('{"a": 1}')
+        override.write_text("{}")
+
+        result = merge_json_files(base, override)
+
+        assert result.endswith("\n")
+
+    def test_output_is_valid_json(self, temp_dir):
+        base = temp_dir / "base.json"
+        override = temp_dir / "override.json"
+        base.write_text('{"nested": {"a": 1}, "list": [1, 2]}')
+        override.write_text('{"extra": "value"}')
+
+        result = merge_json_files(base, override)
+
+        parsed = json.loads(result)
+        assert parsed["nested"] == {"a": 1}
+        assert parsed["list"] == [1, 2]
+        assert parsed["extra"] == "value"
+
+
+@pytest.mark.unit
+class TestVSCodeShell:
+    """Test VSCodeShell additional files configuration."""
+
+    def test_settings_has_base_source_path(self, temp_dir, monkeypatch):
+        shell = VSCodeShell()
+        config_dir = temp_dir / "config"
+        (config_dir / "editor").mkdir(parents=True)
+        (config_dir / "vscode").mkdir(parents=True)
+        monkeypatch.setattr(
+            "shell_configs.shells.vscode.get_config_dir", lambda: config_dir
+        )
+
+        files = shell.get_additional_files()
+        settings = next(f for f in files if f.name == "settings.json")
+
+        assert settings.base_source_path == config_dir / "editor" / "settings.json"
+
+    def test_keybindings_uses_shared_editor_source(self, temp_dir, monkeypatch):
+        shell = VSCodeShell()
+        config_dir = temp_dir / "config"
+        (config_dir / "editor").mkdir(parents=True)
+        (config_dir / "vscode").mkdir(parents=True)
+        monkeypatch.setattr(
+            "shell_configs.shells.vscode.get_config_dir", lambda: config_dir
+        )
+
+        files = shell.get_additional_files()
+        keybindings = next(f for f in files if f.name == "keybindings.json")
+
+        assert keybindings.source_path == config_dir / "editor" / "keybindings.json"
+        assert keybindings.base_source_path is None
+
+
+@pytest.mark.unit
+class TestCursorShell:
+    """Test CursorShell additional files configuration."""
+
+    def test_settings_has_base_source_path(self, temp_dir, monkeypatch):
+        shell = CursorShell()
+        config_dir = temp_dir / "config"
+        (config_dir / "editor").mkdir(parents=True)
+        (config_dir / "cursor").mkdir(parents=True)
+        monkeypatch.setattr(
+            "shell_configs.shells.cursor.get_config_dir", lambda: config_dir
+        )
+
+        files = shell.get_additional_files()
+        settings = next(f for f in files if f.name == "settings.json")
+
+        assert settings.base_source_path == config_dir / "editor" / "settings.json"
+
+    def test_keybindings_uses_shared_editor_source(self, temp_dir, monkeypatch):
+        shell = CursorShell()
+        config_dir = temp_dir / "config"
+        (config_dir / "editor").mkdir(parents=True)
+        (config_dir / "cursor").mkdir(parents=True)
+        monkeypatch.setattr(
+            "shell_configs.shells.cursor.get_config_dir", lambda: config_dir
+        )
+
+        files = shell.get_additional_files()
+        keybindings = next(f for f in files if f.name == "keybindings.json")
+
+        assert keybindings.source_path == config_dir / "editor" / "keybindings.json"
+        assert keybindings.base_source_path is None

@@ -53,15 +53,17 @@ class VSCodeShell(Shell):
         if vscode_dir is None:
             return []
         config_dir = get_config_dir()
+        editor_dir = config_dir / "editor"
         return [
             AdditionalFile(
                 name="settings.json",
                 source_path=config_dir / "vscode" / "settings.json",
                 target_path=vscode_dir / "settings.json",
+                base_source_path=editor_dir / "settings.json",
             ),
             AdditionalFile(
                 name="keybindings.json",
-                source_path=config_dir / "vscode" / "keybindings.json",
+                source_path=editor_dir / "keybindings.json",
                 target_path=vscode_dir / "keybindings.json",
             ),
         ]

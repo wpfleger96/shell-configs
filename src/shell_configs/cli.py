@@ -11,6 +11,7 @@ import click
 
 from shell_configs import __version__
 from shell_configs.config import ConfigReader
+from shell_configs.shells.base import merge_json_files
 
 if TYPE_CHECKING:
     from shell_configs.manager import ConfigManager
@@ -168,7 +169,13 @@ def _display_diffs_for_shells(
                 found_diffs = True
                 continue
 
-            repo_content = additional_file.source_path.read_text()
+            if additional_file.base_source_path:
+                repo_content = merge_json_files(
+                    additional_file.base_source_path,
+                    additional_file.source_path,
+                )
+            else:
+                repo_content = additional_file.source_path.read_text()
 
             if additional_file.comment_prefix:
                 section = manager.extract_managed_section(
@@ -189,10 +196,16 @@ def _display_diffs_for_shells(
                 installed_content = section.content
                 repo_content = manager._strip_json_outer_brackets(repo_content)
             else:
-                if manager.files_match(
-                    additional_file.source_path, additional_file.target_path
-                ):
-                    continue
+                if additional_file.base_source_path:
+                    if manager.content_matches(
+                        repo_content, additional_file.target_path
+                    ):
+                        continue
+                else:
+                    if manager.files_match(
+                        additional_file.source_path, additional_file.target_path
+                    ):
+                        continue
                 installed_content = additional_file.target_path.read_text()
 
             found_diffs = True
@@ -361,6 +374,18 @@ def install(
                     content,
                     dry_run=dry_run,
                     comment_prefix=additional_file.comment_prefix,
+                )
+            elif additional_file.base_source_path:
+                merged_content = merge_json_files(
+                    additional_file.base_source_path,
+                    additional_file.source_path,
+                )
+                result, message, diff_text = (
+                    manager.install_additional_file_from_content(
+                        merged_content,
+                        additional_file.target_path,
+                        dry_run=dry_run,
+                    )
                 )
             else:
                 result, message, diff_text = manager.install_additional_file(
@@ -637,9 +662,18 @@ def status(shells: list[str] | None) -> None:
                 )
             else:
                 exists = additional_file.target_path.exists()
-                synced = manager.files_match(
-                    additional_file.source_path, additional_file.target_path
-                )
+                if additional_file.base_source_path:
+                    merged_content = merge_json_files(
+                        additional_file.base_source_path,
+                        additional_file.source_path,
+                    )
+                    synced = manager.content_matches(
+                        merged_content, additional_file.target_path
+                    )
+                else:
+                    synced = manager.files_match(
+                        additional_file.source_path, additional_file.target_path
+                    )
             status_str = get_status_indicator(synced, exists)
             path_display = str(additional_file.target_path).replace(home, "~")
 
