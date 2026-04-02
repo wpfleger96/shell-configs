@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v0.21.0 (2026-04-02)
+
+### Features
+
+- Consolidate editor settings and add liveshare security config
+  ([`bf7099f`](https://github.com/wpfleger96/shell-configs/commit/bf7099f9994220be5bbf4bb06ef69fe5237f6ac2))
+
+VSCode and Cursor settings were ~75% duplicated, causing config drift when shared settings were
+  added to one editor but not the other. The liveshare security settings (guest approval, anonymous
+  rejection, external file sharing) were also getting wiped on each install because the mechanism is
+  full-file replacement.
+
+Introduces a shared editor base config (config/editor/) with a shallow JSON merge at install time:
+  final settings = shared base + editor overrides. Refactors install_additional_file to delegate to
+  a new content-based install method, eliminating ~60 lines of duplication.
+
+
 ## v0.20.0 (2026-04-02)
 
 ### Features
