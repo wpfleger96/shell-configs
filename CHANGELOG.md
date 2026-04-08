@@ -1,6 +1,40 @@
 # CHANGELOG
 
 
+## v0.22.0 (2026-04-08)
+
+### Features
+
+- Add iTerm2 configuration management
+  ([`0d2a601`](https://github.com/wpfleger96/shell-configs/commit/0d2a60186361b998f06979ecc91044316b2f6d8c))
+
+iTerm2 is macOS-only and uses two distinct config surfaces that can't be managed with the existing
+  file-copy pattern alone. Dynamic Profiles (JSON files auto-watched by iTerm2) handle profile
+  settings, while global preferences require `defaults import` into the macOS preferences domain.
+  This introduces a PreferencesFile dataclass and ConfigManager methods for the defaults-based
+  workflow, extending the Shell ABC without changing existing handlers.
+
+Manages only non-default settings (verified against factory DefaultBookmark.plist): font size,
+  terminal type, unlimited scrollback, sync title, keyboard navigation shortcuts, and global key
+  bindings including Cmd+Shift+T (duplicate tab) and Cmd+Shift+N (duplicate window). Adds backup_dir
+  to AdditionalFile so DynamicProfiles backups go to ~/.config/shell-configs/backups/iterm2/ instead
+  of polluting the watched directory. The preferences install/uninstall methods accept app_name for
+  running-app detection, validate null JSON values before plistlib, and check defaults delete return
+  codes.
+
+- Add iTerm2 shell integration and terminal parity settings
+  ([`0eda4ae`](https://github.com/wpfleger96/shell-configs/commit/0eda4ae1f95790ce5d8b0561e1c6c7eaf7396401))
+
+Vendor iTerm2 shell integration scripts for zsh and bash, sourced via the macOS platform overlay.
+  Shell integration adds prompt marks for Cmd+Shift+Up/Down navigation between commands, automatic
+  per-command status indicators, and Cmd+click file opening. Scripts are placed in shell-specific
+  directories (config/zsh/, config/bash/) to avoid cross-pollution between shell handlers.
+
+Add integrated terminal settings to the shared editor config for VS Code/Cursor parity with iTerm2:
+  Monaco 15pt font, unlimited scrollback, block cursor without blinking, and macOptionIsMeta for
+  Opt+arrow word navigation.
+
+
 ## v0.21.1 (2026-04-02)
 
 ### Bug Fixes
