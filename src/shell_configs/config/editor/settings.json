@@ -80,10 +80,8 @@
     "terminal.integrated.cursorStyle": "block",
     "terminal.integrated.defaultLocation": "editor",
     "terminal.integrated.enableMultiLinePasteWarning": false,
-    "terminal.integrated.fontFamily": "Monaco",
-    "terminal.integrated.fontSize": 15,
     "terminal.integrated.macOptionClickForcesSelection": true,
     "terminal.integrated.macOptionIsMeta": true,
-    "terminal.integrated.scrollback": 0,
+    "terminal.integrated.scrollback": 50000,
     "workbench.colorTheme": "Visual Studio Dark"
 }
