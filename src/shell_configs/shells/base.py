@@ -27,6 +27,17 @@ class AdditionalFile:
     target_path: Path
     comment_prefix: str | None = None
     base_source_path: Path | None = field(default=None)
+    backup_dir: Path | None = field(default=None)
+
+
+@dataclass
+class PreferencesFile:
+    """Represents application preferences written via macOS defaults(1)."""
+
+    name: str
+    source_path: Path
+    domain: str
+    app_name: str | None = None
 
 
 def merge_json_files(base_path: Path, override_path: Path) -> str:
@@ -166,6 +177,14 @@ class Shell(ABC):
                     )
 
         return additional_files
+
+    def get_preferences_files(self) -> list["PreferencesFile"]:
+        """Get preferences files to install via the macOS defaults system.
+
+        Returns:
+            List of PreferencesFile objects
+        """
+        return []
 
     def supports_shared_config(self) -> bool:
         """Check if this shell supports shared configuration.

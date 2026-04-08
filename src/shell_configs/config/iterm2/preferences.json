@@ -1,0 +1,31 @@
+{
+    "Default Bookmark Guid": "AD1D7A23-1BB6-4BAF-874D-95136828B70B",
+    "AllowClipboardAccess": true,
+    "ApplePressAndHoldEnabled": false,
+    "OnlyWhenMoreTabs": false,
+    "PromptOnQuit": false,
+    "TabStyleWithAutomaticOption": 4,
+    "GlobalKeyMap": {
+        "0xd-0x20000-0x24": {
+            "Action": 12,
+            "Keycode": 13,
+            "Modifiers": 131072,
+            "Text": "\\n",
+            "Version": 1
+        },
+        "0x54-0x120000-0x11": {
+            "Action": 61,
+            "Apply Mode": 0,
+            "Escaping": 2,
+            "Text": "",
+            "Version": 2
+        },
+        "0x4e-0x120000-0x2d": {
+            "Action": 25,
+            "Apply Mode": 0,
+            "Escaping": 2,
+            "Text": "Duplicate Window\nDuplicate Window",
+            "Version": 2
+        }
+    }
+}

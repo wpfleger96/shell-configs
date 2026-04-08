@@ -1,13 +1,30 @@
 """Manager for shell configuration sections."""
 
+import json
+import logging
 import os
+import plistlib
 import shutil
+import subprocess
 import tempfile
 
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+_MISSING = object()
+
+
+def _format_pref_value(value: object) -> str:
+    """Format a preference value for display in diffs."""
+    if isinstance(value, dict):
+        return f"<dict with {len(value)} key(s)>"
+    if isinstance(value, str):
+        return f'"{value}"'
+    return str(value)
 
 
 class OperationResult(Enum):
@@ -189,45 +206,62 @@ class ConfigManager:
 
         return ManagedSection(content=content, start_line=start_idx, end_line=end_idx)
 
-    def create_backup(self, config_file: Path) -> tuple[Path, list[Path]]:
+    def create_backup(
+        self, config_file: Path, backup_dir: Path | None = None
+    ) -> tuple[Path, list[Path]]:
         """Create a timestamped backup of a config file.
 
         Args:
             config_file: Path to the config file
+            backup_dir: Optional directory to store backups in instead of
+                        the config file's parent directory
 
         Returns:
             Tuple of (backup_path, removed_files)
         """
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        backup_path = config_file.with_suffix(
-            f"{config_file.suffix}.{self.backup_suffix}.{timestamp}"
-        )
+        backup_name = f"{config_file.name}.{self.backup_suffix}.{timestamp}"
+
+        if backup_dir:
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            backup_path = backup_dir / backup_name
+        else:
+            backup_path = config_file.with_suffix(
+                f"{config_file.suffix}.{self.backup_suffix}.{timestamp}"
+            )
+
         shutil.copy2(config_file, backup_path)
 
         removed_files = self.cleanup_old_backups(
-            config_file, keep=self.backup_retention
+            config_file, keep=self.backup_retention, backup_dir=backup_dir
         )
 
         return backup_path, removed_files
 
-    def find_backup_files(self, config_file: Path) -> list[Path]:
+    def find_backup_files(
+        self, config_file: Path, backup_dir: Path | None = None
+    ) -> list[Path]:
         """Find all shell-configs backup files for a given config file.
 
         Args:
             config_file: Path to the config file
+            backup_dir: Optional directory where backups are stored
 
         Returns:
             List of backup file paths, sorted by timestamp (newest first)
         """
-        if not config_file.parent.exists():
+        search_dir = backup_dir or config_file.parent
+        if not search_dir.exists():
             return []
 
         pattern = f"{config_file.name}.{self.backup_suffix}.*"
-        backup_files = list(config_file.parent.glob(pattern))
+        backup_files = list(search_dir.glob(pattern))
 
         return sorted(backup_files, reverse=True)
 
-    def cleanup_old_backups(self, config_file: Path, keep: int = 5) -> list[Path]:
+    def cleanup_old_backups(
+        self, config_file: Path, keep: int = 5, backup_dir: Path | None = None
+    ) -> list[Path]:
         """Remove old backup files, keeping the N most recent.
 
         Args:
@@ -237,7 +271,7 @@ class ConfigManager:
         Returns:
             List of removed backup file paths
         """
-        backup_files = self.find_backup_files(config_file)
+        backup_files = self.find_backup_files(config_file, backup_dir=backup_dir)
 
         if len(backup_files) <= keep:
             return []
@@ -608,7 +642,11 @@ class ConfigManager:
             return (OperationResult.ERROR, f"Error removing section: {e}")
 
     def install_additional_file(
-        self, source_path: Path, target_path: Path, dry_run: bool = False
+        self,
+        source_path: Path,
+        target_path: Path,
+        dry_run: bool = False,
+        backup_dir: Path | None = None,
     ) -> tuple[OperationResult, str, str | None]:
         """Install or update an additional file.
 
@@ -635,11 +673,15 @@ class ConfigManager:
                 None,
             )
         return self.install_additional_file_from_content(
-            content, target_path, dry_run=dry_run
+            content, target_path, dry_run=dry_run, backup_dir=backup_dir
         )
 
     def install_additional_file_from_content(
-        self, content: str, target_path: Path, dry_run: bool = False
+        self,
+        content: str,
+        target_path: Path,
+        dry_run: bool = False,
+        backup_dir: Path | None = None,
     ) -> tuple[OperationResult, str, str | None]:
         """Install or update an additional file from pre-computed content.
 
@@ -693,7 +735,9 @@ class ConfigManager:
 
             backup_msg = ""
             if target_path.exists():
-                backup_path, removed_files = self.create_backup(target_path)
+                backup_path, removed_files = self.create_backup(
+                    target_path, backup_dir=backup_dir
+                )
                 backup_msg = f" (backup: {backup_path.name})"
                 if removed_files:
                     backup_msg += f"; removed {len(removed_files)} old backup(s)"
@@ -733,13 +777,17 @@ class ConfigManager:
             return False
 
     def uninstall_additional_file(
-        self, target_path: Path, dry_run: bool = False
+        self,
+        target_path: Path,
+        dry_run: bool = False,
+        backup_dir: Path | None = None,
     ) -> tuple[OperationResult, str]:
         """Remove an additional file.
 
         Args:
             target_path: Path to target file
             dry_run: If True, don't actually remove the file
+            backup_dir: Optional directory to store backups in
 
         Returns:
             Tuple of (result, message)
@@ -757,7 +805,9 @@ class ConfigManager:
                     f"Would remove {target_path}",
                 )
 
-            backup_path, removed_files = self.create_backup(target_path)
+            backup_path, removed_files = self.create_backup(
+                target_path, backup_dir=backup_dir
+            )
             target_path.unlink()
 
             backup_msg = f" (backup: {backup_path.name})"
@@ -812,3 +862,327 @@ class ConfigManager:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
             raise
+
+    def _export_defaults_domain(self, domain: str) -> dict[str, object] | None:
+        """Export a macOS defaults domain as a Python dict.
+
+        Args:
+            domain: The preferences domain (e.g., "com.googlecode.iterm2")
+
+        Returns:
+            Dict of all domain keys, or None if the domain doesn't exist
+        """
+        try:
+            result = subprocess.run(
+                ["defaults", "export", domain, "-"],
+                capture_output=True,
+                timeout=10,
+            )
+            if result.returncode != 0:
+                stderr = result.stderr.decode(errors="replace").lower()
+                if "does not exist" not in stderr:
+                    logger.debug("defaults export failed for %s: %s", domain, stderr)
+                return None
+            data: dict[str, object] = plistlib.loads(result.stdout)
+            return data
+        except Exception as e:
+            logger.debug("defaults export error for %s: %s", domain, e)
+            return None
+
+    def _check_app_running(self, app_name: str) -> str | None:
+        """Check if an application is running and return a warning if so.
+
+        Args:
+            app_name: Process name to check (e.g., "iTerm2")
+
+        Returns:
+            Warning message string, or None if not running
+        """
+        try:
+            result = subprocess.run(
+                ["pgrep", "-x", app_name],
+                capture_output=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                return (
+                    f"{app_name} is running — "
+                    f"preference changes take effect after restart"
+                )
+        except Exception:
+            pass
+        return None
+
+    def install_preferences_file(
+        self,
+        source_path: Path,
+        domain: str,
+        dry_run: bool = False,
+        app_name: str | None = None,
+    ) -> tuple[OperationResult, str, str | None]:
+        """Install preferences from a JSON file into a macOS defaults domain.
+
+        Reads the JSON file, converts managed keys to a plist, and writes
+        via 'defaults import'. Only managed keys are written; other domain
+        keys are untouched (defaults import merges at the top level).
+
+        Note: nested dict values (e.g., GlobalKeyMap) are replaced entirely,
+        not recursively merged. This is intentional — managed dicts represent
+        the complete desired state.
+
+        Args:
+            source_path: Path to JSON file with managed preferences
+            domain: macOS preferences domain
+            dry_run: If True, don't actually modify preferences
+
+        Returns:
+            Tuple of (result, message, diff_text)
+        """
+        try:
+            if not source_path.exists():
+                return (
+                    OperationResult.ERROR,
+                    f"Source file does not exist: {source_path}",
+                    None,
+                )
+
+            managed_prefs = json.loads(source_path.read_text())
+
+            null_keys = [k for k, v in managed_prefs.items() if v is None]
+            if null_keys:
+                return (
+                    OperationResult.ERROR,
+                    f"Null values not supported in preferences: {', '.join(null_keys)}",
+                    None,
+                )
+
+            domain_data = self._export_defaults_domain(domain)
+            exists = domain_data is not None
+
+            if exists and domain_data is not None:
+                all_match = all(
+                    domain_data.get(key) == value
+                    for key, value in managed_prefs.items()
+                )
+                if all_match:
+                    return (
+                        OperationResult.ALREADY_SYNCED,
+                        f"{domain} preferences are already synced",
+                        None,
+                    )
+
+            if dry_run:
+                action = "update" if exists else "create"
+                return (
+                    OperationResult.UPDATED if exists else OperationResult.CREATED,
+                    f"Would {action} {len(managed_prefs)} preference(s) in {domain}",
+                    None,
+                )
+
+            diff_text = self._build_preferences_diff(managed_prefs, domain_data or {})
+
+            temp_path = None
+            try:
+                fd, temp_path = tempfile.mkstemp(suffix=".plist")
+                os.close(fd)
+                with open(temp_path, "wb") as f:
+                    plistlib.dump(managed_prefs, f, fmt=plistlib.FMT_XML)
+
+                result = subprocess.run(
+                    ["defaults", "import", domain, temp_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if result.returncode != 0:
+                    return (
+                        OperationResult.ERROR,
+                        f"defaults import failed: {result.stderr.strip()}",
+                        None,
+                    )
+            finally:
+                if temp_path:
+                    Path(temp_path).unlink(missing_ok=True)
+
+            action = "Updated" if exists else "Created"
+            message = f"{action} {len(managed_prefs)} preference(s) in {domain}"
+
+            if app_name:
+                warning = self._check_app_running(app_name)
+                if warning:
+                    message += f"\n  ⚠ {warning}"
+
+            return (
+                OperationResult.UPDATED if exists else OperationResult.CREATED,
+                message,
+                diff_text,
+            )
+
+        except Exception as e:
+            return (
+                OperationResult.ERROR,
+                f"Error installing preferences: {e}",
+                None,
+            )
+
+    def uninstall_preferences_file(
+        self,
+        source_path: Path,
+        domain: str,
+        dry_run: bool = False,
+        app_name: str | None = None,
+    ) -> tuple[OperationResult, str]:
+        """Remove managed preference keys from a macOS defaults domain.
+
+        Args:
+            source_path: Path to JSON file with managed preference keys
+            domain: macOS preferences domain
+            dry_run: If True, don't actually modify preferences
+
+        Returns:
+            Tuple of (result, message)
+        """
+        try:
+            if not source_path.exists():
+                return (
+                    OperationResult.ERROR,
+                    f"Source file does not exist: {source_path}",
+                )
+
+            managed_prefs = json.loads(source_path.read_text())
+            domain_data = self._export_defaults_domain(domain)
+
+            if domain_data is None:
+                return (
+                    OperationResult.NOT_FOUND,
+                    f"Domain {domain} does not exist",
+                )
+
+            existing_keys = [k for k in managed_prefs if k in domain_data]
+            if not existing_keys:
+                return (
+                    OperationResult.NOT_FOUND,
+                    f"No managed preferences found in {domain}",
+                )
+
+            if dry_run:
+                return (
+                    OperationResult.REMOVED,
+                    f"Would delete {len(existing_keys)} preference(s) from {domain}",
+                )
+
+            deleted = 0
+            failed: list[str] = []
+            for key in existing_keys:
+                result = subprocess.run(
+                    ["defaults", "delete", domain, key],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if result.returncode == 0:
+                    deleted += 1
+                else:
+                    failed.append(key)
+
+            if failed:
+                message = (
+                    f"Deleted {deleted} preference(s) from {domain}; "
+                    f"{len(failed)} failed: {', '.join(failed)}"
+                )
+            else:
+                message = f"Deleted {deleted} preference(s) from {domain}"
+
+            if app_name:
+                warning = self._check_app_running(app_name)
+                if warning:
+                    message += f"\n  ⚠ {warning}"
+
+            return (OperationResult.REMOVED, message)
+
+        except Exception as e:
+            return (OperationResult.ERROR, f"Error removing preferences: {e}")
+
+    def check_preferences_file_status(
+        self, source_path: Path, domain: str
+    ) -> tuple[bool, bool]:
+        """Check if managed preferences are installed and synced.
+
+        Args:
+            source_path: Path to JSON file with managed preferences
+            domain: macOS preferences domain
+
+        Returns:
+            Tuple of (exists, synced) where:
+            - exists = at least one managed key is present in the domain
+            - synced = all managed keys match the expected values
+        """
+        try:
+            if not source_path.exists():
+                return (False, False)
+
+            managed_prefs = json.loads(source_path.read_text())
+            domain_data = self._export_defaults_domain(domain)
+
+            if domain_data is None:
+                return (False, False)
+
+            exists = any(key in domain_data for key in managed_prefs)
+            synced = all(
+                domain_data.get(key) == value for key, value in managed_prefs.items()
+            )
+
+            return (exists, synced)
+        except Exception:
+            return (False, False)
+
+    def diff_preferences_file(self, source_path: Path, domain: str) -> str | None:
+        """Get a human-readable diff between repo preferences and installed.
+
+        Args:
+            source_path: Path to JSON file with managed preferences
+            domain: macOS preferences domain
+
+        Returns:
+            Multi-line string showing changed/missing keys, or None if synced
+        """
+        try:
+            if not source_path.exists():
+                return None
+
+            managed_prefs = json.loads(source_path.read_text())
+            domain_data = self._export_defaults_domain(domain)
+
+            return self._build_preferences_diff(managed_prefs, domain_data or {})
+        except Exception:
+            return None
+
+    def _build_preferences_diff(
+        self,
+        managed_prefs: dict[str, object],
+        domain_data: dict[str, object],
+    ) -> str | None:
+        """Build a human-readable diff between managed and installed prefs.
+
+        Args:
+            managed_prefs: Expected preference values
+            domain_data: Current domain values
+
+        Returns:
+            Formatted diff string, or None if all match
+        """
+        lines = []
+        for key, expected in sorted(managed_prefs.items()):
+            current = domain_data.get(key, _MISSING)
+            if current is _MISSING:
+                lines.append(f"  + {key}: {_format_pref_value(expected)}")
+            elif current != expected:
+                lines.append(
+                    f"  ~ {key}: "
+                    f"{_format_pref_value(current)} → "
+                    f"{_format_pref_value(expected)}"
+                )
+
+        if not lines:
+            return None
+        return "\n".join(lines)

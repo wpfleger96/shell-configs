@@ -1,0 +1,46 @@
+{
+    "Profiles": [
+        {
+            "Guid": "AD1D7A23-1BB6-4BAF-874D-95136828B70B",
+            "Name": "shell-configs",
+            "Normal Font": "Monaco 15",
+            "Terminal Type": "xterm-256color",
+            "Unlimited Scrollback": true,
+            "Sync Title": true,
+            "Keyboard Map": {
+                "0x7f-0x100000": {
+                    "Action": 11,
+                    "Text": "0x15"
+                },
+                "0x7f-0x80000": {
+                    "Action": 11,
+                    "Text": "0x1b 0x7f"
+                },
+                "0xf702-0x280000": {
+                    "Action": 10,
+                    "Text": "b"
+                },
+                "0xf703-0x280000": {
+                    "Action": 10,
+                    "Text": "f"
+                },
+                "0xf702-0x300000": {
+                    "Action": 11,
+                    "Text": "0x1"
+                },
+                "0xf703-0x300000": {
+                    "Action": 11,
+                    "Text": "0x5"
+                },
+                "0xf728-0x0": {
+                    "Action": 11,
+                    "Text": "0x4"
+                },
+                "0xf728-0x80000": {
+                    "Action": 10,
+                    "Text": "d"
+                }
+            }
+        }
+    ]
+}

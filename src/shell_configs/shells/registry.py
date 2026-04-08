@@ -4,6 +4,7 @@ from shell_configs.shells.base import Shell
 from shell_configs.shells.bash import BashShell
 from shell_configs.shells.cursor import CursorShell
 from shell_configs.shells.git import GitShell
+from shell_configs.shells.iterm2 import ITerm2Shell
 from shell_configs.shells.vscode import VSCodeShell
 from shell_configs.shells.xdg import XdgShell
 from shell_configs.shells.zsh import ZshShell
@@ -23,6 +24,7 @@ class ShellRegistry:
         self.register(ZshShell())
         self.register(GitShell())
         self.register(XdgShell())
+        self.register(ITerm2Shell())
         self.register(CursorShell())
         self.register(VSCodeShell())
 

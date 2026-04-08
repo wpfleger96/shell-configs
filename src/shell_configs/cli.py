@@ -230,6 +230,19 @@ def _display_diffs_for_shells(
                 syntax = Syntax(diff_text, "diff", theme="monokai")
                 console.print(syntax)
 
+        preferences_files = shell.get_preferences_files()
+        for pref_file in preferences_files:
+            pref_diff = manager.diff_preferences_file(
+                pref_file.source_path, pref_file.domain
+            )
+            if pref_diff:
+                found_diffs = True
+                console.print(
+                    f"\n[bold cyan]{shell.display_name}[/bold cyan]: "
+                    f"{pref_file.domain} (preferences)"
+                )
+                console.print(pref_diff)
+
     return found_diffs
 
 
@@ -386,6 +399,7 @@ def install(
                         merged_content,
                         additional_file.target_path,
                         dry_run=dry_run,
+                        backup_dir=additional_file.backup_dir,
                     )
                 )
             else:
@@ -393,6 +407,7 @@ def install(
                     additional_file.source_path,
                     additional_file.target_path,
                     dry_run=dry_run,
+                    backup_dir=additional_file.backup_dir,
                 )
             print_operation_result(result, message)
             if diff_text and result == OperationResult.UPDATED:
@@ -400,6 +415,23 @@ def install(
 
                 print_diff(diff_text)
             additional_file_results[str(additional_file.target_path)] = result
+
+    preferences_results: dict[str, OperationResult] = {}
+    for shell in selected_shells:
+        preferences_files = shell.get_preferences_files()
+        for pref_file in preferences_files:
+            result, message, diff_text = manager.install_preferences_file(
+                pref_file.source_path,
+                pref_file.domain,
+                dry_run=dry_run,
+                app_name=pref_file.app_name,
+            )
+            print_operation_result(result, message)
+            if diff_text and result == OperationResult.UPDATED:
+                from shell_configs.display import print_diff
+
+                print_diff(diff_text)
+            preferences_results[pref_file.name] = result
 
     if dry_run:
         print_info("Dry run complete. Use without --dry-run to apply changes.")
@@ -414,7 +446,12 @@ def install(
         for r in additional_file_results.values()
         if r in [OperationResult.CREATED, OperationResult.UPDATED]
     )
-    total_success = success_count + additional_success_count
+    preferences_success_count = sum(
+        1
+        for r in preferences_results.values()
+        if r in [OperationResult.CREATED, OperationResult.UPDATED]
+    )
+    total_success = success_count + additional_success_count + preferences_success_count
 
     if total_success > 0 and not dry_run:
         print_info(f"Successfully installed/updated {total_success} file(s)")
@@ -556,17 +593,34 @@ def uninstall(shells: list[str] | None, yes: bool) -> None:
                 )
             else:
                 result, message = manager.uninstall_additional_file(
-                    additional_file.target_path
+                    additional_file.target_path,
+                    backup_dir=additional_file.backup_dir,
                 )
             if result != OperationResult.NOT_FOUND:
                 print_operation_result(result, message)
             additional_file_results[str(additional_file.target_path)] = result
 
+    preferences_results: dict[str, OperationResult] = {}
+    for shell in selected_shells:
+        preferences_files = shell.get_preferences_files()
+        for pref_file in preferences_files:
+            result, message = manager.uninstall_preferences_file(
+                pref_file.source_path,
+                pref_file.domain,
+                app_name=pref_file.app_name,
+            )
+            if result != OperationResult.NOT_FOUND:
+                print_operation_result(result, message)
+            preferences_results[pref_file.name] = result
+
     success_count = sum(1 for r in results.values() if r == OperationResult.REMOVED)
     additional_success_count = sum(
         1 for r in additional_file_results.values() if r == OperationResult.REMOVED
     )
-    total_success = success_count + additional_success_count
+    preferences_success_count = sum(
+        1 for r in preferences_results.values() if r == OperationResult.REMOVED
+    )
+    total_success = success_count + additional_success_count + preferences_success_count
 
     if total_success > 0:
         print_info(f"Successfully removed {total_success} file(s)")
@@ -677,6 +731,20 @@ def status(shells: list[str] | None) -> None:
                     )
             status_str = get_status_indicator(synced, exists)
             path_display = str(additional_file.target_path).replace(home, "~")
+
+            if i == 0 and not has_shown_name:
+                add_status_row(table, shell.display_name, path_display, status_str)
+                has_shown_name = True
+            else:
+                add_additional_file_row(table, path_display, status_str)
+
+        preferences_files = shell.get_preferences_files()
+        for i, pref_file in enumerate(preferences_files):
+            exists, synced = manager.check_preferences_file_status(
+                pref_file.source_path, pref_file.domain
+            )
+            status_str = get_status_indicator(synced, exists)
+            path_display = f"{pref_file.domain} (preferences)"
 
             if i == 0 and not has_shown_name:
                 add_status_row(table, shell.display_name, path_display, status_str)
@@ -932,6 +1000,7 @@ def cleanup(dry_run: bool, keep: int | None, yes: bool) -> None:
     console.print("[cyan]Scanning for shell-configs backup files...[/cyan]\n")
 
     backup_by_config = defaultdict(list)
+    backup_dir_map: dict[Path, Path] = {}
 
     for shell in all_shells:
         for config_file in shell.get_config_files():
@@ -941,10 +1010,20 @@ def cleanup(dry_run: bool, keep: int | None, yes: bool) -> None:
                     backup_by_config[config_file.path].extend(backups)
 
         for additional_file in shell.get_additional_files():
-            if additional_file.target_path.exists():
-                backups = manager.find_backup_files(additional_file.target_path)
+            should_scan = (
+                additional_file.target_path.exists() or additional_file.backup_dir
+            )
+            if should_scan:
+                backups = manager.find_backup_files(
+                    additional_file.target_path,
+                    backup_dir=additional_file.backup_dir,
+                )
                 if backups:
                     backup_by_config[additional_file.target_path].extend(backups)
+                    if additional_file.backup_dir:
+                        backup_dir_map[additional_file.target_path] = (
+                            additional_file.backup_dir
+                        )
 
     if not backup_by_config:
         print_info("No backup files found")
@@ -1006,7 +1085,11 @@ def cleanup(dry_run: bool, keep: int | None, yes: bool) -> None:
 
     removed_count = 0
     for config_path in backup_by_config:
-        removed = manager.cleanup_old_backups(config_path, keep=retention)
+        removed = manager.cleanup_old_backups(
+            config_path,
+            keep=retention,
+            backup_dir=backup_dir_map.get(config_path),
+        )
         removed_count += len(removed)
 
     console.print(
