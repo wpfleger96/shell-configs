@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v0.22.1 (2026-04-08)
+
+### Bug Fixes
+
+- Correct VS Code terminal scrollback and font size settings
+  ([`f07d719`](https://github.com/wpfleger96/shell-configs/commit/f07d7196eaf05ab77dc29c8bdf5498cb483c489e))
+
+scrollback=0 caused xterm.js to convert mouse wheel events to cursor key sequences (no buffer to
+  scroll), making the mouse wheel navigate zsh command history instead of scrolling terminal output.
+  The default terminal font size on macOS is 12pt, not 14 — setting 15pt was a 25% increase that
+  made the terminal text disproportionately large.
+
+Changes scrollback to 50000 (VS Code has no unlimited option) and removes the explicit fontSize to
+  inherit the macOS default. Keeps Monaco as fontFamily since it renders correctly at the default
+  size.
+
+
 ## v0.22.0 (2026-04-08)
 
 ### Features
