@@ -137,3 +137,37 @@ class TestSaveAutoUpdateConfig:
 
         config = AutoUpdateConfig(backup_retention=5)
         save_auto_update_config(config)
+
+    def test_active_profile_round_trips(self, mock_home, monkeypatch):
+        """AutoUpdateConfig saves and loads active_profile correctly."""
+        config_file = mock_home / ".shell-configs" / "update_config.yaml"
+        config_file.parent.mkdir(parents=True, exist_ok=True)
+
+        monkeypatch.setattr(
+            "shell_configs.bootstrap.config.get_config_path",
+            lambda pkg="shell-configs": config_file,
+        )
+
+        config = AutoUpdateConfig(backup_retention=5, active_profile="work")
+        save_auto_update_config(config)
+
+        loaded = load_auto_update_config()
+        assert loaded.active_profile == "work"
+        assert loaded.backup_retention == 5
+
+    def test_missing_active_profile_field_defaults_to_none(
+        self, mock_home, monkeypatch
+    ):
+        """Old configs without active_profile field load with None default."""
+        config_file = mock_home / ".shell-configs" / "update_config.yaml"
+        config_file.parent.mkdir(parents=True, exist_ok=True)
+        config_file.write_text("backup_retention: 7\n")
+
+        monkeypatch.setattr(
+            "shell_configs.bootstrap.config.get_config_path",
+            lambda pkg="shell-configs": config_file,
+        )
+
+        loaded = load_auto_update_config()
+        assert loaded.active_profile is None
+        assert loaded.backup_retention == 7

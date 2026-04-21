@@ -7,6 +7,7 @@ from shell_configs.packages.packages import (
     Package,
     get_package_manager,
     load_packages,
+    load_packages_for_profile,
     sort_packages_for_install,
     sort_packages_for_uninstall,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "Package",
     "get_package_manager",
     "load_packages",
+    "load_packages_for_profile",
     "sort_packages_for_install",
     "sort_packages_for_uninstall",
 ]

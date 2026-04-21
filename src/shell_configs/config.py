@@ -2,8 +2,12 @@
 
 from importlib.resources import files as resource_files
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from shell_configs.platform import detect_platform
+
+if TYPE_CHECKING:
+    from shell_configs.profiles.profile import Profile
 
 
 def get_config_dir() -> Path:
@@ -32,13 +36,17 @@ class ConfigReader:
         self.config_dir = config_dir if config_dir is not None else get_config_dir()
 
     def get_config_content(
-        self, shell_name: str, config_name: str | None
+        self,
+        shell_name: str,
+        config_name: str | None,
+        profile: "Profile | None" = None,
     ) -> str | None:
         """Get the content of a configuration file.
 
         Args:
             shell_name: Name of the shell (e.g., 'bash', 'zsh', 'git')
             config_name: Name of the config file (e.g., 'bashrc', 'zshrc'), or None for shared-only shells
+            profile: Optional active Profile; shell_overrides for this shell are appended
 
         Returns:
             Content of the config file, or None if not found
@@ -50,8 +58,15 @@ class ConfigReader:
         if not config_path.exists():
             return None
 
-        content = config_path.read_text()
-        return content.rstrip("\n")
+        content = config_path.read_text().rstrip("\n")
+
+        if profile and shell_name in profile.shell_overrides:
+            override = profile.shell_overrides[shell_name].rstrip("\n")
+            content = (
+                f"{content}\n\n### Profile Override ({profile.name}) ###\n{override}"
+            )
+
+        return content
 
     def get_available_shells(self) -> list[str]:
         """Get a list of available shell configurations.
@@ -69,16 +84,22 @@ class ConfigReader:
 
         return sorted(shells)
 
-    def get_shared_config_content(self, shell_name: str) -> str | None:
+    def get_shared_config_content(
+        self,
+        shell_name: str,
+        profile: "Profile | None" = None,
+    ) -> str | None:
         """Get the content of shared configuration with platform overlay.
 
         This method:
         1. Loads the base shared config (shared.sh or shared.gitconfig)
         2. Appends platform-specific overlay if it exists
         3. Prepends SHELL_CONFIGS_DIR export for shell configs (not git)
+        4. Appends profile shell_overrides["shared"] if present
 
         Args:
             shell_name: Name of the shell (e.g., 'bash', 'zsh', 'git')
+            profile: Optional active Profile; shell_overrides["shared"] are appended
 
         Returns:
             Combined content with platform overlay, or None if not found
@@ -106,5 +127,11 @@ class ConfigReader:
         if shell_name != "git":
             config_dir_export = f'export SHELL_CONFIGS_DIR="{self.config_dir}"'
             content = f"{config_dir_export}\n\n{content}"
+
+        if profile and "shared" in profile.shell_overrides:
+            override = profile.shell_overrides["shared"].rstrip("\n")
+            content = (
+                f"{content}\n\n### Profile Override ({profile.name}) ###\n{override}"
+            )
 
         return content

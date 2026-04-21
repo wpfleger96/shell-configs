@@ -179,7 +179,7 @@ class TestDiffCommand:
 class TestValidateCommand:
     """Test the validate command."""
 
-    def test_validate_success(self, test_repo, cli_runner, monkeypatch):
+    def test_validate_success(self, test_repo, mock_home, cli_runner, monkeypatch):
         monkeypatch.chdir(test_repo)
 
         result = cli_runner.invoke(cli, ["validate", "--shells", "bash,git"])
@@ -187,7 +187,9 @@ class TestValidateCommand:
         assert result.exit_code == 0
         assert "valid" in result.output.lower()
 
-    def test_validate_specific_shell(self, test_repo, cli_runner, monkeypatch):
+    def test_validate_specific_shell(
+        self, test_repo, mock_home, cli_runner, monkeypatch
+    ):
         monkeypatch.chdir(test_repo)
 
         result = cli_runner.invoke(cli, ["validate", "--shells", "bash"])

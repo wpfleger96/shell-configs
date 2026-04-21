@@ -7,6 +7,7 @@ import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 
 @dataclass
@@ -38,6 +39,57 @@ class PreferencesFile:
     source_path: Path
     domain: str
     app_name: str | None = None
+
+
+def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge two dicts; override wins on key conflicts.
+
+    Non-dict values are replaced entirely (not recursively merged).
+
+    Args:
+        base: Base dictionary
+        override: Override dictionary (wins on key conflicts)
+
+    Returns:
+        New merged dictionary
+    """
+    result = dict(base)
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def merge_json_with_profile(
+    base_path: Path,
+    override_path: Path,
+    profile_overrides: dict[str, Any] | None,
+) -> str:
+    """Merge two JSON files and apply profile overrides on top.
+
+    Calls merge_json_files for the two-file base/override merge, then
+    deep-merges profile_overrides on top if provided.
+
+    Args:
+        base_path: Path to the base JSON file
+        override_path: Path to the override JSON file
+        profile_overrides: Optional dict of profile overrides to apply last
+
+    Returns:
+        Formatted JSON string with trailing newline
+    """
+    import json
+
+    merged_str = merge_json_files(base_path, override_path)
+
+    if not profile_overrides:
+        return merged_str
+
+    merged = json.loads(merged_str)
+    merged = deep_merge(merged, profile_overrides)
+    return json.dumps(merged, indent=4, ensure_ascii=False) + "\n"
 
 
 def merge_json_files(base_path: Path, override_path: Path) -> str:

@@ -14,9 +14,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AutoUpdateConfig:
-    """Configuration for backup retention."""
+    """Configuration for backup retention and active profile."""
 
     backup_retention: int = 5
+    active_profile: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AutoUpdateConfig":

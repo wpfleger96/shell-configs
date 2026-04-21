@@ -5,8 +5,12 @@ import subprocess
 
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
+
+if TYPE_CHECKING:
+    from shell_configs.profiles.profile import Profile
 
 from pydantic import BaseModel
 
@@ -761,6 +765,38 @@ def sort_packages_for_uninstall(packages: list[Package]) -> list[Package]:
         return 1
 
     return sorted(packages, key=sort_key)
+
+
+def load_packages_for_profile(
+    profile: "Profile",
+    manifest_path: Path | None = None,
+) -> list[Package]:
+    """Load packages filtered and extended by a profile.
+
+    Starts with the full package list, removes packages in
+    profile.packages["remove"], and adds packages in profile.packages["add"]
+    (only those that already exist in the manifest by name).
+
+    Args:
+        profile: Active profile
+        manifest_path: Optional path to packages.yaml
+
+    Returns:
+        Filtered/extended list of Package objects
+    """
+    base_packages = load_packages(manifest_path)
+    remove_names = set(profile.packages.get("remove", []))
+    add_names = profile.packages.get("add", [])
+
+    result = [p for p in base_packages if p.name not in remove_names]
+
+    existing_names = {p.name for p in result}
+    for name in add_names:
+        if name not in existing_names:
+            matching = [p for p in base_packages if p.name == name]
+            result.extend(matching)
+
+    return result
 
 
 def load_packages(manifest_path: Path | None = None) -> list[Package]:

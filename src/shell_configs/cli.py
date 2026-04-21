@@ -12,10 +12,11 @@ import click
 
 from shell_configs import __version__
 from shell_configs.config import ConfigReader
-from shell_configs.shells.base import merge_json_files
+from shell_configs.shells.base import merge_json_with_profile
 
 if TYPE_CHECKING:
     from shell_configs.manager import ConfigManager
+    from shell_configs.profiles.profile import Profile
     from shell_configs.shells.base import Shell
     from shell_configs.shells.registry import ShellRegistry
 
@@ -100,6 +101,7 @@ def _display_diffs_for_shells(
     selected_shells: list["Shell"],
     config_reader: ConfigReader,
     manager: "ConfigManager",
+    profile: "Profile | None" = None,
 ) -> bool:
     """Display diffs for selected shells before install.
 
@@ -115,14 +117,16 @@ def _display_diffs_for_shells(
     for shell in selected_shells:
         for config_file in shell.get_config_files():
             repo_content = config_reader.get_config_content(
-                shell.name, config_file.repo_config_name
+                shell.name, config_file.repo_config_name, profile=profile
             )
             if repo_content is None:
                 continue
 
             shared_content = None
             if shell.supports_shared_config():
-                shared_content = config_reader.get_shared_config_content(shell.name)
+                shared_content = config_reader.get_shared_config_content(
+                    shell.name, profile=profile
+                )
 
             repo_content = manager.combine_content(shared_content, repo_content)
 
@@ -171,9 +175,13 @@ def _display_diffs_for_shells(
                 continue
 
             if additional_file.base_source_path:
-                repo_content = merge_json_files(
+                profile_overrides = (
+                    profile.settings_overrides.get(shell.name) if profile else None
+                )
+                repo_content = merge_json_with_profile(
                     additional_file.base_source_path,
                     additional_file.source_path,
+                    profile_overrides,
                 )
             else:
                 repo_content = additional_file.source_path.read_text()
@@ -276,8 +284,13 @@ def cli() -> None:
     hidden=True,
     help="Override config directory path (for setup command)",
 )
+@click.option("--profile", "profile_name", default=None, help="Profile to use")
 def install(
-    shells: list[str] | None, dry_run: bool, yes: bool, config_dir: Path | None
+    shells: list[str] | None,
+    dry_run: bool,
+    yes: bool,
+    config_dir: Path | None,
+    profile_name: str | None,
 ) -> None:
     """Install or update managed configuration sections."""
     from rich.prompt import Confirm
@@ -290,13 +303,16 @@ def install(
         print_warning,
     )
     from shell_configs.manager import ConfigManager, OperationResult
-    from shell_configs.packages import get_package_manager, load_packages
+    from shell_configs.packages import get_package_manager, load_packages_for_profile
+    from shell_configs.profiles import ProfileLoader, resolve_active_profile
     from shell_configs.shells.registry import ShellRegistry
 
     auto_update_config = load_auto_update_config()
     config_reader = ConfigReader(config_dir=config_dir)
     manager = ConfigManager(backup_retention=auto_update_config.backup_retention)
     registry = ShellRegistry()
+    profile_loader = ProfileLoader(config_reader.config_dir)
+    active_profile = resolve_active_profile(profile_name, profile_loader)
 
     selected_shells = _get_selected_shells(
         registry, shells, config_reader=config_reader
@@ -310,7 +326,7 @@ def install(
         pkg_manager = get_package_manager()
         if pkg_manager:
             try:
-                packages = load_packages()
+                packages = load_packages_for_profile(active_profile)
                 required = [pkg for pkg in packages if pkg.required]
                 missing_required = [
                     pkg for pkg in required if not pkg_manager.is_installed(pkg)
@@ -332,10 +348,12 @@ def install(
                 print_warning(f"Error installing required packages: {e}")
 
     has_diffs = False
-    if not yes and not dry_run:
-        has_diffs = _display_diffs_for_shells(selected_shells, config_reader, manager)
+    if not yes or dry_run:
+        has_diffs = _display_diffs_for_shells(
+            selected_shells, config_reader, manager, profile=active_profile
+        )
 
-        if has_diffs:
+        if has_diffs and not dry_run:
             console.print()
             if not click.confirm("Apply these changes?"):
                 print_info("Installation cancelled")
@@ -350,7 +368,7 @@ def install(
                 content = None
             else:
                 content = config_reader.get_config_content(
-                    shell.name, config_file.repo_config_name
+                    shell.name, config_file.repo_config_name, profile=active_profile
                 )
                 if content is None:
                     print_warning(
@@ -360,7 +378,9 @@ def install(
 
             shared_content = None
             if shell.supports_shared_config():
-                shared_content = config_reader.get_shared_config_content(shell.name)
+                shared_content = config_reader.get_shared_config_content(
+                    shell.name, profile=active_profile
+                )
 
             if content is None and shared_content is None:
                 continue
@@ -390,9 +410,15 @@ def install(
                     comment_prefix=additional_file.comment_prefix,
                 )
             elif additional_file.base_source_path:
-                merged_content = merge_json_files(
+                profile_overrides = (
+                    active_profile.settings_overrides.get(shell.name)
+                    if active_profile
+                    else None
+                )
+                merged_content = merge_json_with_profile(
                     additional_file.base_source_path,
                     additional_file.source_path,
+                    profile_overrides,
                 )
                 result, message, diff_text = (
                     manager.install_additional_file_from_content(
@@ -458,11 +484,21 @@ def install(
     elif not has_diffs and not dry_run:
         print_info("All configurations already in sync")
 
+    if not dry_run and profile_name is not None:
+        from shell_configs.bootstrap.config import save_auto_update_config
+
+        save_auto_update_config(
+            auto_update_config.__class__(
+                backup_retention=auto_update_config.backup_retention,
+                active_profile=active_profile.name,
+            )
+        )
+
     if not dry_run:
         pkg_manager = get_package_manager()
         if pkg_manager:
             try:
-                packages = load_packages()
+                packages = load_packages_for_profile(active_profile)
                 missing = [pkg for pkg in packages if not pkg_manager.is_installed(pkg)]
 
                 if missing:
@@ -632,7 +668,8 @@ def uninstall(shells: list[str] | None, yes: bool) -> None:
     callback=parse_shell_filter,
     help="Comma-separated list of shells to check",
 )
-def status(shells: list[str] | None) -> None:
+@click.option("--profile", "profile_name", default=None, help="Profile to use")
+def status(shells: list[str] | None, profile_name: str | None) -> None:
     """Show the status of managed configurations."""
     from shell_configs.bootstrap import load_auto_update_config
     from shell_configs.display import (
@@ -644,14 +681,17 @@ def status(shells: list[str] | None) -> None:
         print_warning,
     )
     from shell_configs.manager import ConfigManager
-    from shell_configs.packages import get_package_manager, load_packages
+    from shell_configs.packages import get_package_manager, load_packages_for_profile
     from shell_configs.platform import detect_platform
+    from shell_configs.profiles import ProfileLoader, resolve_active_profile
     from shell_configs.shells.registry import ShellRegistry
 
     auto_update_config = load_auto_update_config()
     config_reader = ConfigReader()
     manager = ConfigManager(backup_retention=auto_update_config.backup_retention)
     registry = ShellRegistry()
+    profile_loader = ProfileLoader(config_reader.config_dir)
+    active_profile = resolve_active_profile(profile_name, profile_loader)
 
     selected_shells = _get_selected_shells(
         registry, shells, config_reader=config_reader
@@ -671,11 +711,13 @@ def status(shells: list[str] | None) -> None:
 
         for config_file in shell.get_config_files():
             repo_content = config_reader.get_config_content(
-                shell.name, config_file.repo_config_name
+                shell.name, config_file.repo_config_name, profile=active_profile
             )
             shared_content = None
             if shell.supports_shared_config():
-                shared_content = config_reader.get_shared_config_content(shell.name)
+                shared_content = config_reader.get_shared_config_content(
+                    shell.name, profile=active_profile
+                )
 
             if repo_content is None and shared_content is not None:
                 repo_content = ""
@@ -718,9 +760,15 @@ def status(shells: list[str] | None) -> None:
             else:
                 exists = additional_file.target_path.exists()
                 if additional_file.base_source_path:
-                    merged_content = merge_json_files(
+                    profile_overrides = (
+                        active_profile.settings_overrides.get(shell.name)
+                        if active_profile
+                        else None
+                    )
+                    merged_content = merge_json_with_profile(
                         additional_file.base_source_path,
                         additional_file.source_path,
+                        profile_overrides,
                     )
                     synced = manager.content_matches(
                         merged_content, additional_file.target_path
@@ -789,7 +837,7 @@ def status(shells: list[str] | None) -> None:
     pkg_manager = get_package_manager()
     if pkg_manager:
         try:
-            packages = load_packages()
+            packages = load_packages_for_profile(active_profile)
             installed = []
             missing = []
             for pkg in packages:
@@ -835,17 +883,21 @@ def status(shells: list[str] | None) -> None:
     callback=parse_shell_filter,
     help="Comma-separated list of shells to diff",
 )
-def diff(shells: list[str] | None) -> None:
+@click.option("--profile", "profile_name", default=None, help="Profile to use")
+def diff(shells: list[str] | None, profile_name: str | None) -> None:
     """Show differences between repository and installed configurations."""
     from shell_configs.bootstrap import load_auto_update_config
     from shell_configs.display import print_info, print_warning
     from shell_configs.manager import ConfigManager
+    from shell_configs.profiles import ProfileLoader, resolve_active_profile
     from shell_configs.shells.registry import ShellRegistry
 
     auto_update_config = load_auto_update_config()
     config_reader = ConfigReader()
     manager = ConfigManager(backup_retention=auto_update_config.backup_retention)
     registry = ShellRegistry()
+    profile_loader = ProfileLoader(config_reader.config_dir)
+    active_profile = resolve_active_profile(profile_name, profile_loader)
 
     selected_shells = _get_selected_shells(
         registry, shells, config_reader=config_reader
@@ -855,7 +907,9 @@ def diff(shells: list[str] | None) -> None:
         print_warning("No shell configurations found")
         return
 
-    found_diffs = _display_diffs_for_shells(selected_shells, config_reader, manager)
+    found_diffs = _display_diffs_for_shells(
+        selected_shells, config_reader, manager, profile=active_profile
+    )
 
     if not found_diffs:
         print_info("All configurations are in sync")
@@ -867,7 +921,8 @@ def diff(shells: list[str] | None) -> None:
     callback=parse_shell_filter,
     help="Comma-separated list of shells to validate",
 )
-def validate(shells: list[str] | None) -> None:
+@click.option("--profile", "profile_name", default=None, help="Profile to use")
+def validate(shells: list[str] | None, profile_name: str | None) -> None:
     """Validate configuration file syntax."""
     from shell_configs.display import (
         add_validation_row,
@@ -877,37 +932,54 @@ def validate(shells: list[str] | None) -> None:
         print_info,
         print_warning,
     )
+    from shell_configs.profiles import ProfileLoader, resolve_active_profile
     from shell_configs.shells.registry import ShellRegistry
 
     config_reader = ConfigReader()
     registry = ShellRegistry()
+    profile_loader = ProfileLoader(config_reader.config_dir)
+    active_profile = resolve_active_profile(profile_name, profile_loader)
 
     selected_shells = _get_selected_shells(
         registry, shells, config_reader=config_reader
     )
 
+    all_valid = True
+    table = create_validation_table()
+
     if not selected_shells:
         print_warning("No shell configurations found")
-        return
+    else:
+        for shell in selected_shells:
+            for config_file in shell.get_config_files():
+                content = config_reader.get_config_content(
+                    shell.name, config_file.repo_config_name, profile=active_profile
+                )
+                if content is None:
+                    continue
 
-    table = create_validation_table()
-    all_valid = True
+                valid, message = shell.validate_syntax(content)
+                add_validation_row(table, shell.display_name, valid, message)
 
-    for shell in selected_shells:
-        for config_file in shell.get_config_files():
-            content = config_reader.get_config_content(
-                shell.name, config_file.repo_config_name
-            )
-            if content is None:
-                continue
+                if not valid:
+                    all_valid = False
 
-            valid, message = shell.validate_syntax(content)
-            add_validation_row(table, shell.display_name, valid, message)
+        console.print(table)
 
-            if not valid:
-                all_valid = False
+    from shell_configs.profiles.profile import ProfileError
 
-    console.print(table)
+    profile_errors: list[str] = []
+    for pname in profile_loader.list_profiles():
+        try:
+            profile_loader.resolve_profile(pname)
+        except ProfileError as e:
+            profile_errors.append(f"{pname}: {e}")
+
+    if profile_errors:
+        console.print()
+        for err in profile_errors:
+            print_error(f"Profile inheritance error — {err}")
+        all_valid = False
 
     if not all_valid:
         print_error("Some configurations have syntax errors")
@@ -1476,17 +1548,23 @@ def packages() -> None:
 @packages.command(name="install")
 @click.option("--dry-run", is_flag=True, help="Show what would be installed")
 @click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
-def packages_install(dry_run: bool, yes: bool) -> None:
+@click.option("--profile", "profile_name", default=None, help="Profile to use")
+def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None:
     """Install required system packages."""
     from rich.prompt import Confirm
 
     from shell_configs.display import console, print_error, print_info
     from shell_configs.packages import (
         get_package_manager,
-        load_packages,
+        load_packages_for_profile,
         sort_packages_for_install,
     )
     from shell_configs.platform import detect_platform
+    from shell_configs.profiles import ProfileLoader, resolve_active_profile
+
+    config_reader = ConfigReader()
+    profile_loader = ProfileLoader(config_reader.config_dir)
+    active_profile = resolve_active_profile(profile_name, profile_loader)
 
     platform_name = detect_platform().display_name
     console.print(f"[dim]Platform:[/dim] {platform_name}")
@@ -1501,7 +1579,7 @@ def packages_install(dry_run: bool, yes: bool) -> None:
     console.print(f"[dim]Package manager:[/dim] {manager.display_name}\n")
 
     try:
-        packages = load_packages()
+        packages = load_packages_for_profile(active_profile)
     except FileNotFoundError as e:
         print_error(str(e))
         sys.exit(1)
@@ -1572,11 +1650,17 @@ def packages_install(dry_run: bool, yes: bool) -> None:
 
 
 @packages.command(name="status")
-def packages_status() -> None:
+@click.option("--profile", "profile_name", default=None, help="Profile to use")
+def packages_status(profile_name: str | None) -> None:
     """Show status of required packages."""
     from shell_configs.display import console, print_error, print_info
-    from shell_configs.packages import get_package_manager, load_packages
+    from shell_configs.packages import get_package_manager, load_packages_for_profile
     from shell_configs.platform import detect_platform
+    from shell_configs.profiles import ProfileLoader, resolve_active_profile
+
+    config_reader = ConfigReader()
+    profile_loader = ProfileLoader(config_reader.config_dir)
+    active_profile = resolve_active_profile(profile_name, profile_loader)
 
     platform_name = detect_platform().display_name
     console.print(f"[dim]Platform:[/dim] {platform_name}\n")
@@ -1590,7 +1674,7 @@ def packages_status() -> None:
     console.print(f"[dim]Package manager:[/dim] {manager.display_name}\n")
 
     try:
-        packages = load_packages()
+        packages = load_packages_for_profile(active_profile)
     except FileNotFoundError as e:
         print_error(str(e))
         sys.exit(1)
@@ -1627,17 +1711,23 @@ def packages_status() -> None:
 @packages.command(name="uninstall")
 @click.option("--dry-run", is_flag=True, help="Show what would be uninstalled")
 @click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
-def packages_uninstall(dry_run: bool, yes: bool) -> None:
+@click.option("--profile", "profile_name", default=None, help="Profile to use")
+def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> None:
     """Uninstall managed system packages."""
     from rich.prompt import Confirm
 
     from shell_configs.display import console, print_error, print_info
     from shell_configs.packages import (
         get_package_manager,
-        load_packages,
+        load_packages_for_profile,
         sort_packages_for_uninstall,
     )
     from shell_configs.platform import detect_platform
+    from shell_configs.profiles import ProfileLoader, resolve_active_profile
+
+    config_reader = ConfigReader()
+    profile_loader = ProfileLoader(config_reader.config_dir)
+    active_profile = resolve_active_profile(profile_name, profile_loader)
 
     platform_name = detect_platform().display_name
     console.print(f"[dim]Platform:[/dim] {platform_name}")
@@ -1651,7 +1741,7 @@ def packages_uninstall(dry_run: bool, yes: bool) -> None:
     console.print(f"[dim]Package manager:[/dim] {manager.display_name}\n")
 
     try:
-        packages = load_packages()
+        packages = load_packages_for_profile(active_profile)
     except FileNotFoundError as e:
         print_error(str(e))
         sys.exit(1)
@@ -1735,6 +1825,139 @@ def packages_uninstall(dry_run: bool, yes: bool) -> None:
             console.print(
                 f"\n[green]✓[/green] Package uninstall complete ({success_count} packages)"
             )
+
+
+@cli.group()
+def profile() -> None:
+    """Manage configuration profiles."""
+    pass
+
+
+@profile.command(name="list")
+def profile_list() -> None:
+    """List all available profiles."""
+    from rich.table import Table
+
+    from shell_configs.bootstrap.config import load_auto_update_config
+    from shell_configs.display import console
+    from shell_configs.profiles import ProfileLoader
+
+    config_reader = ConfigReader()
+    loader = ProfileLoader(config_reader.config_dir)
+    auto_config = load_auto_update_config()
+    active_name = auto_config.active_profile or "default"
+
+    table = Table(show_header=True)
+    table.add_column("Profile")
+    table.add_column("Description")
+    table.add_column("Extends")
+
+    for name in loader.list_profiles():
+        try:
+            p = loader.load_profile(name)
+            active_marker = " [green]*[/green]" if name == active_name else ""
+            table.add_row(
+                f"{p.name}{active_marker}",
+                p.description or "[dim]-[/dim]",
+                p.extends or "[dim]-[/dim]",
+            )
+        except Exception as e:
+            table.add_row(name, f"[red]Error: {e}[/red]", "[dim]-[/dim]")
+
+    console.print(table)
+    console.print("\n[dim]* = active profile[/dim]")
+
+
+@profile.command(name="show")
+@click.argument("name")
+@click.option("--resolved", is_flag=True, help="Show fully inherited result")
+def profile_show(name: str, resolved: bool) -> None:
+    """Show profile YAML. Use --resolved to see fully inherited values."""
+    import yaml
+
+    from shell_configs.display import console
+    from shell_configs.profiles import ProfileLoader
+
+    config_reader = ConfigReader()
+    loader = ProfileLoader(config_reader.config_dir)
+
+    try:
+        if resolved:
+            p = loader.resolve_profile(name)
+            import dataclasses
+
+            data = dataclasses.asdict(p)
+        else:
+            profile_path = loader.get_profile_path(name)
+            if profile_path is None:
+                if name == "default":
+                    console.print(
+                        "name: default\ndescription: Default profile (no overrides)"
+                    )
+                    return
+                console.print(f"[red]Error:[/red] Profile '{name}' not found")
+                return
+            data = yaml.safe_load(profile_path.read_text()) or {}
+
+        console.print(
+            yaml.dump(data, default_flow_style=False, sort_keys=False).rstrip()
+        )
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+
+
+@profile.command(name="current")
+def profile_current() -> None:
+    """Show the currently active profile."""
+    from shell_configs.bootstrap.config import load_auto_update_config
+    from shell_configs.display import console
+    from shell_configs.profiles import ProfileLoader
+
+    config_reader = ConfigReader()
+    loader = ProfileLoader(config_reader.config_dir)
+    auto_config = load_auto_update_config()
+    active_name = auto_config.active_profile or "default"
+
+    try:
+        p = loader.load_profile(active_name)
+        console.print(f"[bold]{p.name}[/bold]")
+        if p.description:
+            console.print(f"[dim]{p.description}[/dim]")
+        if p.extends:
+            console.print(f"[dim]Extends: {p.extends}[/dim]")
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+
+
+@profile.command(name="switch")
+@click.argument("name")
+def profile_switch(name: str) -> None:
+    """Switch the active profile."""
+    from shell_configs.bootstrap.config import (
+        load_auto_update_config,
+        save_auto_update_config,
+    )
+    from shell_configs.display import console
+    from shell_configs.profiles import ProfileLoader
+
+    config_reader = ConfigReader()
+    loader = ProfileLoader(config_reader.config_dir)
+
+    try:
+        loader.load_profile(name)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        return
+
+    auto_config = load_auto_update_config()
+    save_auto_update_config(
+        auto_config.__class__(
+            backup_retention=auto_config.backup_retention,
+            active_profile=name,
+        )
+    )
+    console.print(f"[green]✓[/green] Switched to profile '{name}'")
+    console.print("[dim]Run 'shell-configs install' to apply.[/dim]")
 
 
 @cli.group()
