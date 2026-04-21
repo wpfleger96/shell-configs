@@ -1,6 +1,33 @@
 # CHANGELOG
 
 
+## v0.23.0 (2026-04-21)
+
+### Bug Fixes
+
+- Auto-detect large repos for git prompt tuning
+  ([`b3bf5d9`](https://github.com/wpfleger96/shell-configs/commit/b3bf5d96c5af573a6e4cf696d75bdeb47f653a3e))
+
+The previous approach used hardcoded LARGE_REPO_PATTERNS with glob matching in a case statement, but
+  zsh treats $pattern as a literal string in case expressions — the globs never matched and the
+  expensive GIT_PS1_SHOW* flags were never disabled. Replaced with dynamic detection based on
+  .git/index file size (>5 MB = large repo), which works correctly in both bash and zsh without
+  maintaining a list of known repos.
+
+### Features
+
+- Add profile system for per-machine configuration
+  ([`d255301`](https://github.com/wpfleger96/shell-configs/commit/d255301e967bba87170e963132f850c7dd8f7c5e))
+
+Adds YAML-based profiles with single inheritance so configs can vary between work and personal
+  laptops. The work profile adds Block CPE compliance keys to VS Code settings; the default profile
+  is the clean baseline. Profiles affect shell content (appended), JSON settings (deep-merged), and
+  package lists (add/remove).
+
+Moves workbench.startupEditor into the base VS Code override layer since it applies to both
+  machines. Also fixes install --dry-run to show actual diffs instead of only listing file paths.
+
+
 ## v0.22.1 (2026-04-08)
 
 ### Bug Fixes
