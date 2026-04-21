@@ -72,29 +72,31 @@ gdifm() {
 }
 
 ### Git - Configuration ###
-# Large repos where expensive git prompt status checks should be disabled
-LARGE_REPO_PATTERNS=(
-    "*/cash-server"
-    "*/cash-server/*"
-)
+# Index files over 5 MB indicate repos large enough to make __git_ps1 painfully slow
+_GIT_LARGE_REPO_INDEX_THRESHOLD=5242880
 
 _tune_git_prompt() {
-    for pattern in "${LARGE_REPO_PATTERNS[@]}"; do
-        # shellcheck disable=SC2254 # intentional glob matching
-        case "$PWD" in
-            $pattern)
-                export GIT_PS1_SHOWDIRTYSTATE=
-                export GIT_PS1_SHOWSTASHSTATE=
-                export GIT_PS1_SHOWUNTRACKEDFILES=
-                export GIT_PS1_SHOWUPSTREAM=
-                return
-                ;;
-        esac
-    done
-    export GIT_PS1_SHOWDIRTYSTATE=true
-    export GIT_PS1_SHOWSTASHSTATE=true
-    export GIT_PS1_SHOWUNTRACKEDFILES=true
-    export GIT_PS1_SHOWUPSTREAM="auto"
+    local git_root index_size
+    git_root=$(command git rev-parse --show-toplevel 2>/dev/null) || {
+        # Not in a git repo — enable defaults for when we enter one
+        export GIT_PS1_SHOWDIRTYSTATE=true
+        export GIT_PS1_SHOWSTASHSTATE=true
+        export GIT_PS1_SHOWUNTRACKEDFILES=true
+        export GIT_PS1_SHOWUPSTREAM="auto"
+        return
+    }
+    index_size=$(wc -c <"$git_root/.git/index" 2>/dev/null) || index_size=0
+    if [[ $index_size -gt $_GIT_LARGE_REPO_INDEX_THRESHOLD ]]; then
+        export GIT_PS1_SHOWDIRTYSTATE=
+        export GIT_PS1_SHOWSTASHSTATE=
+        export GIT_PS1_SHOWUNTRACKEDFILES=
+        export GIT_PS1_SHOWUPSTREAM=
+    else
+        export GIT_PS1_SHOWDIRTYSTATE=true
+        export GIT_PS1_SHOWSTASHSTATE=true
+        export GIT_PS1_SHOWUNTRACKEDFILES=true
+        export GIT_PS1_SHOWUPSTREAM="auto"
+    fi
 }
 
 _tune_git_prompt
