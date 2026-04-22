@@ -1,6 +1,18 @@
 # CHANGELOG
 
 
+## v0.24.0 (2026-04-22)
+
+### Features
+
+- Add Codex, Gemini, and Amp CLI aliases
+  ([`421b7e5`](https://github.com/wpfleger96/shell-configs/commit/421b7e529bf0f4ab54fbd5c8c654983efad80f35))
+
+Convenience aliases for three additional coding agents, mirroring the existing Claude Code
+  ccy/ccry/cccy pattern. Prefixes: cx (Codex), gm (Gemini CLI), am (Amp). Suffix semantics are
+  consistent across all four agents: c = continue last, r = resume picker, f = fork, y = yolo.
+
+
 ## v0.23.0 (2026-04-21)
 
 ### Bug Fixes
