@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v0.24.1 (2026-04-22)
+
+### Bug Fixes
+
+- Resolve git prompt tuning in worktree directories
+  ([`74ed244`](https://github.com/wpfleger96/shell-configs/commit/74ed244f2882ce24e86756baf5dc565a5f8ac165))
+
+In worktrees .git is a file (gitdir: pointer), not a directory, so $git_root/.git/index fails with
+  "not a directory" in zsh. Use git rev-parse --git-dir which follows worktree indirection.
+
+
 ## v0.24.0 (2026-04-22)
 
 ### Features
