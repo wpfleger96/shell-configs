@@ -76,8 +76,8 @@ gdifm() {
 _GIT_LARGE_REPO_INDEX_THRESHOLD=5242880
 
 _tune_git_prompt() {
-    local git_root index_size
-    git_root=$(command git rev-parse --show-toplevel 2>/dev/null) || {
+    local git_dir index_size
+    git_dir=$(command git rev-parse --git-dir 2>/dev/null) || {
         # Not in a git repo — enable defaults for when we enter one
         export GIT_PS1_SHOWDIRTYSTATE=true
         export GIT_PS1_SHOWSTASHSTATE=true
@@ -85,7 +85,7 @@ _tune_git_prompt() {
         export GIT_PS1_SHOWUPSTREAM="auto"
         return
     }
-    index_size=$(wc -c <"$git_root/.git/index" 2>/dev/null) || index_size=0
+    index_size=$(wc -c <"$git_dir/index" 2>/dev/null) || index_size=0
     if [[ $index_size -gt $_GIT_LARGE_REPO_INDEX_THRESHOLD ]]; then
         export GIT_PS1_SHOWDIRTYSTATE=
         export GIT_PS1_SHOWSTASHSTATE=
