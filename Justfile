@@ -20,13 +20,13 @@ lint-python-check:
     uvx ruff check .
 
 lint-shell-check:
-    shfmt -f . | grep -v git-prompt.sh | grep -v iterm2-shell-integration | grep -v '^scripts/' | xargs shellcheck
+    shfmt -f . | grep -v git-prompt.sh | grep -v iterm2-shell-integration | grep -v 'src/shell_configs/scripts/' | xargs shellcheck
 
 format-python-check:
     uvx ruff format . --check
 
 format-shell-check:
-    shfmt -f . | grep -v git-prompt.sh | grep -v iterm2-shell-integration | grep -v '^scripts/' | xargs shfmt -d
+    shfmt -f . | grep -v git-prompt.sh | grep -v iterm2-shell-integration | grep -v 'src/shell_configs/scripts/' | xargs shfmt -d
 
 # Code Quality - Fix variants
 lint-python:
@@ -36,7 +36,7 @@ format-python:
     uvx ruff format .
 
 format-shell:
-    shfmt -f . | grep -v git-prompt.sh | grep -v iterm2-shell-integration | grep -v '^scripts/' | xargs shfmt -w
+    shfmt -f . | grep -v git-prompt.sh | grep -v iterm2-shell-integration | grep -v 'src/shell_configs/scripts/' | xargs shfmt -w
 
 # Composite quality checks
 check: sync type-check lint-python-check lint-shell-check format-python-check format-shell-check
