@@ -140,8 +140,18 @@ def main() -> None:
 
         out_dir = str(args.output_dir or file_path.parent)
         result = {"segments": [asdict(s) for s in segment_list]}
-        writer = get_writer(args.output_format, out_dir)
-        writer(result, str(file_path))
+
+        if args.output_format not in ("txt",):
+            writer = get_writer(args.output_format, out_dir)
+            writer(result, str(file_path))
+
+        if args.output_format in ("txt", "all"):
+            out_path = Path(out_dir) / f"{file_path.stem}.txt"
+            with open(out_path, "w") as f:
+                for segment in segment_list:
+                    f.write(
+                        f"{format_time(segment.start):>7}  {segment.text.strip()}\n"
+                    )
 
         out_name = f"{file_path.stem}.{args.output_format}"
         if args.output_format == "all":
