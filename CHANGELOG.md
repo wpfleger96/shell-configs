@@ -1,6 +1,18 @@
 # CHANGELOG
 
 
+## v0.25.0 (2026-04-23)
+
+### Features
+
+- **transcribe**: Include timestamps in txt output
+  ([`eb8fe38`](https://github.com/wpfleger96/shell-configs/commit/eb8fe38a857a36b53abe9016ad7028419852c840))
+
+openai-whisper's WriteTXT strips timestamps, producing a wall of text with no way to locate specific
+  moments. Now txt output mirrors the terminal display with right-aligned timestamps per segment,
+  and the "all" format overwrites the plain txt with the timestamped version.
+
+
 ## v0.24.1 (2026-04-22)
 
 ### Bug Fixes
