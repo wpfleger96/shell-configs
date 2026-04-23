@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 
+from enum import Enum, auto
 from pathlib import Path
 
 if sys.version_info >= (3, 11):
@@ -13,8 +14,29 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as tomllib
 
+
+class ToolSource(Enum):
+    """Source from which a tool was installed."""
+
+    PYPI = auto()
+    GITHUB = auto()
+    LOCAL = auto()
+
+
 UV_NOT_FOUND_ERROR = "uv not found in PATH. Install from https://docs.astral.sh/uv/"
-GITHUB_REPO_URL = "git+ssh://git@github.com/wpfleger96/shell-configs.git"
+GITHUB_REPO = "wpfleger96/shell-configs"
+
+
+def make_github_install_url(repo: str) -> str:
+    """Construct GitHub install URL for uv tool install.
+
+    Args:
+        repo: GitHub repository in format "owner/repo"
+
+    Returns:
+        Full git+ssh URL for uv tool install
+    """
+    return f"git+ssh://git@github.com/{repo}.git"
 
 
 def _validate_package_name(package_name: str) -> bool:
@@ -51,16 +73,15 @@ def get_tool_config_dir(package_name: str = "shell-configs") -> Path:
     )
 
 
-def get_tool_source(package_name: str) -> str | None:
-    """Detect how a uv tool was installed (PyPI vs GitHub vs local file).
+def get_tool_source(package_name: str) -> ToolSource | None:
+    """Detect how a uv tool was installed.
 
     Args:
         package_name: Name of the uv tool package
 
     Returns:
-        "pypi" if installed from PyPI (no path/git key in requirements)
-        "github" if installed from GitHub (has git key with github.com URL)
-        "local" if installed from local file (has path key)
+        ToolSource.PYPI if installed from PyPI
+        ToolSource.GITHUB if installed from GitHub
         None if tool not installed or receipt file not found
     """
     data_home = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
@@ -80,11 +101,11 @@ def get_tool_source(package_name: str) -> str | None:
         first_req = requirements[0]
         if isinstance(first_req, dict):
             if "path" in first_req:
-                return "local"
+                return ToolSource.LOCAL
             if "git" in first_req and "github.com" in first_req["git"]:
-                return "github"
+                return ToolSource.GITHUB
 
-        return "pypi"
+        return ToolSource.PYPI
 
     except (OSError, tomllib.TOMLDecodeError, KeyError, IndexError):
         return None
@@ -118,7 +139,7 @@ def install_tool(
     if not is_command_available("uv"):
         return False, UV_NOT_FOUND_ERROR
 
-    cmd = ["uv", "tool", "install", GITHUB_REPO_URL]
+    cmd = ["uv", "tool", "install", make_github_install_url(GITHUB_REPO)]
     if force:
         cmd.insert(3, "--force")
         cmd.insert(4, "--reinstall")

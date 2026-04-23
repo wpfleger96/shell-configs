@@ -7,6 +7,7 @@ import pytest
 
 from shell_configs.bootstrap.installer import (
     UV_NOT_FOUND_ERROR,
+    ToolSource,
     get_tool_config_dir,
     get_tool_source,
     install_tool,
@@ -272,7 +273,20 @@ class TestGetToolSource:
 
         monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
         result = get_tool_source("test-package")
-        assert result == "local"
+        assert result == ToolSource.LOCAL
+
+    def test_detects_github_installation(self, tmp_path, monkeypatch):
+        """Test that GitHub installations are detected."""
+        tools_dir = tmp_path / "uv" / "tools" / "test-package"
+        tools_dir.mkdir(parents=True)
+        receipt = tools_dir / "uv-receipt.toml"
+        receipt.write_text(
+            '[tool]\nrequirements = [{ name = "test-package", git = "https://github.com/user/repo" }]\n'
+        )
+
+        monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+        result = get_tool_source("test-package")
+        assert result == ToolSource.GITHUB
 
     def test_detects_pypi_installation(self, tmp_path, monkeypatch):
         """Test that PyPI installations are detected."""
@@ -285,7 +299,7 @@ class TestGetToolSource:
 
         monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
         result = get_tool_source("test-package")
-        assert result == "pypi"
+        assert result == ToolSource.PYPI
 
     def test_returns_none_when_not_installed(self, tmp_path, monkeypatch):
         """Test that None is returned for tools that aren't installed."""

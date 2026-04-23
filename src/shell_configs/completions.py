@@ -1,12 +1,15 @@
 """Shell completion installation and management."""
 
 import os
+import re
 
 from dataclasses import dataclass
 from pathlib import Path
 
 COMPLETION_MARKER_START = "# shell-configs shell completion"
 COMPLETION_MARKER_END = "# End shell-configs shell completion"
+
+PROG_NAME = "shell-configs"
 
 
 @dataclass
@@ -89,7 +92,7 @@ def is_completion_installed(config_path: Path) -> bool:
 
 
 def generate_completion_script(shell: str) -> str:
-    """Generate completion script using Click's shell_completion module.
+    """Generate completion script with command-existence guard.
 
     Args:
         shell: Shell name ('bash' or 'zsh')
@@ -106,11 +109,12 @@ def generate_completion_script(shell: str) -> str:
     if comp_cls is None:
         raise ValueError(f"Unsupported shell: {shell}")
 
-    prog_name = "shell-configs"
-    env_var = f"_{prog_name.upper().replace('-', '_')}_COMPLETE"
+    env_var = f"_{PROG_NAME.upper().replace('-', '_')}_COMPLETE"
 
     return f"""{COMPLETION_MARKER_START}
-eval "$({env_var}={shell}_source {prog_name})"
+if command -v {PROG_NAME} >/dev/null 2>&1; then
+  eval "$({env_var}={shell}_source {PROG_NAME})"
+fi
 {COMPLETION_MARKER_END}"""
 
 
@@ -137,7 +141,7 @@ def install_completion(shell: str, dry_run: bool = False) -> tuple[bool, str]:
         )
 
     if is_completion_installed(config_path):
-        return True, f"Completion already installed in {config_path}"
+        return update_completion(shell, dry_run=dry_run)
 
     script = generate_completion_script(shell)
 
@@ -153,6 +157,41 @@ def install_completion(shell: str, dry_run: bool = False) -> tuple[bool, str]:
         )
     except Exception as e:
         return False, f"Failed to write to {config_path}: {e}"
+
+
+def update_completion(shell: str, dry_run: bool = False) -> tuple[bool, str]:
+    """Replace existing completion block with a freshly generated one.
+
+    Args:
+        shell: Shell name (e.g., 'bash', 'zsh')
+        dry_run: If True, only show what would be done
+
+    Returns:
+        Tuple of (success: bool, message: str)
+    """
+    config_path = find_config_file(shell)
+    if config_path is None:
+        return False, f"No {shell} config file found"
+    if not is_completion_installed(config_path):
+        return install_completion(shell, dry_run=dry_run)
+
+    new_script = generate_completion_script(shell)
+    if dry_run:
+        return True, f"Would update completion in {config_path}"
+
+    content = config_path.read_text()
+
+    start_re = re.escape(COMPLETION_MARKER_START)
+    end_re = re.escape(COMPLETION_MARKER_END)
+    pattern = f"({start_re}).*?({end_re})"
+    new_content, n = re.subn(pattern, lambda _: new_script, content, flags=re.DOTALL)
+    if n == 0:
+        return False, f"Could not find completion block in {config_path}"
+    config_path.write_text(new_content)
+    return (
+        True,
+        f"Completion updated in {config_path}. Restart your shell or run: source {config_path}",
+    )
 
 
 def uninstall_completion(config_path: Path) -> tuple[bool, str]:
@@ -172,27 +211,18 @@ def uninstall_completion(config_path: Path) -> tuple[bool, str]:
 
     try:
         content = config_path.read_text()
-        lines = content.split("\n")
 
-        start_idx = None
-        end_idx = None
-        for i, line in enumerate(lines):
-            if COMPLETION_MARKER_START in line:
-                start_idx = i
-            elif COMPLETION_MARKER_END in line:
-                end_idx = i
-                break
+        start_re = re.escape(COMPLETION_MARKER_START)
+        end_re = re.escape(COMPLETION_MARKER_END)
+        pattern = f"({start_re}).*?({end_re})"
+        new_content = re.sub(pattern, lambda _: "", content, flags=re.DOTALL)
 
-        if start_idx is not None and end_idx is not None:
-            new_lines = lines[:start_idx] + lines[end_idx + 1 :]
-            new_content = "\n".join(new_lines)
+        if new_content == content:
+            return False, f"Could not find complete completion block in {config_path}"
 
-            if content == new_content:
-                return True, f"Completion already not present in {config_path}"
+        new_content = re.sub(r"\n{3,}", "\n\n", new_content)
 
-            config_path.write_text(new_content)
-            return True, f"Completion removed from {config_path}"
-        else:
-            return False, f"Could not find completion block markers in {config_path}"
+        config_path.write_text(new_content)
+        return True, f"Completion removed from {config_path}"
     except Exception as e:
         return False, f"Failed to modify {config_path}: {e}"

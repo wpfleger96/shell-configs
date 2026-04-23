@@ -1,5 +1,6 @@
 """Base shell configuration interface."""
 
+import copy
 import json
 import subprocess
 import tempfile
@@ -53,12 +54,14 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]
     Returns:
         New merged dictionary
     """
-    result = dict(base)
+    result = copy.deepcopy(base)
     for key, value in override.items():
-        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+        if key not in result:
+            result[key] = copy.deepcopy(value)
+        elif isinstance(result[key], dict) and isinstance(value, dict):
             result[key] = deep_merge(result[key], value)
         else:
-            result[key] = value
+            result[key] = copy.deepcopy(value)
     return result
 
 
