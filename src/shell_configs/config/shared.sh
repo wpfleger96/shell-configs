@@ -103,6 +103,10 @@ _tune_git_prompt
 GPG_TTY=$(tty)
 export GPG_TTY
 
+_reset_terminal_title() {
+    [[ "$TERM_PROGRAM" == "vscode" || "$TERM_PROGRAM" == "cursor" ]] && printf '\033]2;\007'
+}
+
 ### Git - Functions ###
 _git_default_branch() {
     local remote="${1:-origin}"

@@ -84,3 +84,4 @@ fi
 ### Git Prompt Performance ###
 autoload -U add-zsh-hook
 add-zsh-hook chpwd _tune_git_prompt
+add-zsh-hook precmd _reset_terminal_title

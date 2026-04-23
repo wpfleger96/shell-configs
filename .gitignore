@@ -208,3 +208,5 @@ __marimo__/
 
 # shell-configs specific
 *.shell-configs-backup.*
+
+.claude/
