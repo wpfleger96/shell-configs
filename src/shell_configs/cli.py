@@ -1192,7 +1192,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         check_tool_updates,
         perform_github_update,
     )
-    from shell_configs.bootstrap.installer import GITHUB_REPO_URL
+    from shell_configs.bootstrap.installer import GITHUB_REPO, make_github_install_url
     from shell_configs.display import console
 
     tools = [t for t in UPDATABLE_TOOLS if t.is_installed()]
@@ -1272,7 +1272,9 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
     for tool, _ in tool_updates:
         with console.status(f"Upgrading {tool.display_name}..."):
             try:
-                success, msg, was_upgraded = perform_github_update(GITHUB_REPO_URL)
+                success, msg, was_upgraded = perform_github_update(
+                    make_github_install_url(GITHUB_REPO)
+                )
             except Exception as e:
                 console.print(
                     f"\n[red]Error:[/red] {tool.display_name} upgrade failed: {e}"
@@ -1341,7 +1343,7 @@ def info() -> None:
             continue
 
         source = get_tool_source(tool.package_name)
-        source_display = source if source else "[dim]unknown[/dim]"
+        source_display = source.name.lower() if source else "[dim]unknown[/dim]"
 
         version = tool.get_version()
         version_display = version if version else "[dim]unknown[/dim]"
@@ -1441,9 +1443,14 @@ def setup(
                         console.print("[yellow]Skipped shell-configs upgrade[/yellow]")
                         tool_install_success = True
                     else:
-                        from shell_configs.bootstrap.installer import GITHUB_REPO_URL
+                        from shell_configs.bootstrap.installer import (
+                            GITHUB_REPO,
+                            make_github_install_url,
+                        )
 
-                        success, msg, _ = perform_github_update(GITHUB_REPO_URL)
+                        success, msg, _ = perform_github_update(
+                            make_github_install_url(GITHUB_REPO)
+                        )
                         if success:
                             console.print(
                                 f"[green]✓[/green] Upgraded shell-configs ({update_info.current_version} → {update_info.latest_version})"
