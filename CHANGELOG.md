@@ -1,6 +1,38 @@
 # CHANGELOG
 
 
+## v0.26.0 (2026-04-23)
+
+### Features
+
+- Add VS Code terminal tab title support for Claude Code sessions
+  ([`a18f848`](https://github.com/wpfleger96/shell-configs/commit/a18f848cc9424e4a574f1b345aaa2c34dc488f8e))
+
+Adds ${sequence}${separator}${process} template so OSC-set titles are visible in VS Code/Cursor
+  terminal tabs. Adds _reset_terminal_title() precmd hook to clear stale titles when returning to
+  the shell prompt. Companion to claude-code-status-line's opt-in OSC 2 emission feature.
+
+### Refactoring
+
+- Backport ai-rules bootstrap and completion improvements
+  ([`a1f91ab`](https://github.com/wpfleger96/shell-configs/commit/a1f91abafddb01dc13d0821a3473a433f2fdd0aa))
+
+shell-configs and ai-rules share the same bootstrap/completion architecture. ai-rules evolved
+  several improvements that shell-configs never received; this closes the quality gap without
+  extracting a shared library.
+
+Key changes: - ToolSource enum replaces raw "pypi"/"github"/"local" strings in get_tool_source();
+  LOCAL variant correctly identifies path-key receipts - make_github_install_url() replaces
+  hardcoded GITHUB_REPO_URL constant; GITHUB_REPO (owner/repo) imported by updater instead of
+  duplicated - get_version lambda now uses get_tool_version() instead of
+  importlib.metadata.version(), which can diverge for uvx invocations - deep_merge() uses
+  copy.deepcopy throughout — prevents aliasing when callers share mutable override values -
+  completions: regex-based uninstall/update replaces fragile line-scanner; install_completion
+  delegates to update_completion for existing blocks so users get the new command -v guard without
+  reinstalling; lambda form for re.sub replacements prevents accidental backreference
+  interpretation; uninstall now errors instead of silently succeeding when end marker missing
+
+
 ## v0.25.0 (2026-04-23)
 
 ### Features
