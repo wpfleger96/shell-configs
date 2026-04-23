@@ -1192,7 +1192,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         check_tool_updates,
         perform_github_update,
     )
-    from shell_configs.bootstrap.installer import GITHUB_REPO, make_github_install_url
+    from shell_configs.bootstrap.installer import make_github_install_url
     from shell_configs.display import console
 
     tools = [t for t in UPDATABLE_TOOLS if t.is_installed()]
@@ -1273,7 +1273,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         with console.status(f"Upgrading {tool.display_name}..."):
             try:
                 success, msg, was_upgraded = perform_github_update(
-                    make_github_install_url(GITHUB_REPO)
+                    make_github_install_url(tool.github_repo)
                 )
             except Exception as e:
                 console.print(
@@ -1396,6 +1396,7 @@ def setup(
     from shell_configs.bootstrap.installer import (
         get_tool_config_dir,
         install_tool,
+        make_github_install_url,
     )
     from shell_configs.bootstrap.updater import (
         check_tool_updates,
@@ -1443,13 +1444,8 @@ def setup(
                         console.print("[yellow]Skipped shell-configs upgrade[/yellow]")
                         tool_install_success = True
                     else:
-                        from shell_configs.bootstrap.installer import (
-                            GITHUB_REPO,
-                            make_github_install_url,
-                        )
-
                         success, msg, _ = perform_github_update(
-                            make_github_install_url(GITHUB_REPO)
+                            make_github_install_url(shell_configs_tool.github_repo)
                         )
                         if success:
                             console.print(

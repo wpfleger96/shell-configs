@@ -8,7 +8,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from .installer import (
-    GITHUB_REPO,
     UV_NOT_FOUND_ERROR,
     get_tool_version,
     is_command_available,
@@ -279,6 +278,7 @@ class ToolSpec:
     display_name: str
     get_version: Callable[[], str | None]
     is_installed: Callable[[], bool]
+    github_repo: str
 
 
 UPDATABLE_TOOLS: list[ToolSpec] = [
@@ -288,6 +288,7 @@ UPDATABLE_TOOLS: list[ToolSpec] = [
         display_name="shell-configs",
         get_version=lambda: get_tool_version("shell-configs"),
         is_installed=lambda: get_tool_version("shell-configs") is not None,
+        github_repo="wpfleger96/shell-configs",
     ),
 ]
 
@@ -309,7 +310,7 @@ def check_tool_updates(tool: ToolSpec, timeout: int = 10) -> UpdateInfo | None:
     if current is None:
         return None
 
-    return check_github_updates(GITHUB_REPO, current, timeout)
+    return check_github_updates(tool.github_repo, current, timeout)
 
 
 def get_tool_by_id(tool_id: str) -> ToolSpec | None:
