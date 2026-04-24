@@ -172,27 +172,13 @@ def _load_platform_exceptions(
     return result
 
 
-def _walk_path(root: Path, rel_parts: tuple[str, ...] = ()) -> list[tuple[str, str]]:
+def _walk_tree(root: object, rel_parts: tuple[str, ...] = ()) -> list[tuple[str, str]]:
     found: list[tuple[str, str]] = []
-    for item in sorted(root.iterdir(), key=lambda x: x.name):
+    for item in sorted(root.iterdir(), key=lambda x: x.name):  # type: ignore[attr-defined]
         if item.name in _SKIP_NAMES or item.name.endswith(".pyc"):
             continue
         if item.is_dir():
-            found.extend(_walk_path(item, rel_parts + (item.name,)))
-        elif item.is_file():
-            found.append((item.name, "/".join(rel_parts + (item.name,))))
-    return found
-
-
-def _walk_resource(
-    resource: object, rel_parts: tuple[str, ...] = ()
-) -> list[tuple[str, str]]:
-    found: list[tuple[str, str]] = []
-    for item in sorted(resource.iterdir(), key=lambda x: x.name):  # type: ignore[attr-defined]
-        if item.name in _SKIP_NAMES or item.name.endswith(".pyc"):
-            continue
-        if item.is_dir():
-            found.extend(_walk_resource(item, rel_parts + (item.name,)))
+            found.extend(_walk_tree(item, rel_parts + (item.name,)))
         elif item.is_file():
             found.append((item.name, "/".join(rel_parts + (item.name,))))
     return found
@@ -208,10 +194,8 @@ def discover_scripts(
 
     exceptions = _load_platform_exceptions(source_dir)
 
-    if source_dir is not None:
-        entries = _walk_path(source_dir)
-    else:
-        entries = _walk_resource(files("shell_configs.scripts"))
+    root = source_dir if source_dir is not None else files("shell_configs.scripts")
+    entries = _walk_tree(root)
 
     scripts: list[DiscoveredScript] = []
     for name, rel_path in entries:

@@ -742,6 +742,14 @@ def register_signing_key(key: str, auto_refresh_scope: bool = True) -> tuple[boo
     Returns:
         (success, message) tuple
     """
+    key_parts = key.strip().split()
+    key_data = key_parts[1] if len(key_parts) >= 2 else ""
+    if key_data:
+        for signing_line in get_github_signing_keys():
+            parts = signing_line.split("\t")
+            if len(parts) >= 2 and key_data in parts[1]:
+                return True, "SSH signing key already registered with GitHub"
+
     result = subprocess.run(
         [
             "gh",
@@ -797,45 +805,6 @@ def register_signing_key(key: str, auto_refresh_scope: bool = True) -> tuple[boo
             return False, "Failed to refresh GitHub authentication scope"
 
     return False, error_msg
-
-
-def validate_signing_setup(auto_fix: bool = False) -> tuple[bool, str]:
-    """Validate SSH signing key is registered with GitHub.
-
-    Returns (success, message).
-    """
-    if not shutil.which("gh"):
-        return (
-            False,
-            "GitHub CLI (gh) not installed - run 'shell-configs packages install'",
-        )
-
-    auth_check = subprocess.run(
-        ["gh", "auth", "status"], capture_output=True, timeout=10
-    )
-    if auth_check.returncode != 0:
-        return False, "GitHub CLI not authenticated - run 'gh auth login'"
-
-    agent_keys = get_agent_keys()
-    if not agent_keys:
-        return False, "No SSH keys in ssh-agent - run 'ssh-add'"
-
-    github_keys = get_github_signing_keys()
-
-    for key in agent_keys:
-        if key_is_registered(key, github_keys):
-            return True, "SSH signing key is registered with GitHub"
-
-    if not auto_fix:
-        return (
-            False,
-            "SSH key not registered for signing. Run 'shell-configs signing --fix'",
-        )
-
-    success, msg = register_signing_key(agent_keys[0])
-    if success:
-        return True, "Registered SSH key for signing with GitHub"
-    return False, f"Failed to register key: {msg}"
 
 
 def generate_allowed_signers_file(

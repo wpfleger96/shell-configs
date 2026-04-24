@@ -559,6 +559,45 @@ def install(
             else:
                 console.print(f"[red]✗[/red] {r.message}")
 
+        from shell_configs.script_manager import (
+            InstallResult,
+            ScriptManifest,
+            discover_scripts,
+            get_default_manifest_path,
+            get_default_target_dir,
+            install_script,
+        )
+
+        console.print()
+        console.print("[yellow]Installing utility scripts...[/yellow]")
+        target_dir = get_default_target_dir()
+        manifest = ScriptManifest(get_default_manifest_path())
+        entries = discover_scripts()
+        if not entries:
+            console.print("[dim]No scripts available for this platform[/dim]")
+        else:
+            for entry in entries:
+                script_result, msg = install_script(
+                    entry, target_dir, manifest, dry_run=dry_run
+                )
+                if script_result == InstallResult.COLLISION:
+                    console.print(f"[yellow]⚠[/yellow] {msg}")
+                elif script_result in (
+                    InstallResult.INSTALLED,
+                    InstallResult.UPDATED,
+                    InstallResult.ALREADY_SYNCED,
+                ):
+                    console.print(f"[green]✓[/green] {msg}")
+                elif script_result in (
+                    InstallResult.WOULD_INSTALL,
+                    InstallResult.WOULD_UPDATE,
+                ):
+                    console.print(f"[dim]→[/dim] {msg}")
+                elif script_result == InstallResult.SKIPPED_PLATFORM:
+                    pass
+                else:
+                    console.print(f"[red]✗[/red] {msg}")
+
 
 @cli.command()
 @click.option(
@@ -631,6 +670,28 @@ def uninstall(shells: list[str] | None, yes: bool) -> None:
             if result != OperationResult.NOT_FOUND:
                 print_operation_result(result, message)
             preferences_results[pref_file.name] = result
+
+    from shell_configs.script_manager import (
+        ScriptManifest,
+        UninstallResult,
+        get_default_manifest_path,
+        get_default_target_dir,
+        uninstall_script,
+    )
+
+    manifest = ScriptManifest(get_default_manifest_path())
+    if manifest.scripts:
+        target_dir = get_default_target_dir()
+        for name in list(manifest.scripts.keys()):
+            script_result, message = uninstall_script(
+                name, target_dir, manifest, force=True
+            )
+            if script_result == UninstallResult.REMOVED:
+                print_operation_result(OperationResult.REMOVED, message)
+            elif script_result == UninstallResult.NOT_FOUND:
+                pass
+            else:
+                print_warning(message)
 
     success_count = sum(1 for r in results.values() if r == OperationResult.REMOVED)
     additional_success_count = sum(
@@ -1665,6 +1726,7 @@ def setup(
         scripts_source = get_tool_scripts_dir("shell-configs") if not dry_run else None
         if scripts_source and scripts_source.exists():
             from shell_configs.script_manager import (
+                InstallResult,
                 ScriptManifest,
                 discover_scripts,
                 get_default_manifest_path,
@@ -1682,11 +1744,18 @@ def setup(
                     dry_run=dry_run,
                     source_dir=scripts_source,
                 )
-                if result.value in ("installed", "updated", "already_synced"):
+                if result in (
+                    InstallResult.INSTALLED,
+                    InstallResult.UPDATED,
+                    InstallResult.ALREADY_SYNCED,
+                ):
                     console.print(f"[green]✓[/green] {message}")
-                elif result.value == "collision":
+                elif result == InstallResult.COLLISION:
                     console.print(f"[yellow]⚠[/yellow] {message}")
-                elif result.value.startswith("would_"):
+                elif result in (
+                    InstallResult.WOULD_INSTALL,
+                    InstallResult.WOULD_UPDATE,
+                ):
                     console.print(f"[dim]→[/dim] {message}")
         else:
             ctx.invoke(scripts_install, dry_run=dry_run, yes=yes)

@@ -144,7 +144,7 @@ class TestDiffCommand:
         "scenario,setup_action,expected_output",
         [
             ("not_installed", None, "Not installed"),
-            ("synced", "install", "Scripts"),
+            ("synced", "install", "in sync"),
             ("outdated", "install_and_modify", "Bash"),
         ],
     )
