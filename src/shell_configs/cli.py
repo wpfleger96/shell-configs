@@ -852,7 +852,7 @@ def status(shells: list[str] | None, profile_name: str | None) -> None:
     from shell_configs.script_manager import (
         ScriptManifest,
         ScriptStatus,
-        get_available_scripts,
+        discover_scripts,
         get_default_manifest_path,
         get_default_target_dir,
         get_script_status,
@@ -860,7 +860,7 @@ def status(shells: list[str] | None, profile_name: str | None) -> None:
 
     scripts_target = get_default_target_dir()
     scripts_manifest = ScriptManifest(get_default_manifest_path())
-    script_entries = get_available_scripts()
+    script_entries = discover_scripts()
     scripts_installed = sum(
         1
         for e in script_entries
@@ -935,7 +935,7 @@ def diff(shells: list[str] | None, profile_name: str | None) -> None:
     from shell_configs.script_manager import (
         ScriptManifest,
         ScriptStatus,
-        get_available_scripts,
+        discover_scripts,
         get_default_manifest_path,
         get_default_target_dir,
         get_script_status,
@@ -944,7 +944,7 @@ def diff(shells: list[str] | None, profile_name: str | None) -> None:
     scripts_target = get_default_target_dir()
     scripts_manifest = ScriptManifest(get_default_manifest_path())
     out_of_sync = []
-    for entry in get_available_scripts():
+    for entry in discover_scripts():
         st = get_script_status(entry, scripts_target, scripts_manifest)
         if st != ScriptStatus.INSTALLED:
             out_of_sync.append((entry, st))
@@ -1666,7 +1666,7 @@ def setup(
         if scripts_source and scripts_source.exists():
             from shell_configs.script_manager import (
                 ScriptManifest,
-                get_available_scripts,
+                discover_scripts,
                 get_default_manifest_path,
                 get_default_target_dir,
                 install_script,
@@ -1674,7 +1674,7 @@ def setup(
 
             target_dir = get_default_target_dir()
             manifest = ScriptManifest(get_default_manifest_path())
-            for entry in get_available_scripts():
+            for entry in discover_scripts(source_dir=scripts_source):
                 result, message = install_script(
                     entry,
                     target_dir,
@@ -2293,7 +2293,7 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
     from shell_configs.script_manager import (
         InstallResult,
         ScriptManifest,
-        get_available_scripts,
+        discover_scripts,
         get_default_manifest_path,
         get_default_target_dir,
         install_script,
@@ -2301,7 +2301,7 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
 
     target_dir = get_default_target_dir()
     manifest = ScriptManifest(get_default_manifest_path())
-    entries = get_available_scripts()
+    entries = discover_scripts()
 
     if not entries:
         console.print("[yellow]No scripts available for this platform[/yellow]")
@@ -2312,7 +2312,7 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
             f"[bold]Will install {len(entries)} script(s) to {target_dir}[/bold]\n"
         )
         for entry in entries:
-            console.print(f"  {entry.name}: {entry.description}")
+            console.print(f"  {entry.name}")
         console.print()
         if not Confirm.ask("Proceed?", default=True):
             console.print("[dim]Cancelled[/dim]")
@@ -2402,9 +2402,9 @@ def scripts_status() -> None:
 
     from shell_configs.display import console
     from shell_configs.script_manager import (
-        SCRIPT_REGISTRY,
         ScriptManifest,
         ScriptStatus,
+        discover_scripts,
         get_default_manifest_path,
         get_default_target_dir,
         get_script_status,
@@ -2416,7 +2416,6 @@ def scripts_status() -> None:
     table = Table(show_header=True)
     table.add_column("Script")
     table.add_column("Status")
-    table.add_column("Description")
 
     status_icons = {
         ScriptStatus.INSTALLED: "[green]✓[/green]",
@@ -2427,7 +2426,7 @@ def scripts_status() -> None:
         ScriptStatus.SKIPPED_PLATFORM: "[dim]-[/dim]",
     }
 
-    for entry in SCRIPT_REGISTRY:
+    for entry in discover_scripts(include_all=True):
         status = get_script_status(entry, target_dir, manifest)
         icon = status_icons.get(status, "?")
         label = status.value
@@ -2435,7 +2434,7 @@ def scripts_status() -> None:
             label = "exists (not ours)"
         elif status == ScriptStatus.SKIPPED_PLATFORM:
             label = "other platform"
-        table.add_row(entry.name, f"{icon} {label}", entry.description)
+        table.add_row(entry.name, f"{icon} {label}")
 
     console.print("[bold cyan]Script Status[/bold cyan]\n")
     console.print(table)
@@ -2452,22 +2451,20 @@ def scripts_list(include_all: bool) -> None:
 
     from shell_configs.display import console
     from shell_configs.platform import detect_platform
-    from shell_configs.script_manager import SCRIPT_REGISTRY
+    from shell_configs.script_manager import discover_scripts
 
     current = detect_platform()
+    entries = discover_scripts(include_all=include_all)
 
     table = Table(show_header=True)
     table.add_column("Script")
     table.add_column("Platforms")
-    table.add_column("Description")
 
-    for entry in SCRIPT_REGISTRY:
-        if not include_all and current not in entry.platforms:
-            continue
+    for entry in entries:
         platforms = ", ".join(
             p.display_name for p in sorted(entry.platforms, key=lambda p: p.value)
         )
-        table.add_row(entry.name, platforms, entry.description)
+        table.add_row(entry.name, platforms)
 
     console.print("[bold cyan]Available Scripts[/bold cyan]\n")
     console.print(table)

@@ -15,86 +15,33 @@ from enum import Enum
 from importlib.resources import files
 from pathlib import Path
 
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib  # type: ignore[no-redef]
+
 from shell_configs.platform import Platform, detect_platform
 
 logger = logging.getLogger(__name__)
 
-ALL_PLATFORMS = frozenset({Platform.MACOS, Platform.LINUX, Platform.WSL})
+_ALL_PLATFORMS = frozenset({Platform.MACOS, Platform.LINUX, Platform.WSL})
+
+_SKIP_NAMES = frozenset({"__init__.py", "__pycache__", "scripts.toml"})
+
+_PLATFORM_NAMES: dict[str, Platform] = {
+    "macos": Platform.MACOS,
+    "linux": Platform.LINUX,
+    "wsl": Platform.WSL,
+}
 
 
 @dataclass(frozen=True)
-class ScriptEntry:
-    """Declarative metadata for a distributable script."""
+class DiscoveredScript:
+    """A script discovered from the scripts directory."""
 
-    source: str
     name: str
-    description: str
+    rel_path: str
     platforms: frozenset[Platform]
-    mode: int = 0o755
-
-
-SCRIPT_REGISTRY: list[ScriptEntry] = [
-    ScriptEntry(
-        source="git/check_pr_release_status.py",
-        name="check-pr-release-status",
-        description="Check if a merged PR's commit is included in any published release",
-        platforms=ALL_PLATFORMS,
-    ),
-    ScriptEntry(
-        source="git/fix-git-case-conflicts.sh",
-        name="fix-git-case-conflicts",
-        description="Fix macOS case-sensitivity git ref conflicts",
-        platforms=frozenset({Platform.MACOS}),
-    ),
-    ScriptEntry(
-        source="goose/db-helper.sh",
-        name="db-helper",
-        description="Manage Goose AI assistant's SQLite session database",
-        platforms=ALL_PLATFORMS,
-    ),
-    ScriptEntry(
-        source="transcription/transcribe.py",
-        name="transcribe",
-        description="Transcribe audio files using faster-whisper",
-        platforms=frozenset({Platform.MACOS, Platform.LINUX}),
-    ),
-    ScriptEntry(
-        source="windows/fix-date-formatting.ps1",
-        name="fix-date-formatting",
-        description="Rename files from MM-DD-YY to YYYY-MM-DD date format",
-        platforms=frozenset({Platform.WSL}),
-    ),
-    ScriptEntry(
-        source="work_laptop/backup-repos",
-        name="backup-repos",
-        description="Back up all local git repo remote URLs",
-        platforms=ALL_PLATFORMS,
-    ),
-    ScriptEntry(
-        source="work_laptop/clone-repos",
-        name="clone-repos",
-        description="Clone repos from backup file",
-        platforms=ALL_PLATFORMS,
-    ),
-    ScriptEntry(
-        source="work_laptop/disk-cleanup",
-        name="disk-cleanup",
-        description="Clean up disk space (caches, build artifacts)",
-        platforms=frozenset({Platform.MACOS}),
-    ),
-    ScriptEntry(
-        source="work_laptop/laptop-upgrade",
-        name="laptop-upgrade",
-        description="Update brew, gcloud, and system packages",
-        platforms=frozenset({Platform.MACOS}),
-    ),
-    ScriptEntry(
-        source="work_laptop/new-laptop-setup",
-        name="new-laptop-setup",
-        description="Bootstrap a new Mac for development",
-        platforms=frozenset({Platform.MACOS}),
-    ),
-]
 
 
 class InstallResult(Enum):
@@ -199,10 +146,89 @@ def get_default_target_dir() -> Path:
     return Path.home() / ".local" / "bin"
 
 
-def _read_script_bytes(source: str, source_dir: Path | None = None) -> bytes:
+def _load_platform_exceptions(
+    source_dir: Path | None = None,
+) -> dict[str, frozenset[Platform]]:
+    try:
+        if source_dir is not None:
+            raw = (source_dir / "scripts.toml").read_bytes()
+        else:
+            raw = files("shell_configs.scripts").joinpath("scripts.toml").read_bytes()
+    except FileNotFoundError:
+        return {}
+
+    data = tomllib.loads(raw.decode())
+    result: dict[str, frozenset[Platform]] = {}
+    for script_name, table in data.items():
+        if not isinstance(table, dict):
+            continue
+        platforms = frozenset(
+            _PLATFORM_NAMES[p]
+            for p in table.get("platforms", [])
+            if p in _PLATFORM_NAMES
+        )
+        if platforms:
+            result[script_name] = platforms
+    return result
+
+
+def _walk_path(root: Path, rel_parts: tuple[str, ...] = ()) -> list[tuple[str, str]]:
+    found: list[tuple[str, str]] = []
+    for item in sorted(root.iterdir(), key=lambda x: x.name):
+        if item.name in _SKIP_NAMES or item.name.endswith(".pyc"):
+            continue
+        if item.is_dir():
+            found.extend(_walk_path(item, rel_parts + (item.name,)))
+        elif item.is_file():
+            found.append((item.name, "/".join(rel_parts + (item.name,))))
+    return found
+
+
+def _walk_resource(
+    resource: object, rel_parts: tuple[str, ...] = ()
+) -> list[tuple[str, str]]:
+    found: list[tuple[str, str]] = []
+    for item in sorted(resource.iterdir(), key=lambda x: x.name):  # type: ignore[attr-defined]
+        if item.name in _SKIP_NAMES or item.name.endswith(".pyc"):
+            continue
+        if item.is_dir():
+            found.extend(_walk_resource(item, rel_parts + (item.name,)))
+        elif item.is_file():
+            found.append((item.name, "/".join(rel_parts + (item.name,))))
+    return found
+
+
+def discover_scripts(
+    current_platform: Platform | None = None,
+    source_dir: Path | None = None,
+    include_all: bool = False,
+) -> list[DiscoveredScript]:
+    if current_platform is None and not include_all:
+        current_platform = detect_platform()
+
+    exceptions = _load_platform_exceptions(source_dir)
+
     if source_dir is not None:
-        return (source_dir / source).read_bytes()
-    resource = files("shell_configs.scripts").joinpath(source)
+        entries = _walk_path(source_dir)
+    else:
+        entries = _walk_resource(files("shell_configs.scripts"))
+
+    scripts: list[DiscoveredScript] = []
+    for name, rel_path in entries:
+        platforms = exceptions.get(name, _ALL_PLATFORMS)
+        if not include_all and current_platform not in platforms:
+            continue
+        scripts.append(
+            DiscoveredScript(name=name, rel_path=rel_path, platforms=platforms)
+        )
+
+    return scripts
+
+
+def _read_script_bytes(rel_path: str, source_dir: Path | None = None) -> bytes:
+    if source_dir is not None:
+        return (source_dir / rel_path).read_bytes()
+    resource = files("shell_configs.scripts").joinpath(rel_path)
     return resource.read_bytes()
 
 
@@ -210,43 +236,34 @@ def _hash_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def get_available_scripts(
-    current_platform: Platform | None = None,
-) -> list[ScriptEntry]:
-    if current_platform is None:
-        current_platform = detect_platform()
-
-    return [entry for entry in SCRIPT_REGISTRY if current_platform in entry.platforms]
-
-
 def get_script_status(
-    entry: ScriptEntry,
+    script: DiscoveredScript,
     target_dir: Path,
     manifest: ScriptManifest,
     source_dir: Path | None = None,
 ) -> ScriptStatus:
     current_platform = detect_platform()
-    if current_platform not in entry.platforms:
+    if current_platform not in script.platforms:
         return ScriptStatus.SKIPPED_PLATFORM
 
-    target = target_dir / entry.name
+    target = target_dir / script.name
 
     if not target.exists():
-        if entry.name in manifest.scripts:
-            manifest.remove(entry.name)
+        if script.name in manifest.scripts:
+            manifest.remove(script.name)
         return ScriptStatus.MISSING
 
-    if entry.name not in manifest.scripts:
+    if script.name not in manifest.scripts:
         return ScriptStatus.COLLISION
 
     try:
-        source_bytes = _read_script_bytes(entry.source, source_dir)
+        source_bytes = _read_script_bytes(script.rel_path, source_dir)
     except (FileNotFoundError, TypeError):
         return ScriptStatus.MISSING
 
     source_hash = _hash_bytes(source_bytes)
     installed_hash = _hash_bytes(target.read_bytes())
-    recorded_hash = manifest.scripts[entry.name].source_hash
+    recorded_hash = manifest.scripts[script.name].source_hash
 
     if installed_hash == source_hash:
         return ScriptStatus.INSTALLED
@@ -258,64 +275,67 @@ def get_script_status(
 
 
 def install_script(
-    entry: ScriptEntry,
+    script: DiscoveredScript,
     target_dir: Path,
     manifest: ScriptManifest,
     dry_run: bool = False,
     source_dir: Path | None = None,
 ) -> tuple[InstallResult, str]:
     current_platform = detect_platform()
-    if current_platform not in entry.platforms:
+    if current_platform not in script.platforms:
         return (
             InstallResult.SKIPPED_PLATFORM,
-            f"{entry.name}: not supported on {current_platform.display_name}",
+            f"{script.name}: not supported on {current_platform.display_name}",
         )
 
     try:
-        source_bytes = _read_script_bytes(entry.source, source_dir)
+        source_bytes = _read_script_bytes(script.rel_path, source_dir)
     except FileNotFoundError:
-        return InstallResult.ERROR, f"{entry.name}: source not found: {entry.source}"
-
-    source_hash = _hash_bytes(source_bytes)
-    target = target_dir / entry.name
-
-    if target.exists() and entry.name not in manifest.scripts:
         return (
-            InstallResult.COLLISION,
-            f"{entry.name}: already exists in {target_dir} and wasn't installed by shell-configs",
+            InstallResult.ERROR,
+            f"{script.name}: source not found: {script.rel_path}",
         )
 
-    if target.exists() and entry.name in manifest.scripts:
+    source_hash = _hash_bytes(source_bytes)
+    target = target_dir / script.name
+
+    if target.exists() and script.name not in manifest.scripts:
+        return (
+            InstallResult.COLLISION,
+            f"{script.name}: already exists in {target_dir} and wasn't installed by shell-configs",
+        )
+
+    if target.exists() and script.name in manifest.scripts:
         installed_hash = _hash_bytes(target.read_bytes())
         if installed_hash == source_hash:
-            return InstallResult.ALREADY_SYNCED, f"{entry.name}: already up to date"
+            return InstallResult.ALREADY_SYNCED, f"{script.name}: already up to date"
         if dry_run:
-            return InstallResult.WOULD_UPDATE, f"{entry.name}: would update"
+            return InstallResult.WOULD_UPDATE, f"{script.name}: would update"
 
     elif dry_run:
-        return InstallResult.WOULD_INSTALL, f"{entry.name}: would install to {target}"
+        return InstallResult.WOULD_INSTALL, f"{script.name}: would install to {target}"
 
     target_dir.mkdir(parents=True, exist_ok=True)
-    fd, temp_path = tempfile.mkstemp(dir=target_dir, prefix=f".{entry.name}.")
+    fd, temp_path = tempfile.mkstemp(dir=target_dir, prefix=f".{script.name}.")
     try:
         os.write(fd, source_bytes)
         os.close(fd)
-        os.chmod(temp_path, entry.mode)
+        os.chmod(temp_path, 0o755)
         shutil.move(temp_path, target)
     except Exception as e:
         try:
             os.unlink(temp_path)
         except OSError:
             pass
-        return InstallResult.ERROR, f"{entry.name}: {e}"
+        return InstallResult.ERROR, f"{script.name}: {e}"
 
-    is_update = entry.name in manifest.scripts
-    manifest.record_install(entry.name, source_hash, entry.source)
+    is_update = script.name in manifest.scripts
+    manifest.record_install(script.name, source_hash, script.rel_path)
     manifest.save()
 
     if is_update:
-        return InstallResult.UPDATED, f"{entry.name}: updated"
-    return InstallResult.INSTALLED, f"{entry.name}: installed to {target}"
+        return InstallResult.UPDATED, f"{script.name}: updated"
+    return InstallResult.INSTALLED, f"{script.name}: installed to {target}"
 
 
 def uninstall_script(
