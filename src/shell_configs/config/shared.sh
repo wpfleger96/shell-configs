@@ -104,7 +104,8 @@ GPG_TTY=$(tty)
 export GPG_TTY
 
 _reset_terminal_title() {
-    [[ "$TERM_PROGRAM" == "vscode" || "$TERM_PROGRAM" == "cursor" ]] && printf '\033]2;\007'
+    local name="${ZSH_NAME:-${BASH##*/}}"
+    [[ -n "$TERM_PROGRAM" ]] && printf '\033]0;%s\007' "${name:-shell}"
 }
 
 ### Git - Functions ###

@@ -84,6 +84,6 @@
     "terminal.integrated.macOptionIsMeta": true,
     "terminal.integrated.scrollback": 50000,
     "terminal.integrated.tabs.description": "${task}${separator}${local}${separator}${cwdFolder}",
-    "terminal.integrated.tabs.title": "${sequence}${separator}${process}",
+    "terminal.integrated.tabs.title": "${sequence}",
     "workbench.colorTheme": "Visual Studio Dark"
 }
