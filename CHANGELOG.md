@@ -1,6 +1,30 @@
 # CHANGELOG
 
 
+## v0.27.0 (2026-04-24)
+
+### Features
+
+- Package utility scripts and consolidate SSH key lifecycle
+  ([#2](https://github.com/wpfleger96/shell-configs/pull/2),
+  [`00820b0`](https://github.com/wpfleger96/shell-configs/commit/00820b02c3b854686fd6fe28aed42f8337de7f6b))
+
+Scripts were only usable from a repo checkout — now they're packaged and installed to ~/.local/bin
+  via convention-based discovery. Adding a new script = dropping a file in scripts/; scripts.toml
+  lists the 5 platform-restricted exceptions. install/uninstall commands manage scripts alongside
+  shell configs.
+
+The SSH key lifecycle was split between shell-configs (signing only) and homelabconfigs (generation
+  + auth upload). Now shell-configs owns it end-to-end via signing --fix, using GitHub fingerprint
+  matching to discover the managed key instead of hardcoding ~/.ssh/id_rsa. Decision matrix: 0 keys
+  → generate, 1 key → use it, fingerprint match → use match, 2+ unmatched → interactive prompt.
+
+All subprocess calls in signing.py go through _run() which catches TimeoutExpired. ssh-add no longer
+  captures output so passphrase prompts work. register_signing_key and generate_allowed_signers_file
+  are idempotent. config/script/ renamed to config/lib/ to distinguish support libraries from
+  distributable scripts.
+
+
 ## v0.26.1 (2026-04-24)
 
 ### Bug Fixes
