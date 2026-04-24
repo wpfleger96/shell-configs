@@ -519,11 +519,7 @@ def setup_signing(
             if not ok:
                 return results
     else:
-        results.append(
-            StepResult(
-                "generate_key", True, f"SSH key exists: {key_path}", skipped=True
-            )
-        )
+        results.append(StepResult("generate_key", True, f"SSH key exists: {key_path}"))
 
     if dry_run:
         results.append(
@@ -543,12 +539,13 @@ def setup_signing(
         ok, msg = upload_auth_key(key_path)
         results.append(StepResult("upload_auth", ok, msg))
 
+    pub_key_str = _read_pub_key(key_path) if not dry_run else None
+
     if dry_run:
         results.append(
             StepResult("register_signing", True, "Would register SSH signing key")
         )
     else:
-        pub_key_str = _read_pub_key(key_path)
         if pub_key_str:
             ok, msg = register_signing_key(pub_key_str, auto_refresh_scope=False)
             results.append(StepResult("register_signing", ok, msg))
@@ -563,7 +560,9 @@ def setup_signing(
             StepResult("allowed_signers", True, "Would generate allowed_signers")
         )
     else:
-        ok, msg = generate_allowed_signers_file(allowed_signers)
+        ok, msg = generate_allowed_signers_file(
+            allowed_signers, signing_key=pub_key_str
+        )
         results.append(StepResult("allowed_signers", ok, msg))
 
     return results
@@ -808,22 +807,26 @@ def register_signing_key(key: str, auto_refresh_scope: bool = True) -> tuple[boo
 
 
 def generate_allowed_signers_file(
-    allowed_signers_path: Path, emails: list[str] | None = None
+    allowed_signers_path: Path,
+    signing_key: str | None = None,
+    emails: list[str] | None = None,
 ) -> tuple[bool, str]:
-    """Generate allowed_signers file with SSH keys from ssh-agent.
-
-    Creates entries for all provided email addresses with all available SSH keys.
+    """Generate allowed_signers file for git commit signature verification.
 
     Args:
         allowed_signers_path: Path where allowed_signers file should be created
+        signing_key: The public key string to use. If None, falls back to ssh-agent.
         emails: List of email addresses to include. If None, uses default emails.
 
     Returns:
         (success, message) tuple
     """
-    agent_keys = get_agent_keys()
-    if not agent_keys:
-        return False, "No SSH keys in ssh-agent - run 'ssh-add'"
+    if signing_key:
+        keys = [signing_key]
+    else:
+        keys = get_agent_keys()
+        if not keys:
+            return False, "No SSH keys in ssh-agent - run 'ssh-add'"
 
     if emails is None:
         emails = [
@@ -833,7 +836,7 @@ def generate_allowed_signers_file(
 
     lines = []
     for email in emails:
-        for key in agent_keys:
+        for key in keys:
             lines.append(f"{email} {key}")
 
     new_content = "\n".join(lines) + "\n"
@@ -842,15 +845,15 @@ def generate_allowed_signers_file(
     if file_exists:
         existing_content = allowed_signers_path.read_text()
         if existing_content == new_content:
-            return True, f"allowed_signers is up to date with {len(agent_keys)} key(s)"
+            return True, f"allowed_signers is up to date with {len(keys)} key(s)"
 
     allowed_signers_path.parent.mkdir(parents=True, exist_ok=True)
     allowed_signers_path.write_text(new_content)
 
     if file_exists:
-        return True, f"Updated allowed_signers with {len(agent_keys)} key(s)"
+        return True, f"Updated allowed_signers with {len(keys)} key(s)"
     else:
-        return True, f"Generated allowed_signers with {len(agent_keys)} key(s)"
+        return True, f"Generated allowed_signers with {len(keys)} key(s)"
 
 
 def get_signing_key_info() -> dict[str, str] | None:
