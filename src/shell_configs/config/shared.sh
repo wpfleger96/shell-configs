@@ -669,7 +669,7 @@ rubyssl() {
         echo "Error: SHELL_CONFIGS_DIR not set. Run 'shell-configs install'." >&2
         return 1
     fi
-    RUBYOPT="-r $SHELL_CONFIGS_DIR/script/ssl_fix.rb" ruby "$@"
+    RUBYOPT="-r $SHELL_CONFIGS_DIR/lib/ssl_fix.rb" ruby "$@"
 }
 
 bundlessl() {
@@ -677,7 +677,7 @@ bundlessl() {
         echo "Error: SHELL_CONFIGS_DIR not set. Run 'shell-configs install'." >&2
         return 1
     fi
-    RUBYOPT="-r $SHELL_CONFIGS_DIR/script/ssl_fix.rb" bundle "$@"
+    RUBYOPT="-r $SHELL_CONFIGS_DIR/lib/ssl_fix.rb" bundle "$@"
 }
 
 ### Docker ###

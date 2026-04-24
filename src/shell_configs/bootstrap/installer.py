@@ -73,6 +73,27 @@ def get_tool_config_dir(package_name: str = "shell-configs") -> Path:
     )
 
 
+def get_tool_scripts_dir(package_name: str = "shell-configs") -> Path:
+    """Get scripts directory for a uv tool installation.
+
+    Mirrors get_tool_config_dir() but for the scripts payload.
+    """
+    data_home = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
+    python_version = f"python{sys.version_info.major}.{sys.version_info.minor}"
+
+    return (
+        Path(data_home)
+        / "uv"
+        / "tools"
+        / package_name
+        / "lib"
+        / python_version
+        / "site-packages"
+        / "shell_configs"
+        / "scripts"
+    )
+
+
 def get_tool_source(package_name: str) -> ToolSource | None:
     """Detect how a uv tool was installed.
 

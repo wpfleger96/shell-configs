@@ -1,0 +1,14 @@
+[fix-git-case-conflicts]
+platforms = ["macos"]
+
+[fix-date-formatting]
+platforms = ["wsl"]
+
+[disk-cleanup]
+platforms = ["macos"]
+
+[laptop-upgrade]
+platforms = ["macos"]
+
+[new-laptop-setup]
+platforms = ["macos"]

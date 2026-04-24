@@ -539,42 +539,64 @@ def install(
             except Exception as e:
                 console.print(f"\n[red]Error checking packages:[/red] {e}")
 
-        from shell_configs.signing import (
-            generate_allowed_signers_file,
-            validate_signing_setup,
+        from shell_configs.signing import setup_signing
+
+        console.print()
+        console.print("[yellow]Validating SSH key lifecycle...[/yellow]")
+        interactive = sys.stdin.isatty()
+        signing_results = setup_signing(
+            auto_fix=yes
+            or Confirm.ask(
+                "Set up SSH key lifecycle (generate, auth, sign)?", default=True
+            ),
+            interactive=interactive,
+        )
+        for r in signing_results:
+            if r.skipped:
+                console.print(f"[yellow]⚠[/yellow] {r.message}")
+            elif r.success:
+                console.print(f"[green]✓[/green] {r.message}")
+            else:
+                console.print(f"[red]✗[/red] {r.message}")
+
+        from shell_configs.script_manager import (
+            InstallResult,
+            ScriptManifest,
+            discover_scripts,
+            get_default_manifest_path,
+            get_default_target_dir,
+            install_script,
         )
 
         console.print()
-        console.print("[yellow]Validating SSH signing setup...[/yellow]")
-        success, message = validate_signing_setup(auto_fix=False)
-        if success:
-            console.print(f"[green]✓[/green] {message}")
-        elif "not registered" in message:
-            console.print(f"[yellow]⚠[/yellow] {message}")
-            if yes or Confirm.ask(
-                "Register SSH key for commit signing with GitHub?", default=True
-            ):
-                success, message = validate_signing_setup(auto_fix=True)
-                if success:
-                    console.print(f"[green]✓[/green] {message}")
-                else:
-                    console.print(f"[red]✗[/red] {message}")
-            else:
-                console.print(
-                    "[dim]Skipped. Run 'shell-configs signing --fix' later.[/dim]"
-                )
+        console.print("[yellow]Installing utility scripts...[/yellow]")
+        target_dir = get_default_target_dir()
+        manifest = ScriptManifest(get_default_manifest_path())
+        entries = discover_scripts()
+        if not entries:
+            console.print("[dim]No scripts available for this platform[/dim]")
         else:
-            console.print(f"[yellow]⚠[/yellow] {message}")
-
-        if success or "not registered" in message:
-            allowed_signers_path = Path.home() / ".config" / "git" / "allowed_signers"
-            signers_success, signers_msg = generate_allowed_signers_file(
-                allowed_signers_path
-            )
-            if signers_success:
-                console.print(f"[green]✓[/green] {signers_msg}")
-            else:
-                console.print(f"[yellow]⚠[/yellow] {signers_msg}")
+            for entry in entries:
+                script_result, msg = install_script(
+                    entry, target_dir, manifest, dry_run=dry_run
+                )
+                if script_result == InstallResult.COLLISION:
+                    console.print(f"[yellow]⚠[/yellow] {msg}")
+                elif script_result in (
+                    InstallResult.INSTALLED,
+                    InstallResult.UPDATED,
+                    InstallResult.ALREADY_SYNCED,
+                ):
+                    console.print(f"[green]✓[/green] {msg}")
+                elif script_result in (
+                    InstallResult.WOULD_INSTALL,
+                    InstallResult.WOULD_UPDATE,
+                ):
+                    console.print(f"[dim]→[/dim] {msg}")
+                elif script_result == InstallResult.SKIPPED_PLATFORM:
+                    pass
+                else:
+                    console.print(f"[red]✗[/red] {msg}")
 
 
 @cli.command()
@@ -648,6 +670,28 @@ def uninstall(shells: list[str] | None, yes: bool) -> None:
             if result != OperationResult.NOT_FOUND:
                 print_operation_result(result, message)
             preferences_results[pref_file.name] = result
+
+    from shell_configs.script_manager import (
+        ScriptManifest,
+        UninstallResult,
+        get_default_manifest_path,
+        get_default_target_dir,
+        uninstall_script,
+    )
+
+    manifest = ScriptManifest(get_default_manifest_path())
+    if manifest.scripts:
+        target_dir = get_default_target_dir()
+        for name in list(manifest.scripts.keys()):
+            script_result, message = uninstall_script(
+                name, target_dir, manifest, force=True
+            )
+            if script_result == UninstallResult.REMOVED:
+                print_operation_result(OperationResult.REMOVED, message)
+            elif script_result == UninstallResult.NOT_FOUND:
+                pass
+            else:
+                print_warning(message)
 
     success_count = sum(1 for r in results.values() if r == OperationResult.REMOVED)
     additional_success_count = sum(
@@ -864,15 +908,52 @@ def status(shells: list[str] | None, profile_name: str | None) -> None:
 
     console.print()
 
-    console.print("[bold cyan]SSH Signing[/bold cyan]\n")
+    console.print("[bold cyan]Scripts[/bold cyan]\n")
 
-    from shell_configs.signing import validate_signing_setup
+    from shell_configs.script_manager import (
+        ScriptManifest,
+        ScriptStatus,
+        discover_scripts,
+        get_default_manifest_path,
+        get_default_target_dir,
+        get_script_status,
+    )
 
-    success, message = validate_signing_setup(auto_fix=False)
-    if success:
-        console.print(f"  [green]✓[/green] {message}")
+    scripts_target = get_default_target_dir()
+    scripts_manifest = ScriptManifest(get_default_manifest_path())
+    script_entries = discover_scripts()
+    scripts_installed = sum(
+        1
+        for e in script_entries
+        if get_script_status(e, scripts_target, scripts_manifest)
+        == ScriptStatus.INSTALLED
+    )
+    scripts_total = len(script_entries)
+    if scripts_total == 0:
+        console.print("  [dim]No scripts available for this platform[/dim]")
+    elif scripts_installed == scripts_total:
+        console.print(
+            f"  [green]✓[/green] {scripts_installed}/{scripts_total} scripts installed (~/.local/bin)"
+        )
     else:
-        console.print(f"  [yellow]⚠[/yellow] {message}")
+        console.print(
+            f"  [yellow]⚠[/yellow] {scripts_installed}/{scripts_total} scripts installed "
+            f"({scripts_total - scripts_installed} missing)"
+        )
+        console.print("  [dim]Run 'shell-configs scripts status' for details[/dim]")
+
+    console.print()
+
+    console.print("[bold cyan]SSH Key Lifecycle[/bold cyan]\n")
+
+    from shell_configs.signing import setup_signing
+
+    signing_results = setup_signing(auto_fix=False, interactive=False)
+    for r in signing_results:
+        if r.success:
+            console.print(f"  [green]✓[/green] {r.message}")
+        else:
+            console.print(f"  [yellow]⚠[/yellow] {r.message}")
 
     console.print()
 
@@ -910,6 +991,37 @@ def diff(shells: list[str] | None, profile_name: str | None) -> None:
     found_diffs = _display_diffs_for_shells(
         selected_shells, config_reader, manager, profile=active_profile
     )
+
+    from shell_configs.display import console
+    from shell_configs.script_manager import (
+        ScriptManifest,
+        ScriptStatus,
+        discover_scripts,
+        get_default_manifest_path,
+        get_default_target_dir,
+        get_script_status,
+    )
+
+    scripts_target = get_default_target_dir()
+    scripts_manifest = ScriptManifest(get_default_manifest_path())
+    out_of_sync = []
+    for entry in discover_scripts():
+        st = get_script_status(entry, scripts_target, scripts_manifest)
+        if st != ScriptStatus.INSTALLED:
+            out_of_sync.append((entry, st))
+
+    if out_of_sync:
+        found_diffs = True
+        console.print("\n[bold cyan]Scripts[/bold cyan]\n")
+        status_labels = {
+            ScriptStatus.MISSING: "[red]not installed[/red]",
+            ScriptStatus.OUTDATED: "[yellow]outdated[/yellow]",
+            ScriptStatus.MODIFIED: "[yellow]modified[/yellow]",
+            ScriptStatus.COLLISION: "[yellow]exists (not ours)[/yellow]",
+        }
+        for entry, st in out_of_sync:
+            label = status_labels.get(st, st.value)
+            console.print(f"  {scripts_target / entry.name}: {label}")
 
     if not found_diffs:
         print_info("All configurations are in sync")
@@ -1015,32 +1127,102 @@ def list_shells() -> None:
 @click.option(
     "--fix",
     is_flag=True,
-    help="Auto-register SSH key if not registered for signing",
+    help="Run full SSH key lifecycle (generate, auth, upload, sign)",
 )
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed key information")
-def signing(fix: bool, verbose: bool) -> None:
-    """Validate SSH signing key is registered with GitHub."""
+@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
+@click.option(
+    "--cleanup",
+    is_flag=True,
+    help="Find and remove stale SSH keys from GitHub",
+)
+def signing(fix: bool, verbose: bool, yes: bool, cleanup: bool) -> None:
+    """Validate and manage SSH key lifecycle with GitHub."""
     from shell_configs.display import console
-    from shell_configs.signing import get_signing_key_info, validate_signing_setup
+    from shell_configs.signing import (
+        get_signing_key_info,
+        setup_signing,
+    )
 
-    success, message = validate_signing_setup(auto_fix=fix)
-    if success:
-        console.print(f"[green]✓[/green] {message}")
+    if cleanup:
+        from rich.prompt import Confirm
 
-        if verbose:
-            info = get_signing_key_info()
-            if info:
-                console.print()
-                console.print("[bold cyan]Signing Key Details[/bold cyan]")
-                console.print(f"  Key type:      {info['key_type']}")
-                console.print(f"  Fingerprint:   {info['fingerprint']}")
-                console.print(f"  GitHub title:  {info['github_title'] or 'N/A'}")
-                console.print(f"  Git name:      {info['git_name']}")
-                console.print(f"  Git email:     {info['git_email']}")
-                if info["comment"]:
-                    console.print(f"  Key comment:   {info['comment']}")
-    else:
-        console.print(f"[red]✗[/red] {message}")
+        from shell_configs.signing import (
+            delete_github_key_by_fingerprint,
+            discover_managed_key,
+            find_local_ssh_keys,
+            find_stale_github_keys,
+            get_github_key_fingerprints,
+        )
+
+        local_keys = find_local_ssh_keys()
+        github_fps = get_github_key_fingerprints()
+        managed_key = discover_managed_key(local_keys, github_fps)
+        if not managed_key:
+            console.print(
+                "[red]✗[/red] Could not determine managed SSH key. "
+                "Run 'shell-configs signing --fix' first"
+            )
+            sys.exit(1)
+
+        stale_keys, current_fp = find_stale_github_keys(managed_key)
+        if not current_fp:
+            console.print("[red]✗[/red] Could not read local SSH key fingerprint")
+            sys.exit(1)
+
+        console.print(f"[dim]Current key fingerprint: {current_fp}[/dim]\n")
+
+        if not stale_keys:
+            console.print("[green]✓[/green] No stale SSH keys found on GitHub")
+            return
+
+        console.print(
+            f"[yellow]Found {len(stale_keys)} stale key(s) on GitHub:[/yellow]\n"
+        )
+        for key in stale_keys:
+            console.print(f"  {key.title}  {key.key_type}  {key.fingerprint}")
+        console.print()
+
+        for key in stale_keys:
+            if yes or Confirm.ask(
+                f"Remove '{key.title}' ({key.fingerprint})?", default=False
+            ):
+                ok, msg = delete_github_key_by_fingerprint(key.fingerprint)
+                if ok:
+                    console.print(f"[green]✓[/green] {msg}")
+                else:
+                    console.print(f"[red]✗[/red] {msg}")
+            else:
+                console.print(f"[dim]Skipped: {key.title}[/dim]")
+        return
+
+    interactive = sys.stdin.isatty() if not yes else False
+    results = setup_signing(auto_fix=fix, interactive=interactive)
+
+    has_failure = False
+    for r in results:
+        if r.skipped:
+            console.print(f"[yellow]⚠[/yellow] {r.message}")
+        elif r.success:
+            console.print(f"[green]✓[/green] {r.message}")
+        else:
+            console.print(f"[red]✗[/red] {r.message}")
+            has_failure = True
+
+    if verbose and not has_failure:
+        info = get_signing_key_info()
+        if info:
+            console.print()
+            console.print("[bold cyan]Signing Key Details[/bold cyan]")
+            console.print(f"  Key type:      {info['key_type']}")
+            console.print(f"  Fingerprint:   {info['fingerprint']}")
+            console.print(f"  GitHub title:  {info['github_title'] or 'N/A'}")
+            console.print(f"  Git name:      {info['git_name']}")
+            console.print(f"  Git email:     {info['git_email']}")
+            if info["comment"]:
+                console.print(f"  Key comment:   {info['comment']}")
+
+    if has_failure:
         sys.exit(1)
 
 
@@ -1375,6 +1557,7 @@ def info() -> None:
 )
 @click.option("--skip-completions", is_flag=True, help="Skip shell completion setup")
 @click.option("--skip-packages", is_flag=True, help="Skip package installation")
+@click.option("--skip-scripts", is_flag=True, help="Skip utility script installation")
 @click.pass_context
 def setup(
     ctx: click.Context,
@@ -1383,6 +1566,7 @@ def setup(
     shells: list[str] | None,
     skip_completions: bool,
     skip_packages: bool,
+    skip_scripts: bool,
 ) -> None:
     """One-command setup for shell-configs.
 
@@ -1395,6 +1579,7 @@ def setup(
 
     from shell_configs.bootstrap.installer import (
         get_tool_config_dir,
+        get_tool_scripts_dir,
         install_tool,
         make_github_install_url,
     )
@@ -1411,14 +1596,14 @@ def setup(
     from shell_configs.display import console
 
     if not skip_packages:
-        console.print("\n[bold cyan]Step 1/4: Install required packages[/bold cyan]")
+        console.print("\n[bold cyan]Step 1/5: Install required packages[/bold cyan]")
         console.print(
             "[dim]Installing system packages needed by shell configurations.[/dim]\n"
         )
         ctx.invoke(packages_install, dry_run=dry_run, yes=yes)
 
     console.print(
-        "\n[bold cyan]Step 2/4: Install shell-configs system-wide[/bold cyan]"
+        "\n[bold cyan]Step 2/5: Install shell-configs system-wide[/bold cyan]"
     )
     console.print(
         "[dim]This allows you to run 'shell-configs' from any directory.[/dim]\n"
@@ -1497,7 +1682,7 @@ def setup(
     config_dir = get_tool_config_dir("shell-configs") if not dry_run else None
 
     console.print(
-        "\n[bold cyan]Step 3/4: Installing shell configurations[/bold cyan]\n"
+        "\n[bold cyan]Step 3/5: Installing shell configurations[/bold cyan]\n"
     )
 
     ctx.invoke(
@@ -1509,7 +1694,7 @@ def setup(
     )
 
     if not skip_completions:
-        console.print("\n[bold cyan]Step 4/4: Shell completion setup[/bold cyan]\n")
+        console.print("\n[bold cyan]Step 4/5: Shell completion setup[/bold cyan]\n")
 
         shell = detect_shell()
         if shell is None:
@@ -1534,6 +1719,46 @@ def setup(
                     console.print(f"[green]✓[/green] {message}")
                 else:
                     console.print(f"[yellow]⚠[/yellow] {message}")
+
+    if not skip_scripts:
+        console.print("\n[bold cyan]Step 5/5: Install utility scripts[/bold cyan]")
+        console.print("[dim]Installing utility scripts to ~/.local/bin.[/dim]\n")
+        scripts_source = get_tool_scripts_dir("shell-configs") if not dry_run else None
+        if scripts_source and scripts_source.exists():
+            from shell_configs.script_manager import (
+                InstallResult,
+                ScriptManifest,
+                discover_scripts,
+                get_default_manifest_path,
+                get_default_target_dir,
+                install_script,
+            )
+
+            target_dir = get_default_target_dir()
+            manifest = ScriptManifest(get_default_manifest_path())
+            for entry in discover_scripts(source_dir=scripts_source):
+                result, message = install_script(
+                    entry,
+                    target_dir,
+                    manifest,
+                    dry_run=dry_run,
+                    source_dir=scripts_source,
+                )
+                if result in (
+                    InstallResult.INSTALLED,
+                    InstallResult.UPDATED,
+                    InstallResult.ALREADY_SYNCED,
+                ):
+                    console.print(f"[green]✓[/green] {message}")
+                elif result == InstallResult.COLLISION:
+                    console.print(f"[yellow]⚠[/yellow] {message}")
+                elif result in (
+                    InstallResult.WOULD_INSTALL,
+                    InstallResult.WOULD_UPDATE,
+                ):
+                    console.print(f"[dim]→[/dim] {message}")
+        else:
+            ctx.invoke(scripts_install, dry_run=dry_run, yes=yes)
 
     if dry_run:
         console.print("\n[dim]Dry run complete - no changes were made.[/dim]")
@@ -2118,6 +2343,204 @@ def completions_status() -> None:
 
     console.print(table)
     console.print("\n[dim]To install: shell-configs completions install[/dim]")
+
+
+@cli.group()
+def scripts() -> None:
+    """Manage utility scripts distributed by shell-configs."""
+    pass
+
+
+@scripts.command(name="install")
+@click.option("--dry-run", is_flag=True, help="Show what would be installed")
+@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
+def scripts_install(dry_run: bool, yes: bool) -> None:
+    """Install utility scripts to ~/.local/bin."""
+    from rich.prompt import Confirm
+
+    from shell_configs.display import console
+    from shell_configs.script_manager import (
+        InstallResult,
+        ScriptManifest,
+        discover_scripts,
+        get_default_manifest_path,
+        get_default_target_dir,
+        install_script,
+    )
+
+    target_dir = get_default_target_dir()
+    manifest = ScriptManifest(get_default_manifest_path())
+    entries = discover_scripts()
+
+    if not entries:
+        console.print("[yellow]No scripts available for this platform[/yellow]")
+        return
+
+    if not dry_run and not yes:
+        console.print(
+            f"[bold]Will install {len(entries)} script(s) to {target_dir}[/bold]\n"
+        )
+        for entry in entries:
+            console.print(f"  {entry.name}")
+        console.print()
+        if not Confirm.ask("Proceed?", default=True):
+            console.print("[dim]Cancelled[/dim]")
+            return
+
+    collisions = []
+    for entry in entries:
+        result, message = install_script(entry, target_dir, manifest, dry_run=dry_run)
+        if result == InstallResult.COLLISION:
+            console.print(f"[yellow]⚠[/yellow] {message}")
+            collisions.append(entry.name)
+        elif result == InstallResult.ALREADY_SYNCED:
+            console.print(f"[green]✓[/green] {message}")
+        elif result in (InstallResult.INSTALLED, InstallResult.UPDATED):
+            console.print(f"[green]✓[/green] {message}")
+        elif result in (InstallResult.WOULD_INSTALL, InstallResult.WOULD_UPDATE):
+            console.print(f"[dim]→[/dim] {message}")
+        elif result == InstallResult.SKIPPED_PLATFORM:
+            pass
+        else:
+            console.print(f"[red]✗[/red] {message}")
+
+    if collisions:
+        console.print(
+            f"\n[yellow]⚠ {len(collisions)} collision(s) skipped. "
+            "Remove the existing file(s) first, then re-run install.[/yellow]"
+        )
+
+
+@scripts.command(name="uninstall")
+@click.option("--dry-run", is_flag=True, help="Show what would be removed")
+@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
+@click.option("--force", is_flag=True, help="Remove even user-modified scripts")
+def scripts_uninstall(dry_run: bool, yes: bool, force: bool) -> None:
+    """Remove shell-configs-managed scripts from ~/.local/bin."""
+    from rich.prompt import Confirm
+
+    from shell_configs.display import console
+    from shell_configs.script_manager import (
+        ScriptManifest,
+        UninstallResult,
+        get_default_manifest_path,
+        get_default_target_dir,
+        uninstall_script,
+    )
+
+    manifest = ScriptManifest(get_default_manifest_path())
+    target_dir = get_default_target_dir()
+
+    if not manifest.scripts:
+        console.print("[dim]No scripts installed by shell-configs[/dim]")
+        return
+
+    names = list(manifest.scripts.keys())
+
+    if not dry_run and not yes:
+        console.print(
+            f"[bold]Will uninstall {len(names)} script(s) from {target_dir}[/bold]\n"
+        )
+        for name in names:
+            console.print(f"  {name}")
+        console.print()
+        if not Confirm.ask("Proceed?", default=True):
+            console.print("[dim]Cancelled[/dim]")
+            return
+
+    for name in names:
+        result, message = uninstall_script(
+            name, target_dir, manifest, force=force, dry_run=dry_run
+        )
+        if result == UninstallResult.REMOVED:
+            console.print(f"[green]✓[/green] {message}")
+        elif result == UninstallResult.WOULD_REMOVE:
+            console.print(f"[dim]→[/dim] {message}")
+        elif result == UninstallResult.MODIFIED:
+            console.print(f"[yellow]⚠[/yellow] {message}")
+        elif result == UninstallResult.NOT_FOUND:
+            console.print(f"[dim]-[/dim] {message}")
+        else:
+            console.print(f"[red]✗[/red] {message}")
+
+
+@scripts.command(name="status")
+def scripts_status() -> None:
+    """Show installation status of managed scripts."""
+    from rich.table import Table
+
+    from shell_configs.display import console
+    from shell_configs.script_manager import (
+        ScriptManifest,
+        ScriptStatus,
+        discover_scripts,
+        get_default_manifest_path,
+        get_default_target_dir,
+        get_script_status,
+    )
+
+    target_dir = get_default_target_dir()
+    manifest = ScriptManifest(get_default_manifest_path())
+
+    table = Table(show_header=True)
+    table.add_column("Script")
+    table.add_column("Status")
+
+    status_icons = {
+        ScriptStatus.INSTALLED: "[green]✓[/green]",
+        ScriptStatus.OUTDATED: "[yellow]↑[/yellow]",
+        ScriptStatus.MODIFIED: "[yellow]✎[/yellow]",
+        ScriptStatus.MISSING: "[red]✗[/red]",
+        ScriptStatus.COLLISION: "[yellow]⚠[/yellow]",
+        ScriptStatus.SKIPPED_PLATFORM: "[dim]-[/dim]",
+    }
+
+    for entry in discover_scripts(include_all=True):
+        status = get_script_status(entry, target_dir, manifest)
+        icon = status_icons.get(status, "?")
+        label = status.value
+        if status == ScriptStatus.COLLISION:
+            label = "exists (not ours)"
+        elif status == ScriptStatus.SKIPPED_PLATFORM:
+            label = "other platform"
+        table.add_row(entry.name, f"{icon} {label}")
+
+    console.print("[bold cyan]Script Status[/bold cyan]\n")
+    console.print(table)
+    console.print(f"\n[dim]Target directory: {target_dir}[/dim]")
+
+
+@scripts.command(name="list")
+@click.option(
+    "--all", "include_all", is_flag=True, help="Show scripts for all platforms"
+)
+def scripts_list(include_all: bool) -> None:
+    """List available scripts."""
+    from rich.table import Table
+
+    from shell_configs.display import console
+    from shell_configs.platform import detect_platform
+    from shell_configs.script_manager import discover_scripts
+
+    current = detect_platform()
+    entries = discover_scripts(include_all=include_all)
+
+    table = Table(show_header=True)
+    table.add_column("Script")
+    table.add_column("Platforms")
+
+    for entry in entries:
+        platforms = ", ".join(
+            p.display_name for p in sorted(entry.platforms, key=lambda p: p.value)
+        )
+        table.add_row(entry.name, platforms)
+
+    console.print("[bold cyan]Available Scripts[/bold cyan]\n")
+    console.print(table)
+    if not include_all:
+        console.print(
+            f"\n[dim]Showing scripts for {current.display_name}. Use --all to see all.[/dim]"
+        )
 
 
 def main() -> None:

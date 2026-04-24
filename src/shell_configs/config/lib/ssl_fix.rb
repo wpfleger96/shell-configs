@@ -22,11 +22,11 @@
 #     bundlessl exec rake task
 #
 #   Option 2 - Direct with environment variable (if $SHELL_CONFIGS_DIR is set):
-#     RUBYOPT="-r $SHELL_CONFIGS_DIR/script/ssl_fix.rb" ruby script.rb
-#     RUBYOPT="-r $SHELL_CONFIGS_DIR/script/ssl_fix.rb" bundle exec ruby script.rb
+#     RUBYOPT="-r $SHELL_CONFIGS_DIR/lib/ssl_fix.rb" ruby script.rb
+#     RUBYOPT="-r $SHELL_CONFIGS_DIR/lib/ssl_fix.rb" bundle exec ruby script.rb
 #
 #   Option 3 - Require in script (if you know the absolute path):
-#     require '/path/to/shell_configs/config/script/ssl_fix.rb'
+#     require '/path/to/shell_configs/config/lib/ssl_fix.rb'
 #
 
 require 'openssl'
