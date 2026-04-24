@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v0.26.1 (2026-04-24)
+
+### Bug Fixes
+
+- Terminal title persisting after Claude Code exit, add iTerm2 support
+  ([`4467d78`](https://github.com/wpfleger96/shell-configs/commit/4467d78b3e514fe6bb0bd8421a0da59a1b664202))
+
+VS Code ignores empty OSC 2 sequences because empty string is falsy in JS (microsoft/vscode#312403).
+  The precmd hook now emits the shell name via OSC 0 instead, which also sets iTerm2 tab titles (OSC
+  2 was window only). TERM_PROGRAM gate broadened from hardcoded allowlist to existence check.
+  iTerm2 profile updated to allow title setting and disable profile name prepending.
+
+### Refactoring
+
+- Add github_repo to ToolSpec, remove global constant from cli
+  ([`b7b605b`](https://github.com/wpfleger96/shell-configs/commit/b7b605b5f5d314e16ff29a97d3f5673a49cf5822))
+
+check_tool_updates() hardcoded the module-level GITHUB_REPO constant instead of reading it from the
+  ToolSpec it was passed, forcing cli.py to separately import and reconstruct the URL at three call
+  sites. ToolSpec now carries its own github_repo field.
+
+
 ## v0.26.0 (2026-04-23)
 
 ### Features
