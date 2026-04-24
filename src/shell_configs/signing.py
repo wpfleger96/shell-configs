@@ -143,7 +143,7 @@ def ensure_gh_scopes(
         scopes = ["admin:public_key", "admin:ssh_signing_key"]
 
     test_result = _run(
-        ["gh", "ssh-key", "list", "--limit", "100"],
+        ["gh", "ssh-key", "list"],
         capture_output=True,
         text=True,
         timeout=30,
@@ -177,7 +177,7 @@ def upload_auth_key(key_path: Path) -> tuple[bool, str]:
     pub_key_data = pub_parts[1] if len(pub_parts) >= 2 else ""
 
     existing = _run(
-        ["gh", "ssh-key", "list", "--limit", "100"],
+        ["gh", "ssh-key", "list"],
         capture_output=True,
         text=True,
         timeout=30,
@@ -221,7 +221,7 @@ def find_stale_github_keys(
         return [], None
 
     result = _run(
-        ["gh", "ssh-key", "list", "--limit", "100"],
+        ["gh", "ssh-key", "list"],
         capture_output=True,
         text=True,
         timeout=30,
@@ -331,7 +331,7 @@ def get_github_key_fingerprints() -> set[str]:
     if not shutil.which("gh"):
         return set()
     result = _run(
-        ["gh", "ssh-key", "list", "--limit", "100"],
+        ["gh", "ssh-key", "list"],
         capture_output=True,
         text=True,
         timeout=30,
@@ -638,7 +638,7 @@ def _validate_all_steps(key_path: Path | None) -> list[StepResult]:
                 pub_key_data = parts[1]
 
         existing = _run(
-            ["gh", "ssh-key", "list", "--limit", "100"],
+            ["gh", "ssh-key", "list"],
             capture_output=True,
             text=True,
             timeout=30,
@@ -705,7 +705,7 @@ def get_github_signing_keys() -> list[str]:
         return []
 
     result = _run(
-        ["gh", "ssh-key", "list", "--limit", "100"],
+        ["gh", "ssh-key", "list"],
         capture_output=True,
         text=True,
         timeout=30,
