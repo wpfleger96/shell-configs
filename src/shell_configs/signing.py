@@ -11,8 +11,21 @@ import subprocess
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from shell_configs.platform import detect_platform
+
+
+def _run(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(*args, **kwargs)  # noqa: S603
+    except subprocess.TimeoutExpired:
+        cmd = args[0] if args else kwargs.get("args", [])
+        timeout = kwargs.get("timeout", "?")
+        return subprocess.CompletedProcess(
+            cmd, returncode=1, stdout="", stderr=f"Command timed out after {timeout}s"
+        )
+
 
 DEFAULT_GENERATION_PATH = Path.home() / ".ssh" / "id_ed25519"
 
@@ -50,7 +63,7 @@ def generate_ssh_key(
         "",
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    result = _run(cmd, capture_output=True, text=True, timeout=30)
     if result.returncode != 0:
         return False, f"ssh-keygen failed: {result.stderr.strip()}"
 
@@ -75,9 +88,7 @@ def ensure_ssh_agent(key_path: Path) -> tuple[bool, str, str | None]:
     pub_key = pub_path.read_text().strip()
     key_data = pub_key.split()[1] if len(pub_key.split()) >= 2 else ""
 
-    result = subprocess.run(
-        ["ssh-add", "-L"], capture_output=True, text=True, timeout=10
-    )
+    result = _run(["ssh-add", "-L"], capture_output=True, text=True, timeout=10)
 
     if result.returncode == 2:
         return (
@@ -89,13 +100,11 @@ def ensure_ssh_agent(key_path: Path) -> tuple[bool, str, str | None]:
     if result.returncode == 0 and key_data and key_data in result.stdout:
         return True, "SSH key is loaded in ssh-agent", pub_key
 
-    add_result = subprocess.run(
-        ["ssh-add", str(key_path)], capture_output=True, text=True, timeout=10
-    )
+    add_result = _run(["ssh-add", str(key_path)], timeout=30)
     if add_result.returncode != 0:
         return (
             False,
-            f"Failed to add key to ssh-agent: {add_result.stderr.strip()}",
+            "Failed to add key to ssh-agent",
             None,
         )
 
@@ -110,9 +119,7 @@ def ensure_gh_auth(interactive: bool = True) -> tuple[bool, str]:
             "GitHub CLI (gh) not installed - run 'shell-configs packages install'",
         )
 
-    auth_check = subprocess.run(
-        ["gh", "auth", "status"], capture_output=True, timeout=10
-    )
+    auth_check = _run(["gh", "auth", "status"], capture_output=True, timeout=10)
     if auth_check.returncode == 0:
         return True, "GitHub CLI is authenticated"
 
@@ -122,7 +129,7 @@ def ensure_gh_auth(interactive: bool = True) -> tuple[bool, str]:
             "GitHub CLI not authenticated. Run 'shell-configs signing --fix' in an interactive terminal",
         )
 
-    login_result = subprocess.run(["gh", "auth", "login"], timeout=120)
+    login_result = _run(["gh", "auth", "login"], timeout=120)
     if login_result.returncode == 0:
         return True, "GitHub CLI authenticated successfully"
     return False, "GitHub CLI authentication failed"
@@ -135,8 +142,11 @@ def ensure_gh_scopes(
     if scopes is None:
         scopes = ["admin:public_key", "admin:ssh_signing_key"]
 
-    test_result = subprocess.run(
-        ["gh", "ssh-key", "list"], capture_output=True, text=True, timeout=30
+    test_result = _run(
+        ["gh", "ssh-key", "list", "--limit", "100"],
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     if test_result.returncode == 0:
         return True, "Required OAuth scopes are present"
@@ -148,7 +158,7 @@ def ensure_gh_scopes(
         )
 
     scopes_arg = ",".join(scopes)
-    refresh_result = subprocess.run(
+    refresh_result = _run(
         ["gh", "auth", "refresh", "-h", "github.com", "-s", scopes_arg],
         timeout=120,
     )
@@ -166,14 +176,17 @@ def upload_auth_key(key_path: Path) -> tuple[bool, str]:
     pub_parts = pub_path.read_text().strip().split()
     pub_key_data = pub_parts[1] if len(pub_parts) >= 2 else ""
 
-    existing = subprocess.run(
-        ["gh", "ssh-key", "list"], capture_output=True, text=True, timeout=30
+    existing = _run(
+        ["gh", "ssh-key", "list", "--limit", "100"],
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     if existing.returncode == 0 and pub_key_data and pub_key_data in existing.stdout:
         return True, "SSH auth key already uploaded to GitHub"
 
     title = socket.gethostname()
-    add_result = subprocess.run(
+    add_result = _run(
         ["gh", "ssh-key", "add", str(pub_path), "--title", title],
         capture_output=True,
         text=True,
@@ -207,8 +220,11 @@ def find_stale_github_keys(
     if not current_fp:
         return [], None
 
-    result = subprocess.run(
-        ["gh", "ssh-key", "list"], capture_output=True, text=True, timeout=30
+    result = _run(
+        ["gh", "ssh-key", "list", "--limit", "100"],
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     if result.returncode != 0:
         return [], current_fp
@@ -245,7 +261,7 @@ def delete_github_key_by_fingerprint(fingerprint: str) -> tuple[bool, str]:
     Uses `gh api` to find the key ID by fingerprint, then deletes it.
     """
     for endpoint in ["/user/keys", "/user/ssh_signing_keys"]:
-        list_result = subprocess.run(
+        list_result = _run(
             ["gh", "api", endpoint, "--paginate"],
             capture_output=True,
             text=True,
@@ -266,7 +282,7 @@ def delete_github_key_by_fingerprint(fingerprint: str) -> tuple[bool, str]:
             key_fp = get_key_fingerprint(key_str)
             if key_fp == fingerprint:
                 key_id = key_obj.get("id")
-                delete_result = subprocess.run(
+                delete_result = _run(
                     ["gh", "api", "-X", "DELETE", f"{endpoint}/{key_id}"],
                     capture_output=True,
                     text=True,
@@ -294,7 +310,7 @@ def find_local_ssh_keys() -> list[Path]:
 
 def get_key_fingerprint_from_pub(pub_path: Path) -> str | None:
     """Get SHA256 fingerprint of a .pub key file."""
-    result = subprocess.run(
+    result = _run(
         ["ssh-keygen", "-lf", str(pub_path)],
         capture_output=True,
         text=True,
@@ -314,8 +330,11 @@ def get_github_key_fingerprints() -> set[str]:
     """
     if not shutil.which("gh"):
         return set()
-    result = subprocess.run(
-        ["gh", "ssh-key", "list"], capture_output=True, text=True, timeout=30
+    result = _run(
+        ["gh", "ssh-key", "list", "--limit", "100"],
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     if result.returncode != 0:
         return set()
@@ -618,8 +637,11 @@ def _validate_all_steps(key_path: Path | None) -> list[StepResult]:
             if len(parts) >= 2:
                 pub_key_data = parts[1]
 
-        existing = subprocess.run(
-            ["gh", "ssh-key", "list"], capture_output=True, text=True, timeout=30
+        existing = _run(
+            ["gh", "ssh-key", "list", "--limit", "100"],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         has_auth_key = False
         has_signing_key = False
@@ -671,9 +693,7 @@ def get_signing_key_title() -> str:
 
 def get_agent_keys() -> list[str]:
     """Get SSH public keys from ssh-agent."""
-    result = subprocess.run(
-        ["ssh-add", "-L"], capture_output=True, text=True, timeout=10
-    )
+    result = _run(["ssh-add", "-L"], capture_output=True, text=True, timeout=10)
     if result.returncode != 0:
         return []
     return [line.strip() for line in result.stdout.strip().split("\n") if line.strip()]
@@ -684,8 +704,8 @@ def get_github_signing_keys() -> list[str]:
     if not shutil.which("gh"):
         return []
 
-    result = subprocess.run(
-        ["gh", "ssh-key", "list"],
+    result = _run(
+        ["gh", "ssh-key", "list", "--limit", "100"],
         capture_output=True,
         text=True,
         timeout=30,
@@ -718,7 +738,7 @@ def key_is_registered(agent_key: str, github_keys: list[str]) -> bool:
 
 def get_key_fingerprint(key: str) -> str:
     """Get SHA256 fingerprint of an SSH key."""
-    result = subprocess.run(
+    result = _run(
         ["ssh-keygen", "-lf", "-"],
         input=key,
         capture_output=True,
@@ -749,7 +769,7 @@ def register_signing_key(key: str, auto_refresh_scope: bool = True) -> tuple[boo
             if len(parts) >= 2 and key_data in parts[1]:
                 return True, "SSH signing key already registered with GitHub"
 
-    result = subprocess.run(
+    result = _run(
         [
             "gh",
             "api",
@@ -769,7 +789,7 @@ def register_signing_key(key: str, auto_refresh_scope: bool = True) -> tuple[boo
     error_msg = result.stderr.strip()
 
     if auto_refresh_scope and "admin:ssh_signing_key" in error_msg:
-        refresh_result = subprocess.run(
+        refresh_result = _run(
             [
                 "gh",
                 "auth",
@@ -783,7 +803,7 @@ def register_signing_key(key: str, auto_refresh_scope: bool = True) -> tuple[boo
         )
 
         if refresh_result.returncode == 0:
-            retry_result = subprocess.run(
+            retry_result = _run(
                 [
                     "gh",
                     "api",
@@ -883,14 +903,14 @@ def get_signing_key_info() -> dict[str, str] | None:
                         github_title = gh_key.split("\t")[0]
                         break
 
-            git_name = subprocess.run(
+            git_name = _run(
                 ["git", "config", "user.name"],
                 capture_output=True,
                 text=True,
                 timeout=5,
             ).stdout.strip()
 
-            git_email = subprocess.run(
+            git_email = _run(
                 ["git", "config", "user.email"],
                 capture_output=True,
                 text=True,

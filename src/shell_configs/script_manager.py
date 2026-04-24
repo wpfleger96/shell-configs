@@ -162,13 +162,13 @@ def _load_platform_exceptions(
     for script_name, table in data.items():
         if not isinstance(table, dict):
             continue
+        raw_platforms = table.get("platforms", [])
         platforms = frozenset(
-            _PLATFORM_NAMES[p]
-            for p in table.get("platforms", [])
-            if p in _PLATFORM_NAMES
+            _PLATFORM_NAMES[p] for p in raw_platforms if p in _PLATFORM_NAMES
         )
-        if platforms:
-            result[script_name] = platforms
+        if raw_platforms and not platforms:
+            logger.warning("Unknown platforms for %s: %s", script_name, raw_platforms)
+        result[script_name] = platforms
     return result
 
 
@@ -197,8 +197,18 @@ def discover_scripts(
     root = source_dir if source_dir is not None else files("shell_configs.scripts")
     entries = _walk_tree(root)
 
+    seen: dict[str, str] = {}
     scripts: list[DiscoveredScript] = []
     for name, rel_path in entries:
+        if name in seen:
+            logger.warning(
+                "Script name collision: %s and %s both resolve to '%s'",
+                seen[name],
+                rel_path,
+                name,
+            )
+            continue
+        seen[name] = rel_path
         platforms = exceptions.get(name, _ALL_PLATFORMS)
         if not include_all and current_platform not in platforms:
             continue
@@ -232,12 +242,15 @@ def get_script_status(
 
     target = target_dir / script.name
 
-    if not target.exists():
+    if not target.exists() and not target.is_symlink():
         if script.name in manifest.scripts:
             manifest.remove(script.name)
         return ScriptStatus.MISSING
 
     if script.name not in manifest.scripts:
+        return ScriptStatus.COLLISION
+
+    if not target.is_file():
         return ScriptStatus.COLLISION
 
     try:
@@ -283,13 +296,15 @@ def install_script(
     source_hash = _hash_bytes(source_bytes)
     target = target_dir / script.name
 
-    if target.exists() and script.name not in manifest.scripts:
+    target_present = target.exists() or target.is_symlink()
+
+    if target_present and script.name not in manifest.scripts:
         return (
             InstallResult.COLLISION,
             f"{script.name}: already exists in {target_dir} and wasn't installed by shell-configs",
         )
 
-    if target.exists() and script.name in manifest.scripts:
+    if target_present and script.name in manifest.scripts:
         installed_hash = _hash_bytes(target.read_bytes())
         if installed_hash == source_hash:
             return InstallResult.ALREADY_SYNCED, f"{script.name}: already up to date"
@@ -331,7 +346,7 @@ def uninstall_script(
 ) -> tuple[UninstallResult, str]:
     target = target_dir / name
 
-    if not target.exists():
+    if not target.exists() and not target.is_symlink():
         manifest.remove(name)
         manifest.save()
         return UninstallResult.NOT_FOUND, f"{name}: not found in {target_dir}"
@@ -339,7 +354,7 @@ def uninstall_script(
     if name not in manifest.scripts:
         return UninstallResult.NOT_OURS, f"{name}: not installed by shell-configs"
 
-    current_hash = _hash_bytes(target.read_bytes())
+    current_hash = _hash_bytes(target.read_bytes()) if target.is_file() else ""
     recorded_hash = manifest.scripts[name].source_hash
     if current_hash != recorded_hash and not force:
         return (
