@@ -1,6 +1,110 @@
 # CHANGELOG
 
 
+## v0.28.0 (2026-04-29)
+
+### Chores
+
+- **deps**: Update click requirement from >=8.1 to >=8.3.3
+  ([#7](https://github.com/wpfleger96/shell-configs/pull/7),
+  [`c9068ed`](https://github.com/wpfleger96/shell-configs/commit/c9068ed411cbf54fb7ebe3020eb969a7e42ab083))
+
+Updates the requirements on [click](https://github.com/pallets/click) to permit the latest version.
+  - [Release notes](https://github.com/pallets/click/releases) -
+  [Changelog](https://github.com/pallets/click/blob/main/CHANGES.rst) -
+  [Commits](https://github.com/pallets/click/compare/8.1.0...8.3.3)
+
+--- updated-dependencies: - dependency-name: click dependency-version: 8.3.3
+
+dependency-type: direct:production ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **deps**: Update packaging requirement from >=21.0 to >=26.2
+  ([#3](https://github.com/wpfleger96/shell-configs/pull/3),
+  [`a4a1c7e`](https://github.com/wpfleger96/shell-configs/commit/a4a1c7e77b27f9b7c763d74f582f12c99ef0c49b))
+
+Updates the requirements on [packaging](https://github.com/pypa/packaging) to permit the latest
+  version. - [Release notes](https://github.com/pypa/packaging/releases) -
+  [Changelog](https://github.com/pypa/packaging/blob/main/CHANGELOG.rst) -
+  [Commits](https://github.com/pypa/packaging/compare/21.0...26.2)
+
+--- updated-dependencies: - dependency-name: packaging dependency-version: '26.2'
+
+dependency-type: direct:production ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **deps**: Update pyyaml requirement from >=6.0 to >=6.0.3
+  ([#6](https://github.com/wpfleger96/shell-configs/pull/6),
+  [`f0663ac`](https://github.com/wpfleger96/shell-configs/commit/f0663acc22b5318a7b2475c6c8be5305b6c850d2))
+
+Updates the requirements on [pyyaml](https://github.com/yaml/pyyaml) to permit the latest version. -
+  [Release notes](https://github.com/yaml/pyyaml/releases) -
+  [Changelog](https://github.com/yaml/pyyaml/blob/6.0.3/CHANGES) -
+  [Commits](https://github.com/yaml/pyyaml/compare/6.0...6.0.3)
+
+--- updated-dependencies: - dependency-name: pyyaml dependency-version: 6.0.3
+
+dependency-type: direct:production ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **deps**: Update rich requirement from >=13.0 to >=15.0.0
+  ([#4](https://github.com/wpfleger96/shell-configs/pull/4),
+  [`857eb35`](https://github.com/wpfleger96/shell-configs/commit/857eb35a1c494e4d18f4d9421b7c1e96b5903b3c))
+
+Updates the requirements on [rich](https://github.com/Textualize/rich) to permit the latest version.
+  - [Release notes](https://github.com/Textualize/rich/releases) -
+  [Changelog](https://github.com/Textualize/rich/blob/master/CHANGELOG.md) -
+  [Commits](https://github.com/Textualize/rich/compare/v13.0.0...v15.0.0)
+
+--- updated-dependencies: - dependency-name: rich dependency-version: 15.0.0
+
+dependency-type: direct:production ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **deps-dev**: Update mypy requirement from >=1.18.2 to >=1.20.2
+  ([#5](https://github.com/wpfleger96/shell-configs/pull/5),
+  [`bb9a32a`](https://github.com/wpfleger96/shell-configs/commit/bb9a32a6fc3b342fabb71dccb9965095e9443a64))
+
+Updates the requirements on [mypy](https://github.com/python/mypy) to permit the latest version. -
+  [Changelog](https://github.com/python/mypy/blob/master/CHANGELOG.md) -
+  [Commits](https://github.com/python/mypy/compare/v1.18.2...v1.20.2)
+
+--- updated-dependencies: - dependency-name: mypy dependency-version: 1.20.2
+
+dependency-type: direct:development ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+### Features
+
+- Add IDE extension management for VSCode and Cursor
+  ([`65d6d07`](https://github.com/wpfleger96/shell-configs/commit/65d6d072e655c91033ba72ef83bd42e5fe5d224f))
+
+VSCode and Cursor extensions drift across machines with no way to reconcile. Cursor has no built-in
+  Settings Sync, making external management the only option. This adds declarative extension lists
+  with the same layered merge strategy used for settings.json (shared base + IDE-specific + profile
+  overrides).
+
+New `shell-configs extensions` subcommand group with status, diff, install (with --prune), and
+  export commands. Extensions section integrated into `shell-configs status`. Builtin extensions
+  like Cursor's anysphere.cursorpyright are excluded from diff/export to prevent config poisoning on
+  re-import.
+
+
 ## v0.27.0 (2026-04-24)
 
 ### Features
