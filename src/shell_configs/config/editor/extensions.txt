@@ -1,0 +1,15 @@
+# Shared IDE extensions (both VSCode and Cursor)
+
+# Languages
+golang.go
+ms-python.debugpy
+ms-python.python
+rust-lang.rust-analyzer
+shopify.ruby-lsp
+
+# Infrastructure
+hashicorp.terraform
+ms-vscode.makefile-tools
+
+# Utilities
+tomoki1207.pdf

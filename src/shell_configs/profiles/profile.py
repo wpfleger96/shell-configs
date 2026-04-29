@@ -21,6 +21,9 @@ class Profile:
     # Package list modifications: {"add": ["pkg"], "remove": ["pkg"]}
     packages: dict[str, list[str]] = field(default_factory=dict)
 
+    # Per-shell extension overrides: {"vscode": {"add": ["ext"], "remove": ["ext"]}}
+    extensions: dict[str, dict[str, list[str]]] = field(default_factory=dict)
+
 
 class ProfileError(Exception):
     """Base exception for profile-related errors."""

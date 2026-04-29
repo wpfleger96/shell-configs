@@ -80,6 +80,7 @@ class ProfileLoader:
             settings_overrides=data.get("settings_overrides", {}),
             shell_overrides=data.get("shell_overrides", {}),
             packages=data.get("packages", {}),
+            extensions=data.get("extensions", {}),
         )
 
     def resolve_profile(self, name: str) -> Profile:
@@ -147,6 +148,29 @@ class ProfileLoader:
         if merged_remove:
             merged_packages["remove"] = merged_remove
 
+        merged_extensions: dict[str, dict[str, list[str]]] = {}
+        all_shell_names = set(parent.extensions) | set(child.extensions)
+        for shell_name in all_shell_names:
+            p_ext = parent.extensions.get(shell_name, {})
+            c_ext = child.extensions.get(shell_name, {})
+
+            p_add = [e.lower() for e in p_ext.get("add", [])]
+            c_add = [e.lower() for e in c_ext.get("add", [])]
+            p_rm = [e.lower() for e in p_ext.get("remove", [])]
+            c_rm = [e.lower() for e in c_ext.get("remove", [])]
+
+            ext_add = list(dict.fromkeys(p_add + c_add))
+            ext_rm = list(dict.fromkeys(p_rm + c_rm))
+            ext_add = [e for e in ext_add if e not in set(ext_rm)]
+
+            shell_ext: dict[str, list[str]] = {}
+            if ext_add:
+                shell_ext["add"] = ext_add
+            if ext_rm:
+                shell_ext["remove"] = ext_rm
+            if shell_ext:
+                merged_extensions[shell_name] = shell_ext
+
         return Profile(
             name=child.name,
             description=child.description,
@@ -154,4 +178,5 @@ class ProfileLoader:
             settings_overrides=merged_settings,
             shell_overrides=merged_shell,
             packages=merged_packages,
+            extensions=merged_extensions,
         )

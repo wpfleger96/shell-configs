@@ -35,6 +35,16 @@ class VSCodeShell(Shell):
         else:
             return Path.home() / ".config" / "Code" / "User"
 
+    def get_extension_cli(self) -> str | None:
+        return "code"
+
+    def get_extension_list_paths(self) -> list[Path]:
+        config_dir = get_config_dir()
+        return [
+            config_dir / "editor" / "extensions.txt",
+            config_dir / "vscode" / "extensions.txt",
+        ]
+
     def get_config_files(self) -> list[ConfigFile]:
         """Get VS Code configuration files.
 

@@ -187,6 +187,20 @@ class Shell(ABC):
         finally:
             temp_path.unlink(missing_ok=True)
 
+    def get_extension_cli(self) -> str | None:
+        """Get the CLI command for managing extensions (e.g., "code", "cursor").
+
+        Returns None for shells that don't manage extensions.
+        """
+        return None
+
+    def get_extension_list_paths(self) -> list[Path]:
+        """Get ordered list of extension list file paths to merge.
+
+        Returns empty list for shells that don't manage extensions.
+        """
+        return []
+
     def get_additional_files(self) -> list[AdditionalFile]:
         """Get additional files that should be installed for this shell.
 

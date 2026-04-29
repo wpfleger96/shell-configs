@@ -35,6 +35,16 @@ class CursorShell(Shell):
         else:
             return Path.home() / ".config" / "Cursor" / "User"
 
+    def get_extension_cli(self) -> str | None:
+        return "cursor"
+
+    def get_extension_list_paths(self) -> list[Path]:
+        config_dir = get_config_dir()
+        return [
+            config_dir / "editor" / "extensions.txt",
+            config_dir / "cursor" / "extensions.txt",
+        ]
+
     def get_config_files(self) -> list[ConfigFile]:
         """Get Cursor configuration files.
 

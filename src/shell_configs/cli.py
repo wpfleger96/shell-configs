@@ -908,6 +908,45 @@ def status(shells: list[str] | None, profile_name: str | None) -> None:
 
     console.print()
 
+    console.print("[bold cyan]Extensions[/bold cyan]\n")
+
+    from shell_configs.extensions import ExtensionManager
+
+    ext_manager = ExtensionManager()
+    for shell in selected_shells:
+        cli_cmd = shell.get_extension_cli()
+        if cli_cmd is None:
+            continue
+
+        ext_desired = ext_manager.load_desired_extensions(
+            shell.name, shell.get_extension_list_paths(), profile=active_profile
+        )
+        ext_installed = ext_manager.get_installed_extensions(cli_cmd)
+        ext_diff = ext_manager.compute_diff(
+            ext_desired, ext_installed, shell_name=shell.name
+        )
+
+        if not ext_diff.missing and not ext_diff.extra:
+            console.print(
+                f"  [green]✓[/green] {shell.display_name}: "
+                f"{len(ext_diff.matched)}/{len(ext_desired)} extensions synced"
+            )
+        else:
+            parts = []
+            if ext_diff.missing:
+                parts.append(f"{len(ext_diff.missing)} missing")
+            if ext_diff.extra:
+                parts.append(f"{len(ext_diff.extra)} extra")
+            console.print(
+                f"  [yellow]⚠[/yellow] {shell.display_name}: "
+                f"{len(ext_diff.matched)}/{len(ext_desired)} synced ({', '.join(parts)})"
+            )
+            console.print(
+                "  [dim]Run 'shell-configs extensions diff' for details[/dim]"
+            )
+
+    console.print()
+
     console.print("[bold cyan]Scripts[/bold cyan]\n")
 
     from shell_configs.script_manager import (
@@ -2541,6 +2580,290 @@ def scripts_list(include_all: bool) -> None:
         console.print(
             f"\n[dim]Showing scripts for {current.display_name}. Use --all to see all.[/dim]"
         )
+
+
+@cli.group()
+def extensions() -> None:
+    """Manage IDE extensions for VSCode and Cursor."""
+    pass
+
+
+def _get_extension_shells(
+    registry: "ShellRegistry",
+    shells_filter: list[str] | None = None,
+) -> list["Shell"]:
+    """Get shells that support extension management."""
+    from shell_configs.display import print_error, print_info
+
+    if shells_filter:
+        selected, invalid = registry.filter_by_names(shells_filter)
+        if invalid:
+            print_error(f"Unknown shells: {', '.join(invalid)}")
+            print_info(f"Available shells: {', '.join(registry.get_names())}")
+            sys.exit(1)
+    else:
+        selected = registry.get_all()
+
+    return [s for s in selected if s.get_extension_cli() is not None]
+
+
+@extensions.command(name="status")
+@click.option(
+    "--shells",
+    callback=parse_shell_filter,
+    help="Comma-separated list of IDEs (e.g., vscode,cursor)",
+)
+@click.option("--profile", "profile_name", default=None, help="Profile to use")
+def extensions_status(shells: list[str] | None, profile_name: str | None) -> None:
+    """Show extension sync status for each IDE."""
+    from rich.table import Table
+
+    from shell_configs.display import console
+    from shell_configs.extensions import ExtensionManager
+    from shell_configs.profiles import ProfileLoader, resolve_active_profile
+    from shell_configs.shells.registry import ShellRegistry
+
+    config_reader = ConfigReader()
+    registry = ShellRegistry()
+    profile_loader = ProfileLoader(config_reader.config_dir)
+    active_profile = resolve_active_profile(profile_name, profile_loader)
+    ext_manager = ExtensionManager()
+
+    ide_shells = _get_extension_shells(registry, shells)
+    if not ide_shells:
+        console.print("[yellow]No IDEs with extension management found[/yellow]")
+        return
+
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("IDE", style="cyan")
+    table.add_column("Desired")
+    table.add_column("Installed")
+    table.add_column("Missing")
+    table.add_column("Extra")
+    table.add_column("Status")
+
+    for shell in ide_shells:
+        cli_cmd = shell.get_extension_cli()
+        if cli_cmd is None:
+            continue
+
+        desired = ext_manager.load_desired_extensions(
+            shell.name, shell.get_extension_list_paths(), profile=active_profile
+        )
+        installed = ext_manager.get_installed_extensions(cli_cmd)
+        diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
+
+        if not diff.missing and not diff.extra:
+            status_str = "[green]✓ synced[/green]"
+        else:
+            status_str = "[yellow]⚠ out of sync[/yellow]"
+
+        table.add_row(
+            shell.display_name,
+            str(len(desired)),
+            str(len(installed)),
+            str(len(diff.missing)) if diff.missing else "[green]0[/green]",
+            str(len(diff.extra)) if diff.extra else "[green]0[/green]",
+            status_str,
+        )
+
+    console.print(table)
+
+
+@extensions.command(name="diff")
+@click.option(
+    "--shells",
+    callback=parse_shell_filter,
+    help="Comma-separated list of IDEs (e.g., vscode,cursor)",
+)
+@click.option("--profile", "profile_name", default=None, help="Profile to use")
+def extensions_diff(shells: list[str] | None, profile_name: str | None) -> None:
+    """Show differences between desired and installed extensions."""
+    from shell_configs.display import console, print_info
+    from shell_configs.extensions import ExtensionManager
+    from shell_configs.profiles import ProfileLoader, resolve_active_profile
+    from shell_configs.shells.registry import ShellRegistry
+
+    config_reader = ConfigReader()
+    registry = ShellRegistry()
+    profile_loader = ProfileLoader(config_reader.config_dir)
+    active_profile = resolve_active_profile(profile_name, profile_loader)
+    ext_manager = ExtensionManager()
+
+    ide_shells = _get_extension_shells(registry, shells)
+    if not ide_shells:
+        console.print("[yellow]No IDEs with extension management found[/yellow]")
+        return
+
+    found_diffs = False
+    for shell in ide_shells:
+        cli_cmd = shell.get_extension_cli()
+        if cli_cmd is None:
+            continue
+
+        desired = ext_manager.load_desired_extensions(
+            shell.name, shell.get_extension_list_paths(), profile=active_profile
+        )
+        installed = ext_manager.get_installed_extensions(cli_cmd)
+        diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
+
+        if not diff.missing and not diff.extra:
+            continue
+
+        found_diffs = True
+        console.print(f"\n[bold cyan]{shell.display_name}[/bold cyan]")
+
+        if diff.missing:
+            console.print(f"  [yellow]Missing ({len(diff.missing)}):[/yellow]")
+            for ext_id in sorted(diff.missing):
+                console.print(f"    [yellow]✗[/yellow] {ext_id}")
+
+        if diff.extra:
+            console.print(f"  [dim]Extra ({len(diff.extra)}):[/dim]")
+            for ext_id in sorted(diff.extra):
+                console.print(f"    [dim]+[/dim] {ext_id}")
+
+    if not found_diffs:
+        print_info("All IDE extensions are in sync")
+
+
+@extensions.command(name="install")
+@click.option(
+    "--shells",
+    callback=parse_shell_filter,
+    help="Comma-separated list of IDEs (e.g., vscode,cursor)",
+)
+@click.option(
+    "--prune", is_flag=True, help="Uninstall extensions not in the desired list"
+)
+@click.option(
+    "--dry-run", is_flag=True, help="Show what would be done without doing it"
+)
+@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
+@click.option("--profile", "profile_name", default=None, help="Profile to use")
+def extensions_install(
+    shells: list[str] | None,
+    prune: bool,
+    dry_run: bool,
+    yes: bool,
+    profile_name: str | None,
+) -> None:
+    """Install missing extensions (and optionally prune extras)."""
+    from shell_configs.display import console, print_info
+    from shell_configs.extensions import ExtensionManager
+    from shell_configs.profiles import ProfileLoader, resolve_active_profile
+    from shell_configs.shells.registry import ShellRegistry
+
+    config_reader = ConfigReader()
+    registry = ShellRegistry()
+    profile_loader = ProfileLoader(config_reader.config_dir)
+    active_profile = resolve_active_profile(profile_name, profile_loader)
+    ext_manager = ExtensionManager()
+
+    ide_shells = _get_extension_shells(registry, shells)
+    if not ide_shells:
+        console.print("[yellow]No IDEs with extension management found[/yellow]")
+        return
+
+    any_work = False
+    for shell in ide_shells:
+        cli_cmd = shell.get_extension_cli()
+        if cli_cmd is None:
+            continue
+
+        desired = ext_manager.load_desired_extensions(
+            shell.name, shell.get_extension_list_paths(), profile=active_profile
+        )
+        installed = ext_manager.get_installed_extensions(cli_cmd)
+        diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
+
+        to_install = diff.missing
+        to_uninstall = diff.extra if prune else frozenset()
+
+        if not to_install and not to_uninstall:
+            continue
+
+        any_work = True
+        console.print(f"\n[bold cyan]{shell.display_name}[/bold cyan]")
+
+        if to_install:
+            console.print(
+                f"  [yellow]Installing {len(to_install)} extension(s)...[/yellow]"
+            )
+            if not dry_run and not yes:
+                if not click.confirm("  Proceed?", default=True):
+                    print_info(f"  Skipping {shell.display_name} installs")
+                    to_install = frozenset()
+
+            if to_install:
+                results = ext_manager.install_extensions(
+                    cli_cmd, set(to_install), dry_run=dry_run
+                )
+                for r in results:
+                    if r.success:
+                        console.print(f"  [green]✓[/green] {r.message}")
+                    else:
+                        console.print(f"  [red]✗[/red] {r.extension_id}: {r.message}")
+
+        if to_uninstall:
+            console.print(
+                f"  [yellow]Pruning {len(to_uninstall)} extra extension(s)...[/yellow]"
+            )
+            if not dry_run and not yes:
+                if not click.confirm("  Proceed with pruning?", default=False):
+                    print_info(f"  Skipping {shell.display_name} prune")
+                    to_uninstall = frozenset()
+
+            if to_uninstall:
+                results = ext_manager.uninstall_extensions(
+                    cli_cmd, set(to_uninstall), dry_run=dry_run
+                )
+                for r in results:
+                    if r.success:
+                        console.print(f"  [green]✓[/green] {r.message}")
+                    else:
+                        console.print(f"  [red]✗[/red] {r.extension_id}: {r.message}")
+
+    if not any_work:
+        print_info("All IDE extensions are already in sync")
+
+    if dry_run and any_work:
+        print_info("\nDry run complete. Use without --dry-run to apply changes.")
+
+
+@extensions.command(name="export")
+@click.option(
+    "--shell",
+    "shell_name",
+    required=True,
+    help="IDE to export from (e.g., vscode, cursor)",
+)
+def extensions_export(shell_name: str) -> None:
+    """Export currently installed extensions for an IDE."""
+    from shell_configs.display import console, print_error
+    from shell_configs.extensions import ExtensionManager
+    from shell_configs.shells.registry import ShellRegistry
+
+    registry = ShellRegistry()
+    ext_manager = ExtensionManager()
+
+    shells, invalid = registry.filter_by_names([shell_name])
+    if invalid or not shells:
+        print_error(f"Unknown shell: {shell_name}")
+        console.print(f"[dim]Available: {', '.join(registry.get_names())}[/dim]")
+        sys.exit(1)
+
+    shell = shells[0]
+    cli_cmd = shell.get_extension_cli()
+    if cli_cmd is None:
+        print_error(f"{shell.display_name} does not support extension management")
+        sys.exit(1)
+
+    output = ext_manager.export_extensions(cli_cmd, shell_name=shell.name)
+    if output:
+        console.print(output)
+    else:
+        console.print("[dim]No extensions installed[/dim]")
 
 
 def main() -> None:
