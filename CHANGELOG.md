@@ -1,6 +1,104 @@
 # CHANGELOG
 
 
+## v0.29.0 (2026-04-30)
+
+### Chores
+
+- **deps**: Update pydantic requirement from >=2.12.5 to >=2.13.3
+  ([#8](https://github.com/wpfleger96/shell-configs/pull/8),
+  [`acd05fc`](https://github.com/wpfleger96/shell-configs/commit/acd05fc8404fca78877c1803f5cee77156a0ce92))
+
+Updates the requirements on [pydantic](https://github.com/pydantic/pydantic) to permit the latest
+  version. - [Release notes](https://github.com/pydantic/pydantic/releases) -
+  [Changelog](https://github.com/pydantic/pydantic/blob/main/HISTORY.md) -
+  [Commits](https://github.com/pydantic/pydantic/compare/v2.12.5...v2.13.3)
+
+--- updated-dependencies: - dependency-name: pydantic dependency-version: 2.13.3
+
+dependency-type: direct:production ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **deps-dev**: Update pytest requirement from >=8.4.2 to >=9.0.3
+  ([#11](https://github.com/wpfleger96/shell-configs/pull/11),
+  [`4b08354`](https://github.com/wpfleger96/shell-configs/commit/4b0835427431a6d18fd5f465abebe9c5b0d9ab6f))
+
+Updates the requirements on [pytest](https://github.com/pytest-dev/pytest) to permit the latest
+  version. - [Release notes](https://github.com/pytest-dev/pytest/releases) -
+  [Changelog](https://github.com/pytest-dev/pytest/blob/main/CHANGELOG.rst) -
+  [Commits](https://github.com/pytest-dev/pytest/compare/8.4.2...9.0.3)
+
+--- updated-dependencies: - dependency-name: pytest dependency-version: 9.0.3
+
+dependency-type: direct:development ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **deps-dev**: Update pytest-cov requirement from >=7.0.0 to >=7.1.0
+  ([#9](https://github.com/wpfleger96/shell-configs/pull/9),
+  [`fd8ffbd`](https://github.com/wpfleger96/shell-configs/commit/fd8ffbd05ae2ebafad0164e87bef063f06c7de59))
+
+Updates the requirements on [pytest-cov](https://github.com/pytest-dev/pytest-cov) to permit the
+  latest version. - [Changelog](https://github.com/pytest-dev/pytest-cov/blob/master/CHANGELOG.rst)
+  - [Commits](https://github.com/pytest-dev/pytest-cov/compare/v7.0.0...v7.1.0)
+
+--- updated-dependencies: - dependency-name: pytest-cov dependency-version: 7.1.0
+
+dependency-type: direct:development ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **deps-dev**: Update ruff requirement from >=0.14.3 to >=0.15.12
+  ([#12](https://github.com/wpfleger96/shell-configs/pull/12),
+  [`3fa9e04`](https://github.com/wpfleger96/shell-configs/commit/3fa9e04b35d980d39a40309f10d23e77fb456e46))
+
+Updates the requirements on [ruff](https://github.com/astral-sh/ruff) to permit the latest version.
+  - [Release notes](https://github.com/astral-sh/ruff/releases) -
+  [Changelog](https://github.com/astral-sh/ruff/blob/main/CHANGELOG.md) -
+  [Commits](https://github.com/astral-sh/ruff/compare/0.14.3...0.15.12)
+
+--- updated-dependencies: - dependency-name: ruff dependency-version: 0.15.12
+
+dependency-type: direct:development ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **deps-dev**: Update setuptools requirement from >=61 to >=82.0.1
+  ([#10](https://github.com/wpfleger96/shell-configs/pull/10),
+  [`317d77f`](https://github.com/wpfleger96/shell-configs/commit/317d77fbadd574bf2f6e62cbcd8ed9f7d1ade00a))
+
+Updates the requirements on [setuptools](https://github.com/pypa/setuptools) to permit the latest
+  version. - [Release notes](https://github.com/pypa/setuptools/releases) -
+  [Changelog](https://github.com/pypa/setuptools/blob/main/NEWS.rst) -
+  [Commits](https://github.com/pypa/setuptools/compare/v61.0.0...v82.0.1)
+
+--- updated-dependencies: - dependency-name: setuptools dependency-version: 82.0.1
+
+dependency-type: direct:development ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+### Features
+
+- Add rsync-backup function for standardized file backups
+  ([`3528515`](https://github.com/wpfleger96/shell-configs/commit/35285155f2554fda660aa0cd1a83dfdae3116bf0))
+
+Long rsync backup commands with 50+ exclude flags are error-prone and inconsistent across machines.
+  Centralizes the exclude list and standard flags so backups between servers/laptops use the same
+  filtering. All user-supplied args pass through to rsync directly.
+
+
 ## v0.28.0 (2026-04-29)
 
 ### Chores
