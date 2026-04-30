@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.29.1 (2026-04-30)
+
+### Bug Fixes
+
+- Prevent status flow from mutating SSH agent state
+  ([`21eeb09`](https://github.com/wpfleger96/shell-configs/commit/21eeb09a9149f5251e88b7e42a7690d04be99328))
+
+ensure_ssh_agent() unconditionally called ssh-add when the key wasn't loaded, even from
+  _validate_all_steps() which is the read-only validation path. Repeated status/install invocations
+  accumulated ghost keys in the macOS agent (which never evicts), eventually exceeding MaxAuthTries
+  6.
+
+Gate the ssh-add call behind auto_fix, matching _resolve_key_path's existing pattern for
+  non-interactive mutation control.
+
+
 ## v0.29.0 (2026-04-30)
 
 ### Chores
