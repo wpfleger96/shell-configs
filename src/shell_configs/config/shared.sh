@@ -738,6 +738,69 @@ _pipenv_run_complete() {
     _arguments '1: :_files' '*:: :_default'
 }
 
+### Rsync ###
+rsync-backup() {
+    rsync -avzP --no-perms \
+        --exclude '**/*.git/' \
+        --exclude '**/*.worktrees/' \
+        --exclude '**/*.hermit/' \
+        --exclude '.DS_Store' \
+        --exclude '.Spotlight-V100' \
+        --exclude '.fseventsd' \
+        --exclude '.TemporaryItems' \
+        --exclude '.Trash' \
+        --exclude '**/*Caches/' \
+        --exclude '**/*Applications/' \
+        --exclude 'Library/' \
+        --exclude '.local/' \
+        --exclude '**/*socket*' \
+        --exclude '**/*.venv/' \
+        --exclude '**/*venv/' \
+        --exclude '**/*venvs/' \
+        --exclude '**/__pycache__/' \
+        --exclude '**/*.pytest_cache/' \
+        --exclude '**/*.ruff_cache/' \
+        --exclude '**/*.egg-info/' \
+        --exclude '**/*.mypy_cache/' \
+        --exclude '**/*node_modules/' \
+        --exclude '**/*.gradle/' \
+        --exclude '**/*.maven/' \
+        --exclude '**/*vendor/' \
+        --exclude '**/*mod/cache/' \
+        --exclude '**/target/' \
+        --exclude '**/build/' \
+        --exclude '**/dist/' \
+        --exclude '**/*.cache/' \
+        --exclude '**/*cache/' \
+        --exclude '.cargo/git/' \
+        --exclude '.cargo/registry/' \
+        --exclude '.local/share/uv/' \
+        --exclude '.npm/' \
+        --exclude '.ssh/' \
+        --exclude '.aws/' \
+        --exclude '.gnupg/' \
+        --exclude '.zsh_history' \
+        --exclude '.zcompdump' \
+        --exclude '**/*.swp' \
+        --exclude '**/*.swo' \
+        --exclude '.claude/' \
+        --exclude '.gemini/' \
+        --exclude '.codex/' \
+        --exclude '.cursor/' \
+        --exclude '**/.idea/' \
+        --exclude '**/.vscode/' \
+        --exclude '.docker/' \
+        --exclude '**/goose/' \
+        --exclude '.konan/' \
+        --exclude '.rustup/' \
+        --exclude '.rvm/' \
+        --exclude '.nvm/' \
+        --exclude '**/OSCAR-code/' \
+        --exclude '**/Personal/[Dd]ata/' \
+        --info=progress2 \
+        "$@"
+}
+
 ### Utilities ###
 alias ll='ls -la'
 
