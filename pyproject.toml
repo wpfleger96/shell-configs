@@ -39,7 +39,7 @@ Issues = "https://github.com/wpfleger96/shell-configs/issues"
 shell-configs = "shell_configs.cli:main"
 
 [build-system]
-requires = ["setuptools>=61", "wheel"]
+requires = ["setuptools>=82.0.1", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
