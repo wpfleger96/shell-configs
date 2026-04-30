@@ -75,11 +75,14 @@ def generate_ssh_key(
     return True, f"Generated SSH key: {key_path}"
 
 
-def ensure_ssh_agent(key_path: Path) -> tuple[bool, str, str | None]:
+def ensure_ssh_agent(
+    key_path: Path, auto_fix: bool = True
+) -> tuple[bool, str, str | None]:
     """Ensure ssh-agent is running and key is loaded.
 
     Returns (success, message, public_key_string).
     Exit code 2 from ssh-add means the agent is not running.
+    When auto_fix is False, reports status without loading the key.
     """
     pub_path = key_path.with_suffix(".pub")
     if not pub_path.exists():
@@ -99,6 +102,13 @@ def ensure_ssh_agent(key_path: Path) -> tuple[bool, str, str | None]:
 
     if result.returncode == 0 and key_data and key_data in result.stdout:
         return True, "SSH key is loaded in ssh-agent", pub_key
+
+    if not auto_fix:
+        return (
+            False,
+            "SSH key not in ssh-agent. Run 'shell-configs signing --fix' to add it",
+            None,
+        )
 
     add_result = _run(["ssh-add", str(key_path)], timeout=30)
     if add_result.returncode != 0:
@@ -626,7 +636,7 @@ def _validate_all_steps(key_path: Path | None) -> list[StepResult]:
         return results
     results.append(StepResult("generate_key", True, f"SSH key exists: {key_path}"))
 
-    ok, msg, _ = ensure_ssh_agent(key_path)
+    ok, msg, _ = ensure_ssh_agent(key_path, auto_fix=False)
     results.append(StepResult("ssh_agent", ok, msg))
 
     if gh_authed and gh_has_scopes:
