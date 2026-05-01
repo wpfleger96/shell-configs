@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.30.0 (2026-05-01)
+
+### Features
+
+- Add 21 exclusion patterns to rsync-backup
+  ([`b723413`](https://github.com/wpfleger96/shell-configs/commit/b72341339b6887cb11b7c35943f933943b8ad49c))
+
+First real-world backup revealed missing excludes for caches, AI IDE state, and package stores
+  totaling ~6 GB of unnecessary transfer. Covers pnpm/bun stores, Maven .m2, bundler cache,
+  Windsurf/Codeium/ Copilot state, kubectl/minikube caches, ML model weights, and Square-internal
+  tool artifacts.
+
+
 ## v0.29.1 (2026-04-30)
 
 ### Bug Fixes
