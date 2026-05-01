@@ -749,6 +749,7 @@ rsync-backup() {
         --exclude '.fseventsd' \
         --exclude '.TemporaryItems' \
         --exclude '.Trash' \
+        --exclude '.Trashes' \
         --exclude '**/*Caches/' \
         --exclude '**/*Applications/' \
         --exclude 'Library/' \
@@ -757,6 +758,7 @@ rsync-backup() {
         --exclude '**/*.venv/' \
         --exclude '**/*venv/' \
         --exclude '**/*venvs/' \
+        --exclude '**/*virtenv/' \
         --exclude '**/__pycache__/' \
         --exclude '**/*.pytest_cache/' \
         --exclude '**/*.ruff_cache/' \
@@ -765,6 +767,8 @@ rsync-backup() {
         --exclude '**/*node_modules/' \
         --exclude '**/*.gradle/' \
         --exclude '**/*.maven/' \
+        --exclude '**/.m2/' \
+        --exclude '.bundle/cache/' \
         --exclude '**/*vendor/' \
         --exclude '**/*mod/cache/' \
         --exclude '**/target/' \
@@ -776,17 +780,25 @@ rsync-backup() {
         --exclude '.cargo/registry/' \
         --exclude '.local/share/uv/' \
         --exclude '.npm/' \
+        --exclude '.pnpm-store/' \
+        --exclude '.pnpm-state/' \
+        --exclude '.bun/install/cache/' \
         --exclude '.ssh/' \
         --exclude '.aws/' \
         --exclude '.gnupg/' \
         --exclude '.zsh_history' \
         --exclude '.zcompdump' \
+        --exclude '.zsh_sessions/' \
+        --exclude '.zcompcache/' \
         --exclude '**/*.swp' \
         --exclude '**/*.swo' \
         --exclude '.claude/' \
         --exclude '.gemini/' \
         --exclude '.codex/' \
         --exclude '.cursor/' \
+        --exclude '.windsurf/' \
+        --exclude '.codeium/' \
+        --exclude '.copilot/' \
         --exclude '**/.idea/' \
         --exclude '**/.vscode/' \
         --exclude '.docker/' \
@@ -795,8 +807,16 @@ rsync-backup() {
         --exclude '.rustup/' \
         --exclude '.rvm/' \
         --exclude '.nvm/' \
+        --exclude '.babushka/' \
+        --exclude '.kube/cache/' \
+        --exclude '.minikube/cache/' \
+        --exclude '.insightface/' \
+        --exclude '.embedded-postgres-go/' \
         --exclude '**/OSCAR-code/' \
         --exclude '**/Personal/[Dd]ata/' \
+        --exclude '.rpc-explorer-all-protos/' \
+        --exclude '.snore/' \
+        --exclude '.nexus/' \
         --info=progress2 \
         "$@"
 }
