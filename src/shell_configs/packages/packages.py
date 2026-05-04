@@ -768,7 +768,7 @@ def sort_packages_for_uninstall(packages: list[Package]) -> list[Package]:
 
 
 def load_packages_for_profile(
-    profile: "Profile",
+    profile: "Profile | None",
     manifest_path: Path | None = None,
 ) -> list[Package]:
     """Load packages filtered and extended by a profile.
@@ -778,13 +778,15 @@ def load_packages_for_profile(
     (only those that already exist in the manifest by name).
 
     Args:
-        profile: Active profile
+        profile: Active profile (uses base list unchanged when None)
         manifest_path: Optional path to packages.yaml
 
     Returns:
         Filtered/extended list of Package objects
     """
     base_packages = load_packages(manifest_path)
+    if profile is None:
+        return base_packages
     remove_names = set(profile.packages.get("remove", []))
     add_names = profile.packages.get("add", [])
 

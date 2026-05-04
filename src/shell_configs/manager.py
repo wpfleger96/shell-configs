@@ -100,7 +100,7 @@ class ConfigManager:
         stripped = content.strip()
         return stripped.startswith("{") or stripped.startswith("[")
 
-    def _strip_json_outer_brackets(self, content: str) -> str:
+    def strip_json_outer_brackets(self, content: str) -> str:
         """Strip outer { } or [ ] from JSON content for comparison.
 
         When markers are injected inside JSON brackets, we need to strip
@@ -143,7 +143,7 @@ class ConfigManager:
         Returns:
             True if contents match
         """
-        comparison_content = self._strip_json_outer_brackets(source_content)
+        comparison_content = self.strip_json_outer_brackets(source_content)
         return section_content.strip() == comparison_content.strip()
 
     def has_managed_section(self, config_file: Path, comment_prefix: str = "#") -> bool:
@@ -340,7 +340,7 @@ class ConfigManager:
                 import difflib
 
                 old_lines = existing_section.content.splitlines(keepends=True)
-                new_content = self._strip_json_outer_brackets(final_content)
+                new_content = self.strip_json_outer_brackets(final_content)
                 new_lines = new_content.splitlines(keepends=True)
                 diff_lines = difflib.unified_diff(
                     old_lines,
