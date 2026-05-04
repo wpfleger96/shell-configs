@@ -1,6 +1,38 @@
 # CHANGELOG
 
 
+## v0.31.0 (2026-05-04)
+
+### Bug Fixes
+
+- Ssh-keygen stub writes dummy key files to prevent FileNotFoundError
+  ([`a4b9348`](https://github.com/wpfleger96/shell-configs/commit/a4b934877157a115ee02f64351d56cc24123cae8))
+
+The guard_subprocess fixture stubbed ssh-keygen to return success without writing files.
+  generate_ssh_key() then called os.chmod() on the nonexistent key file, crashing 6 integration
+  tests. The stub now honors the command's postcondition by writing dummy key + .pub files when -f
+  is in the args.
+
+### Features
+
+- Add Kotlin extension, install extensions via `install` command, guard subprocess in tests
+  ([`2caf6c6`](https://github.com/wpfleger96/shell-configs/commit/2caf6c61ac335a08cd967e9114e3fadb10079548))
+
+Kotlin syntax highlighting (`mathiasfrohlich.Kotlin`) was identified as the safe alternative to full
+  Java/Kotlin LSP extensions that caused 25+ GB memory consumption and kernel panics in the
+  cash-server monorepo. Added to the shared extension list for both IDEs. Also added
+  `anthropic.claude-code` to the work profile (MDM keeps reinstalling it via Settings Sync).
+
+The `install` command previously skipped extensions entirely — configs, packages, SSH keys, and
+  scripts were installed but extensions required a separate `shell-configs extensions install`. Now
+  `install` handles missing extensions as part of its normal flow.
+
+Added a subprocess guard fixture in test conftest that prevents tests from hitting real system
+  commands. Shell validation commands (bash, zsh, git) pass through; known external tools (brew,
+  code, cursor, ssh-keygen, etc.) get stubbed no-op results; unknown commands raise RuntimeError.
+  Tests went from hanging for minutes to completing in 1.4 seconds.
+
+
 ## v0.30.0 (2026-05-01)
 
 ### Features
