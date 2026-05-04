@@ -67,6 +67,9 @@ def generate_ssh_key(
     if result.returncode != 0:
         return False, f"ssh-keygen failed: {result.stderr.strip()}"
 
+    if not key_path.exists():
+        return False, f"ssh-keygen reported success but key file not found: {key_path}"
+
     os.chmod(key_path, stat.S_IRUSR | stat.S_IWUSR)
     pub_path = key_path.with_suffix(".pub")
     if pub_path.exists():

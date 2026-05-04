@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -19,8 +20,27 @@ STUB_COMMANDS = {
     "gh",
     "ssh",
     "ssh-add",
-    "ssh-keygen",
 }
+
+
+def _stub_ssh_keygen(cmd: list[Any]) -> subprocess.CompletedProcess[str]:
+    """Stub ssh-keygen that writes dummy key files when generating."""
+    try:
+        str_cmd = [str(c) for c in cmd]
+        if "-f" in str_cmd:
+            key_path = Path(str_cmd[str_cmd.index("-f") + 1])
+            key_path.parent.mkdir(parents=True, exist_ok=True)
+            key_path.write_text(
+                "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+                "FAKEKEYDATA\n"
+                "-----END OPENSSH PRIVATE KEY-----\n"
+            )
+            key_path.with_suffix(".pub").write_text(
+                "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAFAKEKEYDATA test@stubbed\n"
+            )
+    except (ValueError, IndexError):
+        pass
+    return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
 
 
 @pytest.fixture(autouse=True)
@@ -39,6 +59,8 @@ def guard_subprocess(monkeypatch):
         exe = (cmd[0] if isinstance(cmd, list) else cmd.split()[0]).rsplit("/", 1)[-1]
         if exe in PASSTHROUGH_COMMANDS:
             return real_run(cmd, *args, **kwargs)
+        if exe == "ssh-keygen":
+            return _stub_ssh_keygen(cmd if isinstance(cmd, list) else cmd.split())
         if exe in STUB_COMMANDS:
             return subprocess.CompletedProcess(
                 args=cmd, returncode=0, stdout="", stderr=""
