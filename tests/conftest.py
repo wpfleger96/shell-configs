@@ -1,5 +1,6 @@
 """Pytest configuration and fixtures."""
 
+import subprocess
 import tempfile
 
 from pathlib import Path
@@ -7,6 +8,48 @@ from pathlib import Path
 import pytest
 
 from click.testing import CliRunner
+
+PASSTHROUGH_COMMANDS = {"bash", "git", "zsh"}
+
+STUB_COMMANDS = {
+    "brew",
+    "code",
+    "cursor",
+    "defaults",
+    "gh",
+    "ssh",
+    "ssh-add",
+    "ssh-keygen",
+}
+
+
+@pytest.fixture(autouse=True)
+def guard_subprocess(monkeypatch):
+    """Block real subprocess calls, return no-op results for known commands.
+
+    Prevents tests from hitting real system commands (IDE CLIs, package
+    managers, SSH tools). Commands in PASSTHROUGH_COMMANDS execute normally
+    (needed for syntax validation). Commands in STUB_COMMANDS get a
+    successful empty result. Unknown commands raise RuntimeError so new
+    subprocess usage is caught immediately.
+    """
+    real_run = subprocess.run
+
+    def _guarded_run(cmd, *args, **kwargs):
+        exe = (cmd[0] if isinstance(cmd, list) else cmd.split()[0]).rsplit("/", 1)[-1]
+        if exe in PASSTHROUGH_COMMANDS:
+            return real_run(cmd, *args, **kwargs)
+        if exe in STUB_COMMANDS:
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="", stderr=""
+            )
+        raise RuntimeError(
+            f"Subprocess call to '{exe}' blocked by test guard. "
+            f"Add to PASSTHROUGH_COMMANDS or STUB_COMMANDS in conftest.py, "
+            f"or mock it in your test."
+        )
+
+    monkeypatch.setattr(subprocess, "run", _guarded_run)
 
 
 @pytest.fixture(autouse=True)

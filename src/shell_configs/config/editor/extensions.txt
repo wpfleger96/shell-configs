@@ -4,6 +4,7 @@
 golang.go
 ms-python.debugpy
 ms-python.python
+mathiasfrohlich.kotlin
 rust-lang.rust-analyzer
 shopify.ruby-lsp
 

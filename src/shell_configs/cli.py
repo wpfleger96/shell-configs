@@ -598,6 +598,54 @@ def install(
                 else:
                     console.print(f"[red]✗[/red] {msg}")
 
+        from shell_configs.extensions import ExtensionManager
+
+        ext_manager = ExtensionManager()
+        ide_shells = _get_extension_shells(registry)
+        if ide_shells:
+            any_ext_work = False
+            for shell in ide_shells:
+                cli_cmd = shell.get_extension_cli()
+                if cli_cmd is None:
+                    continue
+
+                desired = ext_manager.load_desired_extensions(
+                    shell.name,
+                    shell.get_extension_list_paths(),
+                    profile=active_profile,
+                )
+                installed = ext_manager.get_installed_extensions(cli_cmd)
+                diff = ext_manager.compute_diff(
+                    desired, installed, shell_name=shell.name
+                )
+
+                if not diff.missing:
+                    continue
+
+                if not any_ext_work:
+                    console.print()
+                    console.print("[yellow]Installing IDE extensions...[/yellow]")
+                    any_ext_work = True
+
+                console.print(
+                    f"  [bold cyan]{shell.display_name}[/bold cyan]: "
+                    f"{len(diff.missing)} missing"
+                )
+                ext_results = ext_manager.install_extensions(
+                    cli_cmd, set(diff.missing), dry_run=dry_run
+                )
+                for ext_r in ext_results:
+                    if ext_r.success:
+                        console.print(f"  [green]✓[/green] {ext_r.message}")
+                    else:
+                        console.print(
+                            f"  [red]✗[/red] {ext_r.extension_id}: {ext_r.message}"
+                        )
+
+            if not any_ext_work:
+                console.print()
+                console.print("[green]✓[/green] All IDE extensions already in sync")
+
 
 @cli.command()
 @click.option(
