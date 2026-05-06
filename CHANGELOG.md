@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v0.32.0 (2026-05-06)
+
+### Bug Fixes
+
+- Ignore builtin IDE extensions during sync
+  ([`0d22118`](https://github.com/wpfleger96/shell-configs/commit/0d221184e2d646f5fd35e782c2a4210246712684))
+
+VS Code bundles GitHub Copilot Chat but does not report it in code --list-extensions, which caused
+  extension sync to treat it as missing and fail on a forced downgrade attempt. Treat builtin
+  extensions as ignored managed entries, warn when config still lists them, and keep them out of
+  exported desired extension lists.
+
+### Features
+
+- Add open-folder shortcut for VS Code and Cursor
+  ([`60ad5de`](https://github.com/wpfleger96/shell-configs/commit/60ad5de4d2d51a5cd0e0aefae81711c6328244a0))
+
+Add a shared Ctrl+Alt+O keybinding for Open Folder so the shortcut works consistently across macOS
+  and Windows setups. This keeps the editor shortcut model aligned with the existing cross-platform
+  terminal shortcuts in the managed keybindings file.
+
+
 ## v0.31.0 (2026-05-04)
 
 ### Bug Fixes
