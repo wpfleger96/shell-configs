@@ -49,7 +49,19 @@ just cli-validate      # Test validate command
 
 ```
 src/shell_configs/
-├── cli.py                      # Click CLI commands (install, status, diff, etc.)
+├── cli/                        # Click CLI package (install, status, diff, etc.)
+│   ├── __init__.py             # Click group entry point, version callback, exports cli/main
+│   ├── context.py              # Context dataclass + Component base class
+│   ├── helpers.py              # Shared shell selection and diff display helpers
+│   ├── components/             # Component registry (the ONE place to add managed things)
+│   │   ├── __init__.py         # COMPONENTS list — ordered, explicit
+│   │   ├── configs.py          # ConfigsComponent (config files, diffs, confirm prompt)
+│   │   ├── packages.py         # RequiredPackagesComponent + OptionalPackagesComponent
+│   │   ├── signing.py          # SigningComponent (SSH key lifecycle)
+│   │   ├── scripts.py          # ScriptsComponent (utility scripts)
+│   │   └── extensions.py       # ExtensionsComponent (IDE extensions)
+│   ├── commands/               # Top-level commands (install, status, diff, etc.)
+│   └── groups/                 # Subcommand groups (packages, extensions, scripts, etc.)
 ├── manager.py                  # ConfigManager - insert/remove managed sections
 ├── config.py                   # ConfigReader - reads config/ directory
 ├── display.py                  # Rich console output formatting
@@ -241,7 +253,9 @@ uv run pytest -v                     # Verbose output
 
 | Task | Files |
 |------|-------|
-| Add CLI command | `src/shell_configs/cli.py` |
+| Add a new managed component (install + status + diff) | `src/shell_configs/cli/components/` (new class + entry in `COMPONENTS` list) |
+| Add a top-level CLI command | `src/shell_configs/cli/commands/` + register in `cli/__init__.py` |
+| Add a subcommand group | `src/shell_configs/cli/groups/` + register in `cli/__init__.py` |
 | Modify config installation logic | `src/shell_configs/manager.py` (ConfigManager) |
 | Add new shell support | `src/shell_configs/shells/` (new class extends Shell ABC) |
 | Change config reading | `src/shell_configs/config.py` (ConfigReader) |
