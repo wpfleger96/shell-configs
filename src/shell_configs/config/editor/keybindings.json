@@ -10,5 +10,9 @@
     {
         "key": "ctrl+shift+t",
         "command": "workbench.action.terminal.new"
+    },
+    {
+        "key": "ctrl+alt+o",
+        "command": "workbench.action.files.openFolder"
     }
 ]
