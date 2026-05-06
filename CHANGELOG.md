@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.32.1 (2026-05-06)
+
+### Bug Fixes
+
+- Parse worktree metadata from porcelain output
+  ([`0cab15d`](https://github.com/wpfleger96/shell-configs/commit/0cab15ddfe8d47aca898da6478988947f234a52c))
+
+wt list was treating trailing status tokens like "prunable" as branch names, which made external
+  worktrees display incorrectly and leaked bad metadata into related helper flows. Switch to
+  porcelain parsing so branch names and Git-native statuses stay accurate while cleanup remains
+  scoped to managed .worktrees entries.
+
+
 ## v0.32.0 (2026-05-06)
 
 ### Bug Fixes
