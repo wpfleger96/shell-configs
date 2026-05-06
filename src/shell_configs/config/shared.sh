@@ -327,6 +327,94 @@ _wt_sanitize_dirname() {
     echo "$name"
 }
 
+_wt_print_record() {
+    printf '%s\0%s\0%s\0%s\0' "$1" "$2" "$3" "$4"
+}
+
+_wt_list_records() {
+    local line wt_path="" wt_branch="" wt_head="" wt_prunable="" is_detached=false
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ -z "$line" ]]; then
+            if [[ -n "$wt_path" ]]; then
+                if [[ -z "$wt_branch" ]]; then
+                    if [[ "$is_detached" == true ]] && [[ -n "$wt_head" ]]; then
+                        wt_branch="detached@${wt_head:0:7}"
+                    else
+                        wt_branch="detached"
+                    fi
+                fi
+                _wt_print_record "$wt_path" "$wt_branch" "$wt_head" "$wt_prunable"
+            fi
+            wt_path=""
+            wt_branch=""
+            wt_head=""
+            wt_prunable=""
+            is_detached=false
+            continue
+        fi
+
+        case "$line" in
+            worktree\ *)
+                wt_path="${line#worktree }"
+                ;;
+            branch\ refs/heads/*)
+                wt_branch="${line#branch refs/heads/}"
+                ;;
+            branch\ *)
+                wt_branch="${line#branch }"
+                ;;
+            HEAD\ *)
+                wt_head="${line#HEAD }"
+                ;;
+            prunable\ *)
+                wt_prunable="${line#prunable }"
+                ;;
+            prunable)
+                wt_prunable="prunable"
+                ;;
+            detached)
+                is_detached=true
+                ;;
+        esac
+    done < <(command git worktree list --porcelain)
+
+    if [[ -n "$wt_path" ]]; then
+        if [[ -z "$wt_branch" ]]; then
+            if [[ "$is_detached" == true ]] && [[ -n "$wt_head" ]]; then
+                wt_branch="detached@${wt_head:0:7}"
+            else
+                wt_branch="detached"
+            fi
+        fi
+        _wt_print_record "$wt_path" "$wt_branch" "$wt_head" "$wt_prunable"
+    fi
+}
+
+_wt_is_managed_path() {
+    local repo_root="$1"
+    local wt_path="$2"
+
+    [[ "$wt_path" == "$repo_root/$WT_DIR/"* ]]
+}
+
+_wt_find_worktree_path_by_branch() {
+    local target_branch="$1"
+    local wt_path wt_branch wt_head wt_prunable
+
+    while IFS= read -r -d '' wt_path &&
+        IFS= read -r -d '' wt_branch &&
+        IFS= read -r -d '' wt_head &&
+        IFS= read -r -d '' wt_prunable; do
+        if [[ "$wt_branch" == "$target_branch" ]]; then
+            echo "$wt_path"
+            return 0
+        fi
+    done < <(_wt_list_records)
+
+    return 1
+}
+
 _wt_add() {
     local branch=""
     local base_branch=""
@@ -395,6 +483,8 @@ _wt_add() {
 
 _wt_rm() {
     local branch="" force=false
+    local external_path=""
+    local remove_command="git worktree remove"
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --force | -f) force=true ;;
@@ -415,6 +505,13 @@ _wt_rm() {
     local worktree_path="$repo_root/$WT_DIR/$dir_name"
 
     if [[ ! -d "$worktree_path" ]]; then
+        external_path=$(_wt_find_worktree_path_by_branch "$branch")
+        if [[ -n "$external_path" ]] && [[ "$external_path" != "$repo_root" ]]; then
+            [[ "$force" == true ]] && remove_command="$remove_command --force"
+            echo "Error: Worktree for '$branch' exists outside $WT_DIR at $external_path"
+            echo "Use '$remove_command \"$external_path\"' to manage it directly"
+            return 1
+        fi
         echo "Error: Worktree for '$branch' does not exist"
         return 1
     fi
@@ -435,36 +532,41 @@ _wt_rm() {
 }
 
 _wt_ls() {
-    local repo_root wt_path wt_branch status_markers orphan_reason branch_status
+    local repo_root wt_path wt_branch wt_head wt_prunable status_markers orphan_reason branch_status
     repo_root=$(_wt_repo_root) || return 1
 
     echo "Worktrees:"
-    command git worktree list | while IFS= read -r line; do
-        wt_path="${line%% *}"
-        wt_branch="${line##* }"
-        wt_branch="${wt_branch#\[}"
-        wt_branch="${wt_branch%\]}"
-
+    while IFS= read -r -d '' wt_path &&
+        IFS= read -r -d '' wt_branch &&
+        IFS= read -r -d '' wt_head &&
+        IFS= read -r -d '' wt_prunable; do
         if [[ "$wt_path" == "$repo_root" ]]; then
             echo "  * $wt_branch (main worktree)"
         else
             status_markers=""
-            branch_status=$(_wt_branch_status "$wt_branch")
-            if [[ -n "$branch_status" ]]; then
-                status_markers=" [$branch_status]"
+            if [[ -n "$wt_prunable" ]]; then
+                status_markers=" [PRUNABLE: $wt_prunable]"
             fi
-            orphan_reason=$(_wt_is_orphan "$wt_branch" "$wt_path")
-            if [[ -n "$orphan_reason" ]]; then
-                status_markers="$status_markers [ORPHAN: $orphan_reason]"
+
+            if _wt_is_managed_path "$repo_root" "$wt_path"; then
+                branch_status=$(_wt_branch_status "$wt_branch")
+                if [[ -n "$branch_status" ]]; then
+                    status_markers="$status_markers [$branch_status]"
+                fi
+                orphan_reason=$(_wt_is_orphan "$wt_branch" "$wt_path")
+                if [[ -n "$orphan_reason" ]]; then
+                    status_markers="$status_markers [ORPHAN: $orphan_reason]"
+                fi
             fi
+
             echo "  - $wt_branch$status_markers"
         fi
-    done
+    done < <(_wt_list_records)
 }
 
 _wt_cd() {
     local branch="$1"
-    local repo_root
+    local repo_root external_path=""
     repo_root=$(_wt_repo_root) || return 1
 
     if [[ -z "$branch" ]]; then
@@ -477,6 +579,12 @@ _wt_cd() {
     local worktree_path="$repo_root/$WT_DIR/$dir_name"
 
     if [[ ! -d "$worktree_path" ]]; then
+        external_path=$(_wt_find_worktree_path_by_branch "$branch")
+        if [[ -n "$external_path" ]] && [[ "$external_path" != "$repo_root" ]]; then
+            echo "Error: Worktree for '$branch' exists outside $WT_DIR at $external_path"
+            echo "Use 'cd \"$external_path\"' to access it directly"
+            return 1
+        fi
         echo "Error: Worktree for '$branch' does not exist"
         return 1
     fi
@@ -486,7 +594,7 @@ _wt_cd() {
 
 _wt_prune() {
     local force=false orphans=false
-    local repo_root wt_path wt_branch orphan_reason branch_status
+    local repo_root wt_path wt_branch wt_head wt_prunable orphan_reason branch_status
     local pruned=0 skipped=0
 
     while [[ $# -gt 0 ]]; do
@@ -513,13 +621,11 @@ _wt_prune() {
         command git fetch origin "$default_branch" --quiet 2>/dev/null
     fi
 
-    while IFS= read -r line; do
-        wt_path="${line%% *}"
-        wt_branch="${line##* }"
-        wt_branch="${wt_branch#\[}"
-        wt_branch="${wt_branch%\]}"
-
-        if [[ "$wt_path" != "$repo_root" ]] && [[ "$wt_path" == "$repo_root/$WT_DIR/"* ]]; then
+    while IFS= read -r -d '' wt_path &&
+        IFS= read -r -d '' wt_branch &&
+        IFS= read -r -d '' wt_head &&
+        IFS= read -r -d '' wt_prunable; do
+        if [[ "$wt_path" != "$repo_root" ]] && _wt_is_managed_path "$repo_root" "$wt_path"; then
             branch_status=$(_wt_branch_status "$wt_branch")
             if [[ "$branch_status" == "MERGED" ]]; then
                 _wt_remove "$wt_path" "$force"
@@ -535,16 +641,14 @@ _wt_prune() {
                 esac
             fi
         fi
-    done < <(command git worktree list)
+    done < <(_wt_list_records)
 
     if [[ "$orphans" == true ]]; then
-        while IFS= read -r line; do
-            wt_path="${line%% *}"
-            wt_branch="${line##* }"
-            wt_branch="${wt_branch#\[}"
-            wt_branch="${wt_branch%\]}"
-
-            if [[ "$wt_path" != "$repo_root" ]] && [[ "$wt_path" == "$repo_root/$WT_DIR/"* ]]; then
+        while IFS= read -r -d '' wt_path &&
+            IFS= read -r -d '' wt_branch &&
+            IFS= read -r -d '' wt_head &&
+            IFS= read -r -d '' wt_prunable; do
+            if [[ "$wt_path" != "$repo_root" ]] && _wt_is_managed_path "$repo_root" "$wt_path"; then
                 orphan_reason=$(_wt_is_orphan "$wt_branch" "$wt_path")
                 if [[ -n "$orphan_reason" ]]; then
                     _wt_remove "$wt_path" "$force"
@@ -560,7 +664,7 @@ _wt_prune() {
                     esac
                 fi
             fi
-        done < <(command git worktree list)
+        done < <(_wt_list_records)
     fi
 
     if [[ $pruned -eq 0 ]] && [[ $skipped -eq 0 ]]; then
@@ -569,26 +673,24 @@ _wt_prune() {
 }
 
 _wt_orphans() {
-    local repo_root wt_path wt_branch orphan_reason
+    local repo_root wt_path wt_branch wt_head wt_prunable orphan_reason
     local found=0
     repo_root=$(_wt_repo_root) || return 1
 
     echo "Checking for orphaned worktrees..."
 
-    while IFS= read -r line; do
-        wt_path="${line%% *}"
-        wt_branch="${line##* }"
-        wt_branch="${wt_branch#\[}"
-        wt_branch="${wt_branch%\]}"
-
-        if [[ "$wt_path" != "$repo_root" ]] && [[ "$wt_path" == "$repo_root/$WT_DIR/"* ]]; then
+    while IFS= read -r -d '' wt_path &&
+        IFS= read -r -d '' wt_branch &&
+        IFS= read -r -d '' wt_head &&
+        IFS= read -r -d '' wt_prunable; do
+        if [[ "$wt_path" != "$repo_root" ]] && _wt_is_managed_path "$repo_root" "$wt_path"; then
             orphan_reason=$(_wt_is_orphan "$wt_branch" "$wt_path")
             if [[ -n "$orphan_reason" ]]; then
                 echo "  - $wt_branch ($orphan_reason)"
                 found=$((found + 1))
             fi
         fi
-    done < <(command git worktree list)
+    done < <(_wt_list_records)
 
     if [[ $found -eq 0 ]]; then
         echo "No orphaned worktrees found"
