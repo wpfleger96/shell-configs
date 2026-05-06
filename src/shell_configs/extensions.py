@@ -4,6 +4,7 @@ import logging
 import subprocess
 
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -13,8 +14,19 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 BUILTIN_EXTENSIONS: dict[str, set[str]] = {
+    "vscode": {"github.copilot-chat"},
     "cursor": {"anysphere.cursorpyright"},
 }
+
+
+def get_builtin_extensions(shell_name: str | None) -> frozenset[str]:
+    """Get the builtin extension IDs for an IDE shell."""
+    return frozenset(BUILTIN_EXTENSIONS.get(shell_name or "", set()))
+
+
+def is_builtin_install_error(message: str) -> bool:
+    """Check whether CLI install output indicates the extension is builtin."""
+    return "built-in extension" in message.lower()
 
 
 def load_extension_file(path: Path) -> set[str]:
@@ -47,6 +59,15 @@ class ExtensionDiff:
     missing: frozenset[str]
     extra: frozenset[str]
     matched: frozenset[str]
+    ignored: frozenset[str] = frozenset()
+
+
+class ExtensionResultStatus(StrEnum):
+    """Result classification for an extension install or uninstall attempt."""
+
+    SUCCESS = "success"
+    SKIPPED_BUILTIN = "skipped_builtin"
+    FAILED = "failed"
 
 
 @dataclass(frozen=True)
@@ -56,6 +77,7 @@ class ExtensionResult:
     extension_id: str
     success: bool
     message: str
+    status: ExtensionResultStatus = ExtensionResultStatus.SUCCESS
 
 
 class ExtensionManager:
@@ -136,16 +158,20 @@ class ExtensionManager:
             installed: Set of installed extension IDs
             shell_name: Optional shell name to filter out builtin extensions
         """
-        builtins = BUILTIN_EXTENSIONS.get(shell_name or "", set())
+        builtins = get_builtin_extensions(shell_name)
+        ignored = frozenset(desired & builtins)
+        managed_desired = desired - builtins
+        managed_installed = installed - builtins
 
-        missing = desired - installed
-        extra = (installed - desired) - builtins
-        matched = desired & installed
+        missing = frozenset(managed_desired - managed_installed)
+        extra = frozenset(managed_installed - managed_desired)
+        matched = frozenset(managed_desired & managed_installed)
 
         return ExtensionDiff(
-            missing=frozenset(missing),
-            extra=frozenset(extra),
-            matched=frozenset(matched),
+            missing=missing,
+            extra=extra,
+            matched=matched,
+            ignored=ignored,
         )
 
     def install_extensions(
@@ -175,15 +201,42 @@ class ExtensionManager:
                     results.append(ExtensionResult(ext_id, True, f"Installed {ext_id}"))
                 else:
                     msg = result.stderr.strip() or result.stdout.strip()
-                    results.append(ExtensionResult(ext_id, False, msg))
+                    if is_builtin_install_error(msg):
+                        results.append(
+                            ExtensionResult(
+                                ext_id,
+                                True,
+                                msg,
+                                status=ExtensionResultStatus.SKIPPED_BUILTIN,
+                            )
+                        )
+                    else:
+                        results.append(
+                            ExtensionResult(
+                                ext_id,
+                                False,
+                                msg,
+                                status=ExtensionResultStatus.FAILED,
+                            )
+                        )
             except FileNotFoundError:
                 results.append(
-                    ExtensionResult(ext_id, False, f"{cli_command} not found in PATH")
+                    ExtensionResult(
+                        ext_id,
+                        False,
+                        f"{cli_command} not found in PATH",
+                        status=ExtensionResultStatus.FAILED,
+                    )
                 )
                 break
             except subprocess.TimeoutExpired:
                 results.append(
-                    ExtensionResult(ext_id, False, f"Timed out installing {ext_id}")
+                    ExtensionResult(
+                        ext_id,
+                        False,
+                        f"Timed out installing {ext_id}",
+                        status=ExtensionResultStatus.FAILED,
+                    )
                 )
 
         return results
@@ -216,15 +269,32 @@ class ExtensionManager:
                     )
                 else:
                     msg = result.stderr.strip() or result.stdout.strip()
-                    results.append(ExtensionResult(ext_id, False, msg))
+                    results.append(
+                        ExtensionResult(
+                            ext_id,
+                            False,
+                            msg,
+                            status=ExtensionResultStatus.FAILED,
+                        )
+                    )
             except FileNotFoundError:
                 results.append(
-                    ExtensionResult(ext_id, False, f"{cli_command} not found in PATH")
+                    ExtensionResult(
+                        ext_id,
+                        False,
+                        f"{cli_command} not found in PATH",
+                        status=ExtensionResultStatus.FAILED,
+                    )
                 )
                 break
             except subprocess.TimeoutExpired:
                 results.append(
-                    ExtensionResult(ext_id, False, f"Timed out uninstalling {ext_id}")
+                    ExtensionResult(
+                        ext_id,
+                        False,
+                        f"Timed out uninstalling {ext_id}",
+                        status=ExtensionResultStatus.FAILED,
+                    )
                 )
 
         return results
@@ -235,5 +305,4 @@ class ExtensionManager:
         Filters out builtin extensions to prevent poisoning config files.
         """
         installed = self.get_installed_extensions(cli_command)
-        builtins = BUILTIN_EXTENSIONS.get(shell_name or "", set())
-        return "\n".join(sorted(installed - builtins))
+        return "\n".join(sorted(installed - get_builtin_extensions(shell_name)))

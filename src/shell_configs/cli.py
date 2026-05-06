@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -15,6 +15,7 @@ from shell_configs.config import ConfigReader
 from shell_configs.shells.base import merge_json_with_profile
 
 if TYPE_CHECKING:
+    from shell_configs.extensions import ExtensionResult
     from shell_configs.manager import ConfigManager
     from shell_configs.profiles.profile import Profile
     from shell_configs.shells.base import Shell
@@ -603,7 +604,7 @@ def install(
         ext_manager = ExtensionManager()
         ide_shells = _get_extension_shells(registry)
         if ide_shells:
-            any_ext_work = False
+            any_ext_activity = False
             for shell in ide_shells:
                 cli_cmd = shell.get_extension_cli()
                 if cli_cmd is None:
@@ -618,31 +619,45 @@ def install(
                 diff = ext_manager.compute_diff(
                     desired, installed, shell_name=shell.name
                 )
+                printed_header = False
+
+                if diff.ignored:
+                    if not any_ext_activity:
+                        console.print()
+                        console.print("[yellow]Installing IDE extensions...[/yellow]")
+                    any_ext_activity = True
+                    console.print(f"  [bold cyan]{shell.display_name}[/bold cyan]")
+                    printed_header = _print_ignored_builtin_extensions(
+                        console,
+                        shell.display_name,
+                        diff.ignored,
+                        header_printed=True,
+                    )
 
                 if not diff.missing:
                     continue
 
-                if not any_ext_work:
+                if not any_ext_activity:
                     console.print()
                     console.print("[yellow]Installing IDE extensions...[/yellow]")
-                    any_ext_work = True
+                any_ext_activity = True
 
-                console.print(
-                    f"  [bold cyan]{shell.display_name}[/bold cyan]: "
-                    f"{len(diff.missing)} missing"
-                )
+                if not printed_header:
+                    console.print(
+                        f"  [bold cyan]{shell.display_name}[/bold cyan]: "
+                        f"{len(diff.missing)} missing"
+                    )
+                else:
+                    console.print(
+                        f"  [yellow]Installing {len(diff.missing)} missing extension(s)...[/yellow]"
+                    )
                 ext_results = ext_manager.install_extensions(
                     cli_cmd, set(diff.missing), dry_run=dry_run
                 )
                 for ext_r in ext_results:
-                    if ext_r.success:
-                        console.print(f"  [green]✓[/green] {ext_r.message}")
-                    else:
-                        console.print(
-                            f"  [red]✗[/red] {ext_r.extension_id}: {ext_r.message}"
-                        )
+                    _print_extension_result(console, ext_r)
 
-            if not any_ext_work:
+            if not any_ext_activity:
                 console.print()
                 console.print("[green]✓[/green] All IDE extensions already in sync")
 
@@ -2655,6 +2670,40 @@ def _get_extension_shells(
     return [s for s in selected if s.get_extension_cli() is not None]
 
 
+def _print_ignored_builtin_extensions(
+    console: Any,
+    shell_display_name: str,
+    ignored_extensions: frozenset[str],
+    *,
+    header_printed: bool,
+) -> bool:
+    """Print a warning for builtin extensions listed in desired config."""
+    if not ignored_extensions:
+        return header_printed
+
+    if not header_printed:
+        console.print(f"\n[bold cyan]{shell_display_name}[/bold cyan]")
+        header_printed = True
+
+    ignored = ", ".join(sorted(ignored_extensions))
+    console.print(
+        f"  [yellow]! Ignoring built-in extensions from config: {ignored}[/yellow]"
+    )
+    return header_printed
+
+
+def _print_extension_result(console: Any, result: "ExtensionResult") -> None:
+    """Render extension install/uninstall results consistently."""
+    from shell_configs.extensions import ExtensionResultStatus
+
+    if result.status == ExtensionResultStatus.SKIPPED_BUILTIN:
+        console.print(f"  [yellow]![/yellow] {result.extension_id}: {result.message}")
+    elif result.success:
+        console.print(f"  [green]✓[/green] {result.message}")
+    else:
+        console.print(f"  [red]✗[/red] {result.extension_id}: {result.message}")
+
+
 @extensions.command(name="status")
 @click.option(
     "--shells",
@@ -2689,6 +2738,7 @@ def extensions_status(shells: list[str] | None, profile_name: str | None) -> Non
     table.add_column("Missing")
     table.add_column("Extra")
     table.add_column("Status")
+    ignored_by_shell: list[tuple[str, frozenset[str]]] = []
 
     for shell in ide_shells:
         cli_cmd = shell.get_extension_cli()
@@ -2700,11 +2750,15 @@ def extensions_status(shells: list[str] | None, profile_name: str | None) -> Non
         )
         installed = ext_manager.get_installed_extensions(cli_cmd)
         diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
+        if diff.ignored:
+            ignored_by_shell.append((shell.display_name, diff.ignored))
 
-        if not diff.missing and not diff.extra:
-            status_str = "[green]✓ synced[/green]"
-        else:
+        if diff.missing or diff.extra:
             status_str = "[yellow]⚠ out of sync[/yellow]"
+        elif diff.ignored:
+            status_str = "[yellow]⚠ built-ins ignored[/yellow]"
+        else:
+            status_str = "[green]✓ synced[/green]"
 
         table.add_row(
             shell.display_name,
@@ -2716,6 +2770,11 @@ def extensions_status(shells: list[str] | None, profile_name: str | None) -> Non
         )
 
     console.print(table)
+    for shell_display_name, ignored in ignored_by_shell:
+        ignored_list = ", ".join(sorted(ignored))
+        console.print(
+            f"[yellow]! {shell_display_name}: ignoring built-in extensions from config: {ignored_list}[/yellow]"
+        )
 
 
 @extensions.command(name="diff")
@@ -2755,11 +2814,18 @@ def extensions_diff(shells: list[str] | None, profile_name: str | None) -> None:
         installed = ext_manager.get_installed_extensions(cli_cmd)
         diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
 
-        if not diff.missing and not diff.extra:
+        if not diff.missing and not diff.extra and not diff.ignored:
             continue
 
         found_diffs = True
         console.print(f"\n[bold cyan]{shell.display_name}[/bold cyan]")
+
+        if diff.ignored:
+            console.print(
+                f"  [yellow]Ignored built-ins in config ({len(diff.ignored)}):[/yellow]"
+            )
+            for ext_id in sorted(diff.ignored):
+                console.print(f"    [yellow]![/yellow] {ext_id}")
 
         if diff.missing:
             console.print(f"  [yellow]Missing ({len(diff.missing)}):[/yellow]")
@@ -2813,7 +2879,7 @@ def extensions_install(
         console.print("[yellow]No IDEs with extension management found[/yellow]")
         return
 
-    any_work = False
+    any_activity = False
     for shell in ide_shells:
         cli_cmd = shell.get_extension_cli()
         if cli_cmd is None:
@@ -2827,12 +2893,24 @@ def extensions_install(
 
         to_install = diff.missing
         to_uninstall = diff.extra if prune else frozenset()
+        printed_header = False
+
+        if diff.ignored:
+            any_activity = True
+            printed_header = _print_ignored_builtin_extensions(
+                console,
+                shell.display_name,
+                diff.ignored,
+                header_printed=printed_header,
+            )
 
         if not to_install and not to_uninstall:
             continue
 
-        any_work = True
-        console.print(f"\n[bold cyan]{shell.display_name}[/bold cyan]")
+        any_activity = True
+        if not printed_header:
+            console.print(f"\n[bold cyan]{shell.display_name}[/bold cyan]")
+            printed_header = True
 
         if to_install:
             console.print(
@@ -2848,10 +2926,7 @@ def extensions_install(
                     cli_cmd, set(to_install), dry_run=dry_run
                 )
                 for r in results:
-                    if r.success:
-                        console.print(f"  [green]✓[/green] {r.message}")
-                    else:
-                        console.print(f"  [red]✗[/red] {r.extension_id}: {r.message}")
+                    _print_extension_result(console, r)
 
         if to_uninstall:
             console.print(
@@ -2867,15 +2942,12 @@ def extensions_install(
                     cli_cmd, set(to_uninstall), dry_run=dry_run
                 )
                 for r in results:
-                    if r.success:
-                        console.print(f"  [green]✓[/green] {r.message}")
-                    else:
-                        console.print(f"  [red]✗[/red] {r.extension_id}: {r.message}")
+                    _print_extension_result(console, r)
 
-    if not any_work:
+    if not any_activity:
         print_info("All IDE extensions are already in sync")
 
-    if dry_run and any_work:
+    if dry_run and any_activity:
         print_info("\nDry run complete. Use without --dry-run to apply changes.")
 
 

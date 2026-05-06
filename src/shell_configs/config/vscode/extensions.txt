@@ -1,3 +1,2 @@
 # VSCode-only extensions (Microsoft-proprietary, unavailable on OpenVSX)
-github.copilot-chat
 ms-python.vscode-pylance

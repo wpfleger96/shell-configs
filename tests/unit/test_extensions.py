@@ -9,6 +9,7 @@ import pytest
 from shell_configs.extensions import (
     ExtensionDiff,
     ExtensionManager,
+    ExtensionResultStatus,
     load_extension_file,
 )
 from shell_configs.profiles.loader import ProfileLoader
@@ -109,6 +110,7 @@ class TestExtensionDiff:
         installed = {"golang.go", "anysphere.cursorpyright"}
         diff = self.manager.compute_diff(desired, installed, shell_name="cursor")
         assert diff.extra == frozenset()
+        assert diff.ignored == frozenset()
 
     def test_builtin_exclusion_only_for_matching_shell(self):
         desired = {"golang.go"}
@@ -116,12 +118,21 @@ class TestExtensionDiff:
         diff = self.manager.compute_diff(desired, installed, shell_name="vscode")
         assert "anysphere.cursorpyright" in diff.extra
 
-    def test_builtin_in_desired_not_flagged_as_missing(self):
+    def test_builtin_in_desired_is_ignored(self):
+        desired = {"golang.go", "github.copilot-chat"}
+        installed = {"golang.go"}
+        diff = self.manager.compute_diff(desired, installed, shell_name="vscode")
+        assert diff.missing == frozenset()
+        assert diff.ignored == frozenset({"github.copilot-chat"})
+        assert diff.matched == frozenset({"golang.go"})
+
+    def test_builtin_in_desired_and_installed_is_not_counted_as_matched(self):
         desired = {"golang.go", "anysphere.cursorpyright"}
         installed = {"golang.go", "anysphere.cursorpyright"}
         diff = self.manager.compute_diff(desired, installed, shell_name="cursor")
         assert diff.missing == frozenset()
-        assert "anysphere.cursorpyright" in diff.matched
+        assert diff.ignored == frozenset({"anysphere.cursorpyright"})
+        assert diff.matched == frozenset({"golang.go"})
 
     def test_empty_desired_and_installed(self):
         diff = self.manager.compute_diff(set(), set())
@@ -339,6 +350,28 @@ class TestInstallExtensions:
         assert not results[0].success
         assert results[1].success
 
+    def test_builtin_install_error_is_skipped(self):
+        mock_result = type(
+            "Result",
+            (),
+            {
+                "returncode": 1,
+                "stdout": "",
+                "stderr": (
+                    "Error while installing extension github.copilot-chat: "
+                    "Extension 'github.copilot-chat' is a built-in extension"
+                ),
+            },
+        )()
+
+        manager = ExtensionManager()
+        with patch("shell_configs.extensions.subprocess.run", return_value=mock_result):
+            results = manager.install_extensions("code", {"github.copilot-chat"})
+
+        assert len(results) == 1
+        assert results[0].success
+        assert results[0].status == ExtensionResultStatus.SKIPPED_BUILTIN
+
     def test_uninstall_dry_run(self):
         manager = ExtensionManager()
         results = manager.uninstall_extensions("code", {"golang.go"}, dry_run=True)
@@ -370,6 +403,25 @@ class TestExportExtensions:
         assert "anysphere.cursorpyright" not in lines
         assert "golang.go" in lines
         assert "ms-python.python" in lines
+
+    def test_export_filters_vscode_builtins(self):
+        mock_result = type(
+            "Result",
+            (),
+            {
+                "returncode": 0,
+                "stdout": "github.copilot-chat\ngolang.go\n",
+                "stderr": "",
+            },
+        )()
+
+        manager = ExtensionManager()
+        with patch("shell_configs.extensions.subprocess.run", return_value=mock_result):
+            output = manager.export_extensions("code", shell_name="vscode")
+
+        lines = output.strip().split("\n")
+        assert "github.copilot-chat" not in lines
+        assert "golang.go" in lines
 
     def test_export_without_shell_name_includes_all(self):
         mock_result = type(
