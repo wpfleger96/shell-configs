@@ -248,7 +248,31 @@ def _display_diffs_for_shells(
             else:
                 repo_content = additional_file.source_path.read_text()
 
-            if additional_file.comment_prefix:
+            if additional_file.ini_merge:
+                if manager.check_ini_file_synced(
+                    additional_file.source_path, additional_file.target_path
+                ):
+                    continue
+
+                managed_keys = manager._managed_keys_from_source(
+                    additional_file.source_path
+                )
+                installed_cp = manager._parse_ini(
+                    additional_file.target_path.read_text()
+                )
+                old_lines: list[str] = []
+                new_lines: list[str] = []
+                for ini_section, key, value in managed_keys:
+                    if installed_cp.has_section(
+                        ini_section
+                    ) and installed_cp.has_option(ini_section, key):
+                        old_lines.append(
+                            f"{key}={installed_cp.get(ini_section, key)}\n"
+                        )
+                    new_lines.append(f"{key}={value}\n")
+                installed_content = "".join(old_lines)
+                repo_content = "".join(new_lines)
+            elif additional_file.comment_prefix:
                 section = manager.extract_managed_section(
                     additional_file.target_path,
                     comment_prefix=additional_file.comment_prefix,

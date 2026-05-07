@@ -1,5 +1,7 @@
 """Unit tests for the ConfigManager."""
 
+from pathlib import Path
+
 import pytest
 
 from shell_configs.manager import ConfigManager, OperationResult
@@ -343,3 +345,215 @@ class TestConfigManagerSharedConfig:
         assert manager.SHELL_SPECIFIC_MARKER in content
         assert shared_content in content
         assert shell_content in content
+
+
+@pytest.mark.unit
+class TestConfigManagerIniMerge:
+    """Test ConfigManager INI merge methods."""
+
+    def _write_source(self, path: "Path") -> None:
+        path.write_text(
+            "[Default Applications]\n"
+            "text/html=wslview.desktop\n"
+            "x-scheme-handler/http=wslview.desktop\n"
+        )
+
+    def test_install_ini_file_new(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.list"
+        target = temp_dir / "mimeapps.list"
+        self._write_source(source)
+
+        result, message, _ = manager.install_ini_file(source, target)
+
+        assert result == OperationResult.CREATED
+        assert target.exists()
+        text = target.read_text()
+        assert "text/html" in text
+        assert "wslview.desktop" in text
+        assert manager._sidecar_path(target).exists()
+
+    def test_install_ini_file_already_synced(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.list"
+        target = temp_dir / "mimeapps.list"
+        self._write_source(source)
+
+        manager.install_ini_file(source, target)
+        result, message, _ = manager.install_ini_file(source, target)
+
+        assert result == OperationResult.ALREADY_SYNCED
+
+    def test_install_ini_file_preserves_user_keys(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.list"
+        target = temp_dir / "mimeapps.list"
+        self._write_source(source)
+        target.write_text(
+            "[Default Applications]\n"
+            "x-scheme-handler/claude-cli=claude-code-url-handler.desktop\n"
+        )
+
+        result, message, _ = manager.install_ini_file(source, target)
+
+        assert result == OperationResult.UPDATED
+        text = target.read_text()
+        assert "claude-code-url-handler.desktop" in text
+        assert "wslview.desktop" in text
+
+    def test_install_ini_file_dry_run(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.list"
+        target = temp_dir / "mimeapps.list"
+        self._write_source(source)
+
+        result, message, _ = manager.install_ini_file(source, target, dry_run=True)
+
+        assert result == OperationResult.CREATED
+        assert not target.exists()
+
+    def test_check_ini_file_synced(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.list"
+        target = temp_dir / "mimeapps.list"
+        self._write_source(source)
+
+        assert not manager.check_ini_file_synced(source, target)
+
+        manager.install_ini_file(source, target)
+        assert manager.check_ini_file_synced(source, target)
+
+    def test_check_ini_file_synced_with_extra_keys(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.list"
+        target = temp_dir / "mimeapps.list"
+        self._write_source(source)
+
+        manager.install_ini_file(source, target)
+        import configparser
+
+        cp = configparser.RawConfigParser()
+        cp.optionxform = str  # type: ignore[assignment]
+        cp.read_string(target.read_text())
+        cp.set(
+            "Default Applications",
+            "x-scheme-handler/claude-cli",
+            "claude-code-url-handler.desktop",
+        )
+        import io
+
+        buf = io.StringIO()
+        cp.write(buf)
+        target.write_text(buf.getvalue())
+
+        assert manager.check_ini_file_synced(source, target)
+
+    def test_uninstall_ini_file(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.list"
+        target = temp_dir / "mimeapps.list"
+        self._write_source(source)
+        target.write_text(
+            "[Default Applications]\n"
+            "x-scheme-handler/claude-cli=claude-code-url-handler.desktop\n"
+        )
+
+        manager.install_ini_file(source, target)
+        result, message = manager.uninstall_ini_file(target)
+
+        assert result == OperationResult.REMOVED
+        assert target.exists()
+        text = target.read_text()
+        assert "claude-code-url-handler.desktop" in text
+        assert "wslview.desktop" not in text
+        assert not manager._sidecar_path(target).exists()
+
+    def test_uninstall_ini_file_removes_empty_file(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.list"
+        target = temp_dir / "mimeapps.list"
+        self._write_source(source)
+
+        manager.install_ini_file(source, target)
+        result, message = manager.uninstall_ini_file(target)
+
+        assert result == OperationResult.REMOVED
+        assert not target.exists()
+
+    def test_uninstall_ini_file_not_found(self, temp_dir):
+        manager = ConfigManager()
+        target = temp_dir / "missing.list"
+
+        result, message = manager.uninstall_ini_file(target)
+
+        assert result == OperationResult.NOT_FOUND
+
+    def test_clean_corrupted_ini_markers(self, temp_dir):
+        """Test migration from corrupted marker state."""
+        manager = ConfigManager()
+        source = temp_dir / "source.list"
+        target = temp_dir / "mimeapps.list"
+        self._write_source(source)
+
+        target.write_text(
+            "[Default Applications]\n"
+            "    ########################################\n"
+            "    ##### shell-configs Managed Config #####\n"
+            "    ########################################\n"
+            "    ########################################\n"
+            "    ##### End shell-configs Managed Config #####\n"
+            "    ########################################\n"
+            "[Default Applications]\n"
+            "text/html=wslview.desktop\n"
+            "x-scheme-handler/http=wslview.desktop\n"
+        )
+
+        result, message, _ = manager.install_ini_file(source, target)
+
+        assert result == OperationResult.ALREADY_SYNCED
+        text = target.read_text()
+        assert "shell-configs Managed Config" not in text
+
+    def test_install_ini_file_generates_diff(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.list"
+        target = temp_dir / "mimeapps.list"
+        self._write_source(source)
+        target.write_text("[Default Applications]\ntext/html=firefox.desktop\n")
+
+        result, message, diff_text = manager.install_ini_file(source, target)
+
+        assert result == OperationResult.UPDATED
+        assert diff_text is not None
+        assert "firefox.desktop" in diff_text
+        assert "wslview.desktop" in diff_text
+
+    def test_uninstall_ini_file_dry_run(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.list"
+        target = temp_dir / "mimeapps.list"
+        self._write_source(source)
+
+        manager.install_ini_file(source, target)
+        result, message = manager.uninstall_ini_file(target, dry_run=True)
+
+        assert result == OperationResult.REMOVED
+        assert "Would remove" in message
+        assert target.exists()
+        assert manager._sidecar_path(target).exists()
+
+    def test_install_ini_file_dry_run_shows_diff(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.list"
+        target = temp_dir / "mimeapps.list"
+        self._write_source(source)
+        target.write_text("[Default Applications]\ntext/html=firefox.desktop\n")
+
+        result, message, diff_text = manager.install_ini_file(
+            source, target, dry_run=True
+        )
+
+        assert result == OperationResult.UPDATED
+        assert diff_text is not None
+        assert "firefox.desktop" in diff_text
+        assert not target.read_text().endswith("wslview.desktop\n")

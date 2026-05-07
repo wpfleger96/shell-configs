@@ -1,5 +1,7 @@
 """Manager for shell configuration sections."""
 
+import configparser
+import difflib
 import json
 import logging
 import os
@@ -821,6 +823,221 @@ class ConfigManager:
 
         except Exception as e:
             return (OperationResult.ERROR, f"Error removing file: {e}")
+
+    def _sidecar_path(self, config_file: Path) -> Path:
+        return config_file.parent / f"{config_file.name}.shell-configs-keys"
+
+    def _parse_ini(self, text: str) -> configparser.RawConfigParser:
+        cp = configparser.RawConfigParser()
+        cp.optionxform = str  # type: ignore[assignment]
+        cp.read_string(text)
+        return cp
+
+    def _write_ini(self, cp: configparser.RawConfigParser, path: Path) -> None:
+        import io
+
+        buf = io.StringIO()
+        cp.write(buf)
+        self._atomic_write(path, buf.getvalue())
+
+    def _managed_keys_from_source(
+        self, source_path: Path
+    ) -> list[tuple[str, str, str]]:
+        cp = self._parse_ini(source_path.read_text())
+        return [
+            (section, key, cp.get(section, key))
+            for section in cp.sections()
+            for key in cp.options(section)
+        ]
+
+    def _clean_corrupted_ini_markers(self, config_file: Path) -> None:
+        if not config_file.exists():
+            return
+        text = config_file.read_text()
+        if "shell-configs Managed Config" not in text:
+            return
+        cleaned_lines: list[str] = []
+        seen_sections: set[str] = set()
+        for line in text.splitlines():
+            stripped = line.strip()
+            if "shell-configs Managed Config" in stripped:
+                continue
+            if stripped == "#" * 40:
+                continue
+            if stripped.startswith("[") and stripped.endswith("]"):
+                section = stripped
+                if section in seen_sections:
+                    continue
+                seen_sections.add(section)
+            cleaned_lines.append(line)
+        self._atomic_write(config_file, "\n".join(cleaned_lines) + "\n")
+
+    def check_ini_file_synced(self, source_path: Path, config_file: Path) -> bool:
+        if not config_file.exists():
+            return False
+        try:
+            managed_keys = self._managed_keys_from_source(source_path)
+            installed = self._parse_ini(config_file.read_text())
+            return all(
+                installed.has_section(section)
+                and installed.has_option(section, key)
+                and installed.get(section, key) == value
+                for section, key, value in managed_keys
+            )
+        except Exception:
+            return False
+
+    def install_ini_file(
+        self,
+        source_path: Path,
+        config_file: Path,
+        dry_run: bool = False,
+    ) -> tuple[OperationResult, str, str | None]:
+        try:
+            managed_keys = self._managed_keys_from_source(source_path)
+
+            if config_file.exists():
+                self._clean_corrupted_ini_markers(config_file)
+                installed = self._parse_ini(config_file.read_text())
+            else:
+                installed = self._parse_ini("")
+
+            if all(
+                installed.has_section(s)
+                and installed.has_option(s, k)
+                and installed.get(s, k) == v
+                for s, k, v in managed_keys
+            ):
+                return (
+                    OperationResult.ALREADY_SYNCED,
+                    f"{config_file} is already synced",
+                    None,
+                )
+
+            old_lines: list[str] = []
+            new_lines: list[str] = []
+            for section, key, value in managed_keys:
+                old_val = (
+                    installed.get(section, key)
+                    if installed.has_section(section)
+                    and installed.has_option(section, key)
+                    else None
+                )
+                if old_val is not None:
+                    old_lines.append(f"{key}={old_val}\n")
+                new_lines.append(f"{key}={value}\n")
+
+            diff_raw = "".join(
+                difflib.unified_diff(
+                    old_lines,
+                    new_lines,
+                    fromfile="Previous",
+                    tofile="Updated",
+                    lineterm="",
+                )
+            )
+            diff_text = diff_raw if diff_raw.strip() else None
+
+            if dry_run:
+                return (
+                    OperationResult.UPDATED
+                    if config_file.exists()
+                    else OperationResult.CREATED,
+                    f"Would update {config_file}",
+                    diff_text,
+                )
+
+            backup_msg = ""
+            if config_file.exists():
+                backup_path, removed_files = self.create_backup(config_file)
+                backup_msg = f" (backup: {backup_path.name})"
+                if removed_files:
+                    backup_msg += f"; removed {len(removed_files)} old backup(s)"
+
+            for section, key, value in managed_keys:
+                if not installed.has_section(section):
+                    installed.add_section(section)
+                installed.set(section, key, value)
+
+            self._write_ini(installed, config_file)
+
+            sidecar = [[s, k] for s, k, _v in managed_keys]
+            self._atomic_write(
+                self._sidecar_path(config_file), json.dumps(sidecar) + "\n"
+            )
+
+            is_update = backup_msg != ""
+            return (
+                OperationResult.UPDATED if is_update else OperationResult.CREATED,
+                f"{'Updated' if is_update else 'Created'} {config_file}{backup_msg}",
+                diff_text,
+            )
+
+        except Exception as e:
+            return (OperationResult.ERROR, f"Error installing INI file: {e}", None)
+
+    def uninstall_ini_file(
+        self,
+        config_file: Path,
+        dry_run: bool = False,
+    ) -> tuple[OperationResult, str]:
+        try:
+            sidecar = self._sidecar_path(config_file)
+            if not config_file.exists() and not sidecar.exists():
+                return (
+                    OperationResult.NOT_FOUND,
+                    f"{config_file} does not exist",
+                )
+
+            if dry_run:
+                return (
+                    OperationResult.REMOVED,
+                    f"Would remove managed keys from {config_file}",
+                )
+
+            if sidecar.exists():
+                keys: list[list[str]] = json.loads(sidecar.read_text())
+            else:
+                keys = []
+
+            if config_file.exists() and keys:
+                installed = self._parse_ini(config_file.read_text())
+                for section, key in keys:
+                    if installed.has_section(section) and installed.has_option(
+                        section, key
+                    ):
+                        installed.remove_option(section, key)
+                    if installed.has_section(section) and not installed.options(
+                        section
+                    ):
+                        installed.remove_section(section)
+
+                remaining_sections = installed.sections()
+                if remaining_sections:
+                    backup_path, removed_files = self.create_backup(config_file)
+                    self._write_ini(installed, config_file)
+                    backup_msg = f" (backup: {backup_path.name})"
+                    if removed_files:
+                        backup_msg += f"; removed {len(removed_files)} old backup(s)"
+                else:
+                    backup_path, removed_files = self.create_backup(config_file)
+                    config_file.unlink()
+                    backup_msg = f" (backup: {backup_path.name})"
+                    if removed_files:
+                        backup_msg += f"; removed {len(removed_files)} old backup(s)"
+            else:
+                backup_msg = ""
+
+            if sidecar.exists():
+                sidecar.unlink()
+
+            return (
+                OperationResult.REMOVED,
+                f"Removed managed keys from {config_file}{backup_msg}",
+            )
+
+        except Exception as e:
+            return (OperationResult.ERROR, f"Error uninstalling INI file: {e}")
 
     def files_match(self, file1: Path, file2: Path) -> bool:
         """Check if two files have identical content.

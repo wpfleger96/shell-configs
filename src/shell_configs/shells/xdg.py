@@ -39,7 +39,7 @@ class XdgShell(Shell):
                 name="mimeapps.list",
                 source_path=get_config_dir() / "xdg" / "mimeapps.list",
                 target_path=Path.home() / ".config" / "mimeapps.list",
-                comment_prefix="#",
+                ini_merge=True,
             )
         ]
 
