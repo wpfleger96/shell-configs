@@ -36,7 +36,29 @@ class CursorShell(Shell):
             return Path.home() / ".config" / "Cursor" / "User"
 
     def get_extension_cli(self) -> str | None:
+        if is_platform(Platform.WSL):
+            remote_cli = self._find_cursor_remote_cli()
+            if remote_cli:
+                return str(remote_cli)
         return "cursor"
+
+    def _find_cursor_remote_cli(self) -> Path | None:
+        server_bin = Path.home() / ".cursor-server" / "bin"
+        if not server_bin.exists():
+            return None
+        try:
+            hash_dirs = sorted(
+                (d for d in server_bin.iterdir() if d.is_dir()),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+        except OSError:
+            return None
+        for d in hash_dirs:
+            cli = d / "bin" / "remote-cli" / "cursor"
+            if cli.exists():
+                return cli
+        return None
 
     def get_extension_list_paths(self) -> list[Path]:
         config_dir = get_config_dir()

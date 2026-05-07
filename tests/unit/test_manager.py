@@ -557,3 +557,45 @@ class TestConfigManagerIniMerge:
         assert diff_text is not None
         assert "firefox.desktop" in diff_text
         assert not target.read_text().endswith("wslview.desktop\n")
+
+    def test_parse_ini_handles_duplicate_sections(self, temp_dir):
+        manager = ConfigManager()
+        corrupted_ini = (
+            "[Default Applications]\nkey1=value1\n[Default Applications]\nkey2=value2\n"
+        )
+        cp = manager._parse_ini(corrupted_ini)
+        assert cp.has_section("Default Applications")
+        assert cp.get("Default Applications", "key1") == "value1"
+        assert cp.get("Default Applications", "key2") == "value2"
+
+    def test_diff_handles_corrupted_mimeapps(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.list"
+        target = temp_dir / "mimeapps.list"
+        source.write_text("[Default Applications]\ntext/html=wslview.desktop\n")
+        target.write_text(
+            "[Default Applications]\n"
+            "    ########################################\n"
+            "    ##### shell-configs Managed Config #####\n"
+            "    ########################################\n"
+            "[Default Applications]\n"
+            "text/html=firefox.desktop\n"
+        )
+        manager._managed_keys_from_source(source)
+        installed_cp = manager._parse_ini(target.read_text())
+        assert installed_cp.has_section("Default Applications")
+
+    def test_uninstall_ini_file_handles_corrupted_file(self, temp_dir):
+        manager = ConfigManager()
+        target = temp_dir / "mimeapps.list"
+        sidecar = manager._sidecar_path(target)
+        target.write_text(
+            "[Default Applications]\nkey1=value1\n[Default Applications]\nkey2=value2\n"
+        )
+        sidecar.write_text('[["Default Applications", "key1"]]')
+        result, message = manager.uninstall_ini_file(target)
+        assert result == OperationResult.REMOVED
+        content = target.read_text()
+        assert "key2" in content
+        assert "value2" in content
+        assert "key1" not in content

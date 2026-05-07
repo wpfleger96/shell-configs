@@ -828,7 +828,7 @@ class ConfigManager:
         return config_file.parent / f"{config_file.name}.shell-configs-keys"
 
     def _parse_ini(self, text: str) -> configparser.RawConfigParser:
-        cp = configparser.RawConfigParser()
+        cp = configparser.RawConfigParser(strict=False)
         cp.optionxform = str  # type: ignore[assignment]
         cp.read_string(text)
         return cp

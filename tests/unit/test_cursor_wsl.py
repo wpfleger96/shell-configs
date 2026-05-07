@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from shell_configs.platform import Platform
 from shell_configs.shells.cursor import CursorShell
 
@@ -67,3 +69,36 @@ class TestCursorWSLPaths:
             cursor_dir
             == mock_home / "Library" / "Application Support" / "Cursor" / "User"
         )
+
+
+@pytest.mark.unit
+class TestCursorWSLRemoteCli:
+    def test_finds_remote_cli_on_wsl(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            "shell_configs.shells.cursor.is_platform",
+            lambda p: p == Platform.WSL,
+        )
+        monkeypatch.setattr("shell_configs.shells.cursor.Path.home", lambda: tmp_path)
+        hash_dir = tmp_path / ".cursor-server" / "bin" / "abc123" / "bin" / "remote-cli"
+        hash_dir.mkdir(parents=True)
+        cli = hash_dir / "cursor"
+        cli.write_text("#!/bin/sh")
+        shell = CursorShell()
+        result = shell.get_extension_cli()
+        assert result == str(cli)
+
+    def test_falls_back_to_cursor_when_no_server(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            "shell_configs.shells.cursor.is_platform",
+            lambda p: p == Platform.WSL,
+        )
+        monkeypatch.setattr("shell_configs.shells.cursor.Path.home", lambda: tmp_path)
+        shell = CursorShell()
+        result = shell.get_extension_cli()
+        assert result == "cursor"
+
+    def test_falls_back_when_not_wsl(self, monkeypatch):
+        monkeypatch.setattr("shell_configs.shells.cursor.is_platform", lambda p: False)
+        shell = CursorShell()
+        result = shell.get_extension_cli()
+        assert result == "cursor"
