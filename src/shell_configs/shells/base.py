@@ -30,6 +30,7 @@ class AdditionalFile:
     comment_prefix: str | None = None
     base_source_path: Path | None = field(default=None)
     backup_dir: Path | None = field(default=None)
+    ini_merge: bool = False
 
 
 @dataclass

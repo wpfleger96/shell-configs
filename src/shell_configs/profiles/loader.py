@@ -123,7 +123,6 @@ class ProfileLoader:
             parent.settings_overrides, child.settings_overrides
         )
 
-        # Shell override content: parent first, child appended
         merged_shell: dict[str, str] = dict(parent.shell_overrides)
         for shell_name, content in child.shell_overrides.items():
             if shell_name in merged_shell:
@@ -131,7 +130,6 @@ class ProfileLoader:
             else:
                 merged_shell[shell_name] = content
 
-        # Package lists: union
         parent_add = parent.packages.get("add", [])
         child_add = child.packages.get("add", [])
         parent_remove = parent.packages.get("remove", [])
@@ -139,7 +137,6 @@ class ProfileLoader:
 
         merged_add = list(dict.fromkeys(parent_add + child_add))
         merged_remove = list(dict.fromkeys(parent_remove + child_remove))
-        # Child remove wins over parent add
         merged_add = [p for p in merged_add if p not in set(merged_remove)]
 
         merged_packages: dict[str, list[str]] = {}

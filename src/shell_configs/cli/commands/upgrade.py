@@ -137,9 +137,6 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
     if upgraded_tools:
         console.print()
         console.print("[cyan]Installing updated configurations...[/cyan]")
-        # Run install in a new process so the upgraded code handles it.
-        # ctx.invoke would use stale in-memory modules from the pre-upgrade
-        # version, which may be incompatible with the new on-disk config files.
         import shutil
 
         shell_configs_bin = shutil.which("shell-configs")

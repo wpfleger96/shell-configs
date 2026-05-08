@@ -155,14 +155,21 @@ def ensure_gh_scopes(
     if scopes is None:
         scopes = ["admin:public_key", "admin:ssh_signing_key"]
 
-    test_result = _run(
-        ["gh", "ssh-key", "list"],
+    status_result = _run(
+        ["gh", "auth", "status"],
         capture_output=True,
         text=True,
         timeout=30,
     )
-    if test_result.returncode == 0:
-        return True, "Required OAuth scopes are present"
+    if status_result.returncode == 0:
+        output = f"{status_result.stdout}\n{status_result.stderr}"
+        for line in output.splitlines():
+            if "Token scopes:" in line:
+                scopes_str = line.split("Token scopes:", 1)[1].strip()
+                current_scopes = {s.strip().strip("'\"") for s in scopes_str.split(",")}
+                if all(s in current_scopes for s in scopes):
+                    return True, "Required OAuth scopes are present"
+                break
 
     if not interactive:
         return (
@@ -195,8 +202,14 @@ def upload_auth_key(key_path: Path) -> tuple[bool, str]:
         text=True,
         timeout=30,
     )
-    if existing.returncode == 0 and pub_key_data and pub_key_data in existing.stdout:
-        return True, "SSH auth key already uploaded to GitHub"
+    if existing.returncode == 0 and pub_key_data:
+        for line in existing.stdout.strip().split("\n"):
+            if not line.strip() or pub_key_data not in line:
+                continue
+            cols = line.split("\t")
+            key_type = cols[4].strip().lower() if len(cols) >= 5 else ""
+            if key_type == "authentication":
+                return True, "SSH auth key already uploaded to GitHub"
 
     title = socket.gethostname()
     add_result = _run(

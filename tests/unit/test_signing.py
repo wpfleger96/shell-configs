@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from shell_configs.signing import ensure_ssh_agent
+from shell_configs.signing import ensure_gh_scopes, ensure_ssh_agent, upload_auth_key
 
 
 def _make_result(
@@ -212,3 +212,169 @@ class TestValidateAllStepsNoMutation:
             f"_validate_all_steps must not call ssh-add to load keys, "
             f"but called: {ssh_add_load_calls}"
         )
+
+
+@pytest.mark.unit
+class TestEnsureGhScopes:
+    def test_returns_true_when_all_scopes_present(self, monkeypatch):
+        monkeypatch.setattr(
+            "shell_configs.signing._run",
+            lambda *a, **kw: subprocess.CompletedProcess(
+                a[0],
+                0,
+                stdout=(
+                    "github.com\n"
+                    "  ✓ Logged in to github.com account user\n"
+                    "  - Token scopes: 'admin:public_key', 'admin:ssh_signing_key', 'repo'\n"
+                ),
+                stderr="",
+            ),
+        )
+        ok, msg = ensure_gh_scopes(interactive=False)
+        assert ok is True
+        assert "present" in msg
+
+    def test_returns_false_when_missing_scope_noninteractive(self, monkeypatch):
+        monkeypatch.setattr(
+            "shell_configs.signing._run",
+            lambda *a, **kw: subprocess.CompletedProcess(
+                a[0],
+                0,
+                stdout=(
+                    "github.com\n  - Token scopes: 'admin:ssh_signing_key', 'repo'\n"
+                ),
+                stderr="",
+            ),
+        )
+        ok, msg = ensure_gh_scopes(interactive=False)
+        assert ok is False
+        assert "Missing OAuth scopes" in msg
+
+    def test_parses_scopes_from_stderr_fallback(self, monkeypatch):
+        monkeypatch.setattr(
+            "shell_configs.signing._run",
+            lambda *a, **kw: subprocess.CompletedProcess(
+                a[0],
+                0,
+                stdout="",
+                stderr=(
+                    "github.com\n"
+                    "  - Token scopes: 'admin:public_key', 'admin:ssh_signing_key'\n"
+                ),
+            ),
+        )
+        ok, msg = ensure_gh_scopes(interactive=False)
+        assert ok is True
+
+    def test_returns_false_when_gh_auth_fails(self, monkeypatch):
+        monkeypatch.setattr(
+            "shell_configs.signing._run",
+            lambda *a, **kw: subprocess.CompletedProcess(
+                a[0], 1, stdout="", stderr="not logged in"
+            ),
+        )
+        ok, msg = ensure_gh_scopes(interactive=False)
+        assert ok is False
+
+    def test_parses_scopes_when_split_across_streams(self, monkeypatch):
+        monkeypatch.setattr(
+            "shell_configs.signing._run",
+            lambda *a, **kw: subprocess.CompletedProcess(
+                a[0],
+                0,
+                stdout="Logged in to github.com account user\n",
+                stderr="  - Token scopes: 'admin:public_key', 'admin:ssh_signing_key'\n",
+            ),
+        )
+        ok, msg = ensure_gh_scopes(interactive=False)
+        assert ok is True
+        assert "present" in msg
+
+
+@pytest.mark.unit
+class TestUploadAuthKey:
+    def test_skips_upload_when_auth_key_exists(self, monkeypatch, tmp_path):
+        key_path = tmp_path / "id_rsa"
+        key_path.write_text("ssh-rsa AAAA user@host")
+        pub_path = tmp_path / "id_rsa.pub"
+        pub_path.write_text("ssh-rsa AAAA user@host")
+
+        monkeypatch.setattr(
+            "shell_configs.signing._run",
+            lambda *a, **kw: subprocess.CompletedProcess(
+                a[0],
+                0,
+                stdout="title\tssh-rsa AAAA\t2026-01-01\t123\tauthentication\n",
+                stderr="",
+            ),
+        )
+        ok, msg = upload_auth_key(key_path)
+        assert ok is True
+        assert "already uploaded" in msg
+
+    def test_uploads_when_only_signing_key_exists(self, monkeypatch, tmp_path):
+        key_path = tmp_path / "id_rsa"
+        key_path.write_text("ssh-rsa AAAA user@host")
+        pub_path = tmp_path / "id_rsa.pub"
+        pub_path.write_text("ssh-rsa AAAA user@host")
+
+        calls = []
+
+        def mock_run(*a, **kw):
+            cmd = a[0] if a else kw.get("args", [])
+            calls.append(cmd)
+            if "ssh-key" in cmd and "list" in cmd:
+                return subprocess.CompletedProcess(
+                    cmd,
+                    0,
+                    stdout="title\tssh-rsa AAAA\t2026-01-01\t123\tsigning\n",
+                    stderr="",
+                )
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        monkeypatch.setattr("shell_configs.signing._run", mock_run)
+        ok, msg = upload_auth_key(key_path)
+        assert ok is True
+        assert any("ssh-key" in str(c) and "add" in str(c) for c in calls)
+
+    def test_uploads_when_key_not_found(self, monkeypatch, tmp_path):
+        key_path = tmp_path / "id_rsa"
+        key_path.write_text("ssh-rsa BBBB user@host")
+        pub_path = tmp_path / "id_rsa.pub"
+        pub_path.write_text("ssh-rsa BBBB user@host")
+
+        calls = []
+
+        def mock_run(*a, **kw):
+            cmd = a[0] if a else kw.get("args", [])
+            calls.append(cmd)
+            if "ssh-key" in cmd and "list" in cmd:
+                return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        monkeypatch.setattr("shell_configs.signing._run", mock_run)
+        ok, msg = upload_auth_key(key_path)
+        assert ok is True
+        assert any("ssh-key" in str(c) and "add" in str(c) for c in calls)
+
+    def test_handles_malformed_gh_output(self, monkeypatch, tmp_path):
+        key_path = tmp_path / "id_rsa"
+        key_path.write_text("ssh-rsa CCCC user@host")
+        pub_path = tmp_path / "id_rsa.pub"
+        pub_path.write_text("ssh-rsa CCCC user@host")
+
+        calls = []
+
+        def mock_run(*a, **kw):
+            cmd = a[0] if a else kw.get("args", [])
+            calls.append(cmd)
+            if "ssh-key" in cmd and "list" in cmd:
+                return subprocess.CompletedProcess(
+                    cmd, 0, stdout="malformed output no tabs\n", stderr=""
+                )
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        monkeypatch.setattr("shell_configs.signing._run", mock_run)
+        ok, msg = upload_auth_key(key_path)
+        assert ok is True
+        assert any("ssh-key" in str(c) and "add" in str(c) for c in calls)

@@ -80,7 +80,13 @@ class ConfigsComponent(Component):
         for shell in ctx.selected_shells:
             additional_files = shell.get_additional_files()
             for additional_file in additional_files:
-                if additional_file.comment_prefix:
+                if additional_file.ini_merge:
+                    result, message, diff_text = manager.install_ini_file(
+                        additional_file.source_path,
+                        additional_file.target_path,
+                        dry_run=ctx.dry_run,
+                    )
+                elif additional_file.comment_prefix:
                     content = additional_file.source_path.read_text()
                     result, message, diff_text = manager.install_section(
                         additional_file.target_path,
@@ -230,7 +236,13 @@ class ConfigsComponent(Component):
 
             additional_files = shell.get_additional_files()
             for i, additional_file in enumerate(additional_files):
-                if additional_file.comment_prefix:
+                if additional_file.ini_merge:
+                    exists = additional_file.target_path.exists()
+                    synced = manager.check_ini_file_synced(
+                        additional_file.source_path,
+                        additional_file.target_path,
+                    )
+                elif additional_file.comment_prefix:
                     source_content = (
                         additional_file.source_path.read_text()
                         if additional_file.source_path.exists()
@@ -319,7 +331,11 @@ class ConfigsComponent(Component):
         for shell in ctx.selected_shells:
             additional_files = shell.get_additional_files()
             for additional_file in additional_files:
-                if additional_file.comment_prefix:
+                if additional_file.ini_merge:
+                    result, message = manager.uninstall_ini_file(
+                        additional_file.target_path,
+                    )
+                elif additional_file.comment_prefix:
                     result, message = manager.uninstall_section(
                         additional_file.target_path,
                         comment_prefix=additional_file.comment_prefix,

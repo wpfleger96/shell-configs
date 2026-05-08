@@ -248,7 +248,23 @@ def _display_diffs_for_shells(
             else:
                 repo_content = additional_file.source_path.read_text()
 
-            if additional_file.comment_prefix:
+            if additional_file.ini_merge:
+                if manager.check_ini_file_synced(
+                    additional_file.source_path, additional_file.target_path
+                ):
+                    continue
+                ini_diff = manager.diff_ini_file(
+                    additional_file.source_path, additional_file.target_path
+                )
+                if ini_diff:
+                    found_diffs = True
+                    console.print(
+                        f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
+                    )
+                    syntax = Syntax(ini_diff, "diff", theme="monokai")
+                    console.print(syntax)
+                continue
+            elif additional_file.comment_prefix:
                 section = manager.extract_managed_section(
                     additional_file.target_path,
                     comment_prefix=additional_file.comment_prefix,

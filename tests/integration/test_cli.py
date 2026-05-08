@@ -144,9 +144,6 @@ class TestDiffCommand:
         "scenario,setup_action,expected_in_output,expected_not_in_output",
         [
             ("not_installed", None, "Not installed", None),
-            # After install, config diffs are gone. Signing/extensions may still
-            # report issues in the test env (no SSH keys, no IDEs), so we can't
-            # assert "in sync" globally. Assert no config-level "Not installed".
             ("synced", "install", None, "Not installed"),
             ("outdated", "install_and_modify", "Bash", None),
         ],

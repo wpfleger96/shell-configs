@@ -1,6 +1,7 @@
 """IDE extension management for VSCode and Cursor."""
 
 import logging
+import re
 import subprocess
 
 from dataclasses import dataclass
@@ -13,9 +14,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_EXTENSION_ID_RE = re.compile(r"^[a-z0-9_-]+\.[a-z0-9_-]+$")
+
 BUILTIN_EXTENSIONS: dict[str, set[str]] = {
     "vscode": {"github.copilot-chat"},
-    "cursor": {"anysphere.cursorpyright"},
+    "cursor": {"anysphere.cursorpyright", "github.copilot-chat"},
 }
 
 
@@ -133,11 +136,12 @@ class ExtensionManager:
                 )
                 return set()
 
-            return {
-                line.strip().lower()
-                for line in result.stdout.splitlines()
-                if line.strip()
-            }
+            installed: set[str] = set()
+            for line in result.stdout.splitlines():
+                stripped = line.strip().lower()
+                if stripped and _EXTENSION_ID_RE.match(stripped):
+                    installed.add(stripped)
+            return installed
         except FileNotFoundError:
             logger.warning("%s not found in PATH", cli_command)
             return set()
