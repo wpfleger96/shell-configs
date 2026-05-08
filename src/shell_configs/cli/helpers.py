@@ -253,25 +253,17 @@ def _display_diffs_for_shells(
                     additional_file.source_path, additional_file.target_path
                 ):
                     continue
-
-                managed_keys = manager._managed_keys_from_source(
-                    additional_file.source_path
+                diff_text = manager.diff_ini_file(
+                    additional_file.source_path, additional_file.target_path
                 )
-                installed_cp = manager._parse_ini(
-                    additional_file.target_path.read_text()
-                )
-                old_lines: list[str] = []
-                new_lines: list[str] = []
-                for ini_section, key, value in managed_keys:
-                    if installed_cp.has_section(
-                        ini_section
-                    ) and installed_cp.has_option(ini_section, key):
-                        old_lines.append(
-                            f"{key}={installed_cp.get(ini_section, key)}\n"
-                        )
-                    new_lines.append(f"{key}={value}\n")
-                installed_content = "".join(old_lines)
-                repo_content = "".join(new_lines)
+                if diff_text:
+                    found_diffs = True
+                    console.print(
+                        f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
+                    )
+                    syntax = Syntax(diff_text, "diff", theme="monokai")
+                    console.print(syntax)
+                continue
             elif additional_file.comment_prefix:
                 section = manager.extract_managed_section(
                     additional_file.target_path,

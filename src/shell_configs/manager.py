@@ -833,12 +833,114 @@ class ConfigManager:
         cp.read_string(text)
         return cp
 
-    def _write_ini(self, cp: configparser.RawConfigParser, path: Path) -> None:
-        import io
+    def _apply_ini_keys(
+        self, text: str, managed_keys: list[tuple[str, str, str]]
+    ) -> str:
+        lines = text.splitlines()
+        current_section: str | None = None
+        # Track the index of the last key-value line within each section
+        section_last_key_idx: dict[str, int] = {}
+        # Track which line each (section, key) is on for in-place replacement
+        key_line_idx: dict[tuple[str, str], int] = {}
 
-        buf = io.StringIO()
-        cp.write(buf)
-        self._atomic_write(path, buf.getvalue())
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith("[") and stripped.endswith("]"):
+                current_section = stripped[1:-1]
+            elif (
+                current_section is not None
+                and "=" in stripped
+                and not stripped.startswith(("#", ";"))
+            ):
+                k = stripped.split("=", 1)[0].strip()
+                key_line_idx[(current_section, k)] = i
+                section_last_key_idx[current_section] = i
+
+        # Separate keys into updates (existing), new-in-existing-section, new-in-new-section
+        updates: list[tuple[int, str]] = []
+        appends_by_section: dict[str, list[str]] = {}
+        new_sections: dict[str, list[str]] = {}
+
+        for section, key, value in managed_keys:
+            line_entry = f"{key}={value}"
+            if (section, key) in key_line_idx:
+                updates.append((key_line_idx[(section, key)], line_entry))
+            elif section in section_last_key_idx:
+                appends_by_section.setdefault(section, []).append(line_entry)
+            else:
+                new_sections.setdefault(section, []).append(line_entry)
+
+        # Apply in-place updates
+        for idx, line_entry in updates:
+            lines[idx] = line_entry
+
+        # Insert after last key line within existing sections (reverse order to preserve indices)
+        for section, entries in sorted(
+            appends_by_section.items(),
+            key=lambda kv: section_last_key_idx[kv[0]],
+            reverse=True,
+        ):
+            insert_after = section_last_key_idx[section]
+            for entry in reversed(entries):
+                lines.insert(insert_after + 1, entry)
+
+        # Append new sections at end of file
+        result_lines = lines
+        for section, entries in new_sections.items():
+            result_lines = result_lines + ["", f"[{section}]"] + entries
+
+        return "\n".join(result_lines) + "\n"
+
+    def _remove_ini_keys(self, text: str, keys: list[list[str]]) -> str:
+        remove_set = {(s, k) for s, k in keys}
+        lines = text.splitlines()
+        current_section: str | None = None
+        # Track which sections still have keys after removal
+        section_has_keys: dict[str, bool] = {}
+        section_header_idx: dict[str, int] = {}
+
+        # First pass: determine which sections retain keys
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("[") and stripped.endswith("]"):
+                current_section = stripped[1:-1]
+                if current_section not in section_has_keys:
+                    section_has_keys[current_section] = False
+            elif (
+                current_section is not None
+                and "=" in stripped
+                and not stripped.startswith(("#", ";"))
+            ):
+                k = stripped.split("=", 1)[0].strip()
+                if (current_section, k) not in remove_set:
+                    section_has_keys[current_section] = True
+
+        # Second pass: record section header line indices
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith("[") and stripped.endswith("]"):
+                section_header_idx[stripped[1:-1]] = i
+
+        # Third pass: build output, skipping removed keys and empty section headers
+        result: list[str] = []
+        current_section = None
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("[") and stripped.endswith("]"):
+                current_section = stripped[1:-1]
+                if not section_has_keys.get(current_section, False):
+                    continue
+            elif (
+                current_section is not None
+                and "=" in stripped
+                and not stripped.startswith(("#", ";"))
+            ):
+                k = stripped.split("=", 1)[0].strip()
+                if (current_section, k) in remove_set:
+                    continue
+            result.append(line)
+
+        return "\n".join(result) + "\n"
 
     def _managed_keys_from_source(
         self, source_path: Path
@@ -850,12 +952,9 @@ class ConfigManager:
             for key in cp.options(section)
         ]
 
-    def _clean_corrupted_ini_markers(self, config_file: Path) -> None:
-        if not config_file.exists():
-            return
-        text = config_file.read_text()
+    def _clean_corrupted_ini_markers(self, text: str) -> str:
         if "shell-configs Managed Config" not in text:
-            return
+            return text
         cleaned_lines: list[str] = []
         seen_sections: set[str] = set()
         for line in text.splitlines():
@@ -870,7 +969,34 @@ class ConfigManager:
                     continue
                 seen_sections.add(section)
             cleaned_lines.append(line)
-        self._atomic_write(config_file, "\n".join(cleaned_lines) + "\n")
+        return "\n".join(cleaned_lines) + "\n"
+
+    def diff_ini_file(self, source_path: Path, config_file: Path) -> str | None:
+        try:
+            managed_keys = self._managed_keys_from_source(source_path)
+            installed = self._parse_ini(
+                config_file.read_text() if config_file.exists() else ""
+            )
+            old_lines: list[str] = []
+            new_lines: list[str] = []
+            for section, key, value in managed_keys:
+                if installed.has_section(section) and installed.has_option(
+                    section, key
+                ):
+                    old_lines.append(f"{key}={installed.get(section, key)}\n")
+                new_lines.append(f"{key}={value}\n")
+            diff = "\n".join(
+                difflib.unified_diff(
+                    old_lines,
+                    new_lines,
+                    fromfile="Previous",
+                    tofile="Updated",
+                    lineterm="",
+                )
+            )
+            return diff if diff.strip() else None
+        except Exception:
+            return None
 
     def check_ini_file_synced(self, source_path: Path, config_file: Path) -> bool:
         if not config_file.exists():
@@ -896,38 +1022,50 @@ class ConfigManager:
         try:
             managed_keys = self._managed_keys_from_source(source_path)
 
-            if config_file.exists():
-                self._clean_corrupted_ini_markers(config_file)
-                installed = self._parse_ini(config_file.read_text())
-            else:
-                installed = self._parse_ini("")
+            file_text = config_file.read_text() if config_file.exists() else ""
+            file_text = self._clean_corrupted_ini_markers(file_text)
 
-            if all(
+            # Load old sidecar to detect keys that were tracked previously but
+            # are no longer in the source (stale keys require a re-apply even if
+            # the installed file already contains all current managed values).
+            old_sidecar_path = self._sidecar_path(config_file)
+            stale_keys: list[list[str]] = []
+            if old_sidecar_path.exists():
+                try:
+                    raw = json.loads(old_sidecar_path.read_text())
+                    if isinstance(raw, list) and all(
+                        isinstance(item, list)
+                        and len(item) == 2
+                        and all(isinstance(v, str) for v in item)
+                        for item in raw
+                    ):
+                        current_key_set = {(s, k) for s, k, _ in managed_keys}
+                        stale_keys = [
+                            item
+                            for item in raw
+                            if (item[0], item[1]) not in current_key_set
+                        ]
+                except (json.JSONDecodeError, Exception):
+                    stale_keys = []
+
+            installed = self._parse_ini(file_text)
+            already_synced = not stale_keys and all(
                 installed.has_section(s)
                 and installed.has_option(s, k)
                 and installed.get(s, k) == v
                 for s, k, v in managed_keys
-            ):
-                return (
-                    OperationResult.ALREADY_SYNCED,
-                    f"{config_file} is already synced",
-                    None,
-                )
+            )
 
             old_lines: list[str] = []
             new_lines: list[str] = []
             for section, key, value in managed_keys:
-                old_val = (
-                    installed.get(section, key)
-                    if installed.has_section(section)
-                    and installed.has_option(section, key)
-                    else None
-                )
-                if old_val is not None:
-                    old_lines.append(f"{key}={old_val}\n")
+                if installed.has_section(section) and installed.has_option(
+                    section, key
+                ):
+                    old_lines.append(f"{key}={installed.get(section, key)}\n")
                 new_lines.append(f"{key}={value}\n")
 
-            diff_raw = "".join(
+            diff_text_raw = "\n".join(
                 difflib.unified_diff(
                     old_lines,
                     new_lines,
@@ -936,40 +1074,52 @@ class ConfigManager:
                     lineterm="",
                 )
             )
-            diff_text = diff_raw if diff_raw.strip() else None
+            diff_text = diff_text_raw if diff_text_raw.strip() else None
+
+            file_existed = config_file.exists()
+            new_sidecar_data = [[s, k] for s, k, _ in managed_keys]
+
+            if already_synced:
+                if not old_sidecar_path.exists():
+                    self._atomic_write(
+                        old_sidecar_path, json.dumps(new_sidecar_data) + "\n"
+                    )
+                return (
+                    OperationResult.ALREADY_SYNCED,
+                    f"{config_file} is already synced",
+                    None,
+                )
 
             if dry_run:
+                action = "Would create" if not file_existed else "Would update"
                 return (
-                    OperationResult.UPDATED
-                    if config_file.exists()
-                    else OperationResult.CREATED,
-                    f"Would update {config_file}",
+                    OperationResult.CREATED
+                    if not file_existed
+                    else OperationResult.UPDATED,
+                    f"{action} {config_file}",
                     diff_text,
                 )
 
+            if stale_keys:
+                file_text = self._remove_ini_keys(file_text, stale_keys)
+
+            new_text = self._apply_ini_keys(file_text, managed_keys)
+
             backup_msg = ""
-            if config_file.exists():
+            if file_existed:
                 backup_path, removed_files = self.create_backup(config_file)
                 backup_msg = f" (backup: {backup_path.name})"
                 if removed_files:
                     backup_msg += f"; removed {len(removed_files)} old backup(s)"
 
-            for section, key, value in managed_keys:
-                if not installed.has_section(section):
-                    installed.add_section(section)
-                installed.set(section, key, value)
-
-            self._write_ini(installed, config_file)
-
-            sidecar = [[s, k] for s, k, _v in managed_keys]
+            self._atomic_write(config_file, new_text)
             self._atomic_write(
-                self._sidecar_path(config_file), json.dumps(sidecar) + "\n"
+                self._sidecar_path(config_file), json.dumps(new_sidecar_data) + "\n"
             )
 
-            is_update = backup_msg != ""
             return (
-                OperationResult.UPDATED if is_update else OperationResult.CREATED,
-                f"{'Updated' if is_update else 'Created'} {config_file}{backup_msg}",
+                OperationResult.UPDATED if file_existed else OperationResult.CREATED,
+                f"{'Updated' if file_existed else 'Created'} {config_file}{backup_msg}",
                 diff_text,
             )
 
@@ -996,35 +1146,46 @@ class ConfigManager:
                 )
 
             if sidecar.exists():
-                keys: list[list[str]] = json.loads(sidecar.read_text())
+                try:
+                    raw = json.loads(sidecar.read_text())
+                    if not (
+                        isinstance(raw, list)
+                        and all(
+                            isinstance(item, list)
+                            and len(item) == 2
+                            and all(isinstance(v, str) for v in item)
+                            for item in raw
+                        )
+                    ):
+                        sidecar.unlink()
+                        return (
+                            OperationResult.ERROR,
+                            f"Sidecar for {config_file} is malformed; deleted it. Re-run install to repair.",
+                        )
+                    keys: list[list[str]] = raw
+                except json.JSONDecodeError:
+                    sidecar.unlink()
+                    return (
+                        OperationResult.ERROR,
+                        f"Sidecar for {config_file} could not be parsed; deleted it. Re-run install to repair.",
+                    )
             else:
                 keys = []
 
             if config_file.exists() and keys:
-                installed = self._parse_ini(config_file.read_text())
-                for section, key in keys:
-                    if installed.has_section(section) and installed.has_option(
-                        section, key
-                    ):
-                        installed.remove_option(section, key)
-                    if installed.has_section(section) and not installed.options(
-                        section
-                    ):
-                        installed.remove_section(section)
+                text = config_file.read_text()
+                new_text = self._remove_ini_keys(text, keys)
+                remaining = self._parse_ini(new_text)
 
-                remaining_sections = installed.sections()
-                if remaining_sections:
-                    backup_path, removed_files = self.create_backup(config_file)
-                    self._write_ini(installed, config_file)
-                    backup_msg = f" (backup: {backup_path.name})"
-                    if removed_files:
-                        backup_msg += f"; removed {len(removed_files)} old backup(s)"
+                backup_path, removed_files = self.create_backup(config_file)
+                backup_msg = f" (backup: {backup_path.name})"
+                if removed_files:
+                    backup_msg += f"; removed {len(removed_files)} old backup(s)"
+
+                if remaining.sections():
+                    self._atomic_write(config_file, new_text)
                 else:
-                    backup_path, removed_files = self.create_backup(config_file)
                     config_file.unlink()
-                    backup_msg = f" (backup: {backup_path.name})"
-                    if removed_files:
-                        backup_msg += f"; removed {len(removed_files)} old backup(s)"
             else:
                 backup_msg = ""
 

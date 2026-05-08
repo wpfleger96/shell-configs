@@ -276,6 +276,20 @@ class TestEnsureGhScopes:
         ok, msg = ensure_gh_scopes(interactive=False)
         assert ok is False
 
+    def test_parses_scopes_when_split_across_streams(self, monkeypatch):
+        monkeypatch.setattr(
+            "shell_configs.signing._run",
+            lambda *a, **kw: subprocess.CompletedProcess(
+                a[0],
+                0,
+                stdout="Logged in to github.com account user\n",
+                stderr="  - Token scopes: 'admin:public_key', 'admin:ssh_signing_key'\n",
+            ),
+        )
+        ok, msg = ensure_gh_scopes(interactive=False)
+        assert ok is True
+        assert "present" in msg
+
 
 @pytest.mark.unit
 class TestUploadAuthKey:

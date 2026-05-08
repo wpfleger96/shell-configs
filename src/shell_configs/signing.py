@@ -162,7 +162,7 @@ def ensure_gh_scopes(
         timeout=30,
     )
     if status_result.returncode == 0:
-        output = status_result.stdout or status_result.stderr
+        output = f"{status_result.stdout}\n{status_result.stderr}"
         for line in output.splitlines():
             if "Token scopes:" in line:
                 scopes_str = line.split("Token scopes:", 1)[1].strip()

@@ -8,6 +8,7 @@ from shell_configs.platform import Platform
 from shell_configs.shells.cursor import CursorShell
 
 
+@pytest.mark.unit
 class TestCursorWSLPaths:
     """Test Cursor WSL-specific path handling."""
 
@@ -96,6 +97,32 @@ class TestCursorWSLRemoteCli:
         shell = CursorShell()
         result = shell.get_extension_cli()
         assert result == "cursor"
+
+    def test_selects_newest_hash_dir(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            "shell_configs.shells.cursor.is_platform",
+            lambda p: p == Platform.WSL,
+        )
+        monkeypatch.setattr("shell_configs.shells.cursor.Path.home", lambda: tmp_path)
+
+        old_hash = tmp_path / ".cursor-server" / "bin" / "old_hash"
+        old_cli = old_hash / "bin" / "remote-cli" / "cursor"
+        old_cli.parent.mkdir(parents=True)
+        old_cli.write_text("#!/bin/sh")
+
+        new_hash = tmp_path / ".cursor-server" / "bin" / "new_hash"
+        new_cli = new_hash / "bin" / "remote-cli" / "cursor"
+        new_cli.parent.mkdir(parents=True)
+        new_cli.write_text("#!/bin/sh")
+
+        import os
+        import time
+
+        os.utime(old_hash, (time.time() - 100, time.time() - 100))
+
+        shell = CursorShell()
+        result = shell.get_extension_cli()
+        assert result == str(new_cli)
 
     def test_falls_back_when_not_wsl(self, monkeypatch):
         monkeypatch.setattr("shell_configs.shells.cursor.is_platform", lambda p: False)
