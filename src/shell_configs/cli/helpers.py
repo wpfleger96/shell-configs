@@ -253,15 +253,15 @@ def _display_diffs_for_shells(
                     additional_file.source_path, additional_file.target_path
                 ):
                     continue
-                diff_text = manager.diff_ini_file(
+                ini_diff = manager.diff_ini_file(
                     additional_file.source_path, additional_file.target_path
                 )
-                if diff_text:
+                if ini_diff:
                     found_diffs = True
                     console.print(
                         f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
                     )
-                    syntax = Syntax(diff_text, "diff", theme="monokai")
+                    syntax = Syntax(ini_diff, "diff", theme="monokai")
                     console.print(syntax)
                 continue
             elif additional_file.comment_prefix:
