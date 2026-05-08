@@ -22,7 +22,6 @@ INSTALL_COMPONENTS: list[Component] = [
     ExtensionsComponent(),
 ]
 
-# Matches original monolithic status output order
 STATUS_COMPONENTS: list[Component] = [
     ConfigsComponent(),
     CompletionsComponent(),

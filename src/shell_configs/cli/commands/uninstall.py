@@ -25,7 +25,6 @@ def uninstall(shells: list[str] | None, yes: bool) -> None:
     registry = ShellRegistry()
     config_reader = ConfigReader()
 
-    # Uninstall targets all registered shells by default, not just config-available ones
     selected_shells = _get_selected_shells(registry, shells, use_all=True)
 
     if not selected_shells:

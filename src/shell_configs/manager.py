@@ -838,9 +838,7 @@ class ConfigManager:
     ) -> str:
         lines = text.splitlines()
         current_section: str | None = None
-        # Track the index of the last key-value line within each section
         section_last_key_idx: dict[str, int] = {}
-        # Track which line each (section, key) is on for in-place replacement
         key_line_idx: dict[tuple[str, str], int] = {}
 
         for i, line in enumerate(lines):
@@ -856,7 +854,6 @@ class ConfigManager:
                 key_line_idx[(current_section, k)] = i
                 section_last_key_idx[current_section] = i
 
-        # Separate keys into updates (existing), new-in-existing-section, new-in-new-section
         updates: list[tuple[int, str]] = []
         appends_by_section: dict[str, list[str]] = {}
         new_sections: dict[str, list[str]] = {}
@@ -870,11 +867,9 @@ class ConfigManager:
             else:
                 new_sections.setdefault(section, []).append(line_entry)
 
-        # Apply in-place updates
         for idx, line_entry in updates:
             lines[idx] = line_entry
 
-        # Insert after last key line within existing sections (reverse order to preserve indices)
         for section, entries in sorted(
             appends_by_section.items(),
             key=lambda kv: section_last_key_idx[kv[0]],
@@ -884,7 +879,6 @@ class ConfigManager:
             for entry in reversed(entries):
                 lines.insert(insert_after + 1, entry)
 
-        # Append new sections at end of file
         result_lines = lines
         for section, entries in new_sections.items():
             result_lines = result_lines + ["", f"[{section}]"] + entries
@@ -895,11 +889,9 @@ class ConfigManager:
         remove_set = {(s, k) for s, k in keys}
         lines = text.splitlines()
         current_section: str | None = None
-        # Track which sections still have keys after removal
         section_has_keys: dict[str, bool] = {}
         section_header_idx: dict[str, int] = {}
 
-        # First pass: determine which sections retain keys
         for line in lines:
             stripped = line.strip()
             if stripped.startswith("[") and stripped.endswith("]"):
@@ -915,13 +907,11 @@ class ConfigManager:
                 if (current_section, k) not in remove_set:
                     section_has_keys[current_section] = True
 
-        # Second pass: record section header line indices
         for i, line in enumerate(lines):
             stripped = line.strip()
             if stripped.startswith("[") and stripped.endswith("]"):
                 section_header_idx[stripped[1:-1]] = i
 
-        # Third pass: build output, skipping removed keys and empty section headers
         result: list[str] = []
         current_section = None
         for line in lines:
@@ -1025,9 +1015,6 @@ class ConfigManager:
             file_text = config_file.read_text() if config_file.exists() else ""
             file_text = self._clean_corrupted_ini_markers(file_text)
 
-            # Load old sidecar to detect keys that were tracked previously but
-            # are no longer in the source (stale keys require a re-apply even if
-            # the installed file already contains all current managed values).
             old_sidecar_path = self._sidecar_path(config_file)
             stale_keys: list[list[str]] = []
             if old_sidecar_path.exists():
