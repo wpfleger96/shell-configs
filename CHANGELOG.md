@@ -1,6 +1,90 @@
 # CHANGELOG
 
 
+## v0.32.2 (2026-05-08)
+
+### Bug Fixes
+
+- Address code review findings for INI merge and WSL fixes
+  ([`5e6091b`](https://github.com/wpfleger96/shell-configs/commit/5e6091b650306a14189a2c40ca0441c8e8d07d41))
+
+configparser.write() destroyed user comments and formatting in mimeapps.list on every install.
+  Replaced with line-oriented _apply_ini_keys/_remove_ini_keys that edit only managed key lines
+  in-place. Also fixed: dry-run mutating files via marker cleanup, migration path skipping sidecar
+  creation, stale keys never pruned on source update, mangled diff output, unvalidated sidecar JSON,
+  private manager methods exposed to helpers.py, and extension ID regex admitting non-extension
+  lines.
+
+- Resolve mypy type error in helpers.py ini_merge branch
+  ([`bc55e68`](https://github.com/wpfleger96/shell-configs/commit/bc55e68357e70b3bf87dc215fa81518d61123144))
+
+diff_ini_file returns str | None which shadowed the str-typed diff_text variable used later in the
+  function. Renamed to ini_diff to avoid the type incompatibility.
+
+- Resolve three WSL-specific bugs in extension, SSH, and INI handling
+  ([`0aee4f4`](https://github.com/wpfleger96/shell-configs/commit/0aee4f4af4054d75ed240db333697ce92f6c7fda))
+
+Extension detection used every non-empty line from --list-extensions as an extension ID. On WSL,
+  remote CLIs prepend a header line that became a bogus entry. Cursor's CLI also resolved to the
+  Windows executable instead of the WSL remote CLI, missing WSL-side extensions entirely.
+
+ensure_gh_scopes() relied on gh ssh-key list exit code to verify OAuth scopes, but that command
+  exits 0 even when the /user/keys endpoint returns 404 due to missing admin:public_key scope.
+  upload_auth_key() also skipped uploading when it found the key data in any key type rather than
+  specifically in authentication keys.
+
+_parse_ini(strict=True) crashed on corrupted mimeapps.list files with duplicate sections — a
+  regression from d3e8baf that blocked the diff and uninstall code paths.
+
+- Use INI key merging for mimeapps.list instead of comment markers
+  ([`d3e8baf`](https://github.com/wpfleger96/shell-configs/commit/d3e8baf45df1450d0ad4d6ec8f65efdda231c348))
+
+System tools (xdg-mime, update-desktop-database) parse and rewrite mimeapps.list as INI, breaking
+  the comment-based managed section markers every time. This caused the same wslview.desktop diff to
+  appear on every shell-configs run.
+
+Replace managed-section approach with configparser-based key merging that writes clean INI output
+  surviving external rewrites. A sidecar file (.shell-configs-keys) tracks managed keys for clean
+  uninstall. Includes one-time migration to strip corrupted markers from existing installs.
+
+### Chores
+
+- Remove vestigial .pre-commit-config.yaml
+  ([`84b8fa8`](https://github.com/wpfleger96/shell-configs/commit/84b8fa8e90a450193711190ee5bb8b1c422b2e38))
+
+The pre-commit Python framework config was unused — .hooks/pre-commit runs all checks via just
+  directly. The framework's `pre-commit install` likely set a local core.hooksPath override to
+  .git/hooks, which shadowed the global .hooks setting from shared.gitconfig and prevented the hook
+  from firing.
+
+- **deps**: Update pydantic requirement from >=2.13.3 to >=2.13.4
+  ([#15](https://github.com/wpfleger96/shell-configs/pull/15),
+  [`f797940`](https://github.com/wpfleger96/shell-configs/commit/f797940ec682ed3962b5892bc3492d1b613c4d43))
+
+- **deps-dev**: Update mypy requirement from >=1.20.2 to >=2.0.0
+  ([#14](https://github.com/wpfleger96/shell-configs/pull/14),
+  [`ebf3b40`](https://github.com/wpfleger96/shell-configs/commit/ebf3b405c82f77ca644d8caff21e11d55d625b11))
+
+### Refactoring
+
+- Split monolithic cli.py into component registry package
+  ([#13](https://github.com/wpfleger96/shell-configs/pull/13),
+  [`161b92d`](https://github.com/wpfleger96/shell-configs/commit/161b92dfb12762ea992596991d4a4be9d6ec17f0))
+
+Two bugs caused by "forgot to wire it up" — SSH signing and IDE extensions were both implemented as
+  subcommands but missing from the install command. The monolithic install function had 10
+  hand-wired sections across 360 lines; every new feature required editing install, status, and diff
+  manually.
+
+Introduces a Component base class with install/status/diff/uninstall methods and two ordered
+  component lists (INSTALL_COMPONENTS, STATUS_COMPONENTS). Adding a future managed thing requires
+  one class file and one list entry — install, status, diff, and uninstall pick it up automatically.
+
+Also fixes a regression where install cancellation didn't abort remaining components
+  (Component.install() now returns bool), and a profile-save bug where the active profile was always
+  overwritten even without --profile flag.
+
+
 ## v0.32.1 (2026-05-06)
 
 ### Bug Fixes
