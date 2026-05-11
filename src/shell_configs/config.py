@@ -128,7 +128,7 @@ class ConfigReader:
             config_dir_export = f'export SHELL_CONFIGS_DIR="{self.config_dir}"'
             content = f"{config_dir_export}\n\n{content}"
 
-        if profile and "shared" in profile.shell_overrides:
+        if shell_name != "git" and profile and "shared" in profile.shell_overrides:
             override = profile.shell_overrides["shared"].rstrip("\n")
             content = (
                 f"{content}\n\n### Profile Override ({profile.name}) ###\n{override}"

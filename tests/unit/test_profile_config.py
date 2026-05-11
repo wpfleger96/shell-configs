@@ -134,6 +134,18 @@ class TestConfigReaderWithProfile:
         assert "### Profile Override (work) ###" in content
         assert "export WORK_SHARED=1" in content
 
+    def test_get_shared_config_content_git_excludes_shared_override(self, test_repo):
+        shared_gitconfig = test_repo / "config" / "shared.gitconfig"
+        shared_gitconfig.write_text("[core]\n    autocrlf = input\n")
+
+        p = Profile(name="work", shell_overrides={"shared": "export WORK_SHARED=1"})
+        reader = ConfigReader(config_dir=test_repo / "config")
+        content = reader.get_shared_config_content("git", profile=p)
+        assert content is not None
+        assert "### Profile Override" not in content
+        assert "export WORK_SHARED=1" not in content
+        assert "[core]" in content
+
     def test_get_shared_config_content_no_profile_unchanged(self, test_repo):
         shared_sh = test_repo / "config" / "shared.sh"
         shared_sh.write_text("# Base shared\n")

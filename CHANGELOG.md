@@ -1,6 +1,77 @@
 # CHANGELOG
 
 
+## v0.34.0 (2026-05-11)
+
+### Features
+
+- Add direnv to auto-override corporate index vars in personal repos
+  ([#22](https://github.com/wpfleger96/shell-configs/pull/22),
+  [`43989f5`](https://github.com/wpfleger96/shell-configs/commit/43989f5e53e3b91553fcc63b51c6f21fed2430a1))
+
+Corporate Artifactory can't handle Metadata-Version 2.4 wheels (hatchling >= 1.27.0), breaking uv
+  resolution in personal repos when UV_INDEX_URL points to Artifactory. direnv overrides these vars
+  when entering ~/Development/Personal/ so uv resolves from public PyPI. The .envrc content is managed
+  in work.yaml and deployed to disk on shell startup with content comparison.
+
+### Bug Fixes
+
+- Use explicit PyPI URLs instead of unset in .envrc
+  ([`78c8de3`](https://github.com/wpfleger96/shell-configs/commit/78c8de31e1f5ef9a6307ebe55a2a315c978cdf6a))
+
+~/.config/uv/uv.toml has index-url pointing to Artifactory. unset removes the env var but uv falls
+  through to the config file, still hitting Artifactory. Explicit PyPI URLs override the config file
+  since env vars beat config in uv's precedence chain.
+
+
+## v0.33.1 (2026-05-11)
+
+### Bug Fixes
+
+- Add wsl_only package gate and harden extension CLI error handling
+  ([`c89c8f3`](https://github.com/wpfleger96/shell-configs/commit/c89c8f3c5f07569d7ce1e49c894fa00eca2323ef))
+
+get_installed_extensions() returned an empty set on CLI failure, silently passing invalid data to
+  compute_diff() and causing confusing results. Changed to return None so callers can distinguish
+  failure from "no extensions." Added wsl_only field to Package so WSL-specific packages (wslu) are
+  gated at both get_config_for_platform() and load_packages().
+
+
+## v0.33.0 (2026-05-11)
+
+### Features
+
+- Add declarative gh CLI extension management
+  ([#21](https://github.com/wpfleger96/shell-configs/pull/21),
+  [`8698abb`](https://github.com/wpfleger96/shell-configs/commit/8698abb81e441169480c2a9b8fc6778ab926ce55))
+
+New GhExtensionsComponent reads a YAML manifest and installs missing gh CLI extensions idempotently.
+  Supports version pinning via pin: field, validates extension names against owner/repo format,
+  reports unmanaged extensions in diff/status, and handles missing gh CLI and subprocess timeouts
+  gracefully.
+
+### Chores
+
+- Align CI/CD with golden path
+  ([`9cfc1ba`](https://github.com/wpfleger96/shell-configs/commit/9cfc1ba4ab6643753142c816fccd62ecee15608a))
+
+Standardize workflows to match the battle-tested pattern from ai-agent-rules: GitHub App token for
+  release (replacing SSH deploy key), Dependabot with auto-merge for both uv and github-actions
+  ecosystems, least-privilege permissions, and consistent job naming.
+
+- **deps**: Bump astral-sh/setup-uv from 3 to 7
+  ([#20](https://github.com/wpfleger96/shell-configs/pull/20),
+  [`5184aa7`](https://github.com/wpfleger96/shell-configs/commit/5184aa797417ef141bbefb6e4bc65adddf5a63f7))
+
+- **deps**: Bump actions/create-github-app-token from 2 to 3
+  ([#19](https://github.com/wpfleger96/shell-configs/pull/19),
+  [`8e3b168`](https://github.com/wpfleger96/shell-configs/commit/8e3b16877005abd3e9f6ad92a55eff1486cd8289))
+
+- **deps**: Bump mfinelli/setup-shfmt from 3 to 4
+  ([#18](https://github.com/wpfleger96/shell-configs/pull/18),
+  [`7a9c2c1`](https://github.com/wpfleger96/shell-configs/commit/7a9c2c1f29cff0358bc6978fa9c37ab7b6176918))
+
+
 ## v0.32.2 (2026-05-08)
 
 ### Bug Fixes
