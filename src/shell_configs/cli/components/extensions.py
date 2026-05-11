@@ -37,6 +37,8 @@ class ExtensionsComponent(Component):
                 profile=ctx.profile,
             )
             installed = ext_manager.get_installed_extensions(cli_cmd)
+            if installed is None:
+                continue
             diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
             printed_header = False
 
@@ -100,6 +102,8 @@ class ExtensionsComponent(Component):
                 shell.name, shell.get_extension_list_paths(), profile=ctx.profile
             )
             ext_installed = ext_manager.get_installed_extensions(cli_cmd)
+            if ext_installed is None:
+                continue
             ext_diff = ext_manager.compute_diff(
                 ext_desired, ext_installed, shell_name=shell.name
             )
@@ -145,6 +149,8 @@ class ExtensionsComponent(Component):
                 shell.name, shell.get_extension_list_paths(), profile=ctx.profile
             )
             installed = ext_manager.get_installed_extensions(cli_cmd)
+            if installed is None:
+                continue
             diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
 
             if not diff.missing and not diff.extra and not diff.ignored:

@@ -1,5 +1,7 @@
 """Tests for IDE extension management."""
 
+import subprocess
+
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -251,16 +253,16 @@ class TestGetInstalledExtensions:
 
         assert result == {"golang.go", "rust-lang.rust-analyzer", "ms-python.python"}
 
-    def test_cli_not_found_returns_empty(self):
+    def test_cli_not_found_returns_none(self):
         manager = ExtensionManager()
         with patch(
             "shell_configs.extensions.subprocess.run",
             side_effect=FileNotFoundError,
         ):
             result = manager.get_installed_extensions("nonexistent")
-        assert result == set()
+        assert result is None
 
-    def test_cli_failure_returns_empty(self):
+    def test_cli_failure_returns_none(self):
         mock_result = type(
             "Result",
             (),
@@ -274,7 +276,16 @@ class TestGetInstalledExtensions:
         manager = ExtensionManager()
         with patch("shell_configs.extensions.subprocess.run", return_value=mock_result):
             result = manager.get_installed_extensions("code")
-        assert result == set()
+        assert result is None
+
+    def test_cli_timeout_returns_none(self):
+        manager = ExtensionManager()
+        with patch(
+            "shell_configs.extensions.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(cmd="code", timeout=30),
+        ):
+            result = manager.get_installed_extensions("code")
+        assert result is None
 
 
 @pytest.mark.unit
@@ -399,6 +410,7 @@ class TestExportExtensions:
         with patch("shell_configs.extensions.subprocess.run", return_value=mock_result):
             output = manager.export_extensions("cursor", shell_name="cursor")
 
+        assert output is not None
         lines = output.strip().split("\n")
         assert "anysphere.cursorpyright" not in lines
         assert "golang.go" in lines
@@ -419,6 +431,7 @@ class TestExportExtensions:
         with patch("shell_configs.extensions.subprocess.run", return_value=mock_result):
             output = manager.export_extensions("code", shell_name="vscode")
 
+        assert output is not None
         lines = output.strip().split("\n")
         assert "github.copilot-chat" not in lines
         assert "golang.go" in lines
@@ -438,8 +451,18 @@ class TestExportExtensions:
         with patch("shell_configs.extensions.subprocess.run", return_value=mock_result):
             output = manager.export_extensions("cursor")
 
+        assert output is not None
         lines = output.strip().split("\n")
         assert "anysphere.cursorpyright" in lines
+
+    def test_export_returns_none_on_failure(self):
+        manager = ExtensionManager()
+        with patch(
+            "shell_configs.extensions.subprocess.run",
+            side_effect=FileNotFoundError,
+        ):
+            output = manager.export_extensions("code", shell_name="vscode")
+        assert output is None
 
 
 @pytest.mark.unit

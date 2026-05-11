@@ -66,6 +66,8 @@ def extensions_status(shells: list[str] | None, profile_name: str | None) -> Non
             shell.name, shell.get_extension_list_paths(), profile=active_profile
         )
         installed = ext_manager.get_installed_extensions(cli_cmd)
+        if installed is None:
+            continue
         diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
         if diff.ignored:
             ignored_by_shell.append((shell.display_name, diff.ignored))
@@ -129,6 +131,8 @@ def extensions_diff(shells: list[str] | None, profile_name: str | None) -> None:
             shell.name, shell.get_extension_list_paths(), profile=active_profile
         )
         installed = ext_manager.get_installed_extensions(cli_cmd)
+        if installed is None:
+            continue
         diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
 
         if not diff.missing and not diff.extra and not diff.ignored:
@@ -206,6 +210,8 @@ def extensions_install(
             shell.name, shell.get_extension_list_paths(), profile=active_profile
         )
         installed = ext_manager.get_installed_extensions(cli_cmd)
+        if installed is None:
+            continue
         diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
 
         to_install = diff.missing
@@ -297,7 +303,10 @@ def extensions_export(shell_name: str) -> None:
         sys.exit(1)
 
     output = ext_manager.export_extensions(cli_cmd, shell_name=shell.name)
-    if output:
+    if output is None:
+        print_error(f"Failed to query {shell.display_name} extensions")
+        sys.exit(1)
+    elif output:
         console.print(output)
     else:
         console.print("[dim]No extensions installed[/dim]")

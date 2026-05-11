@@ -126,6 +126,7 @@ class Package(BaseModel):
     command: str | None = None
     description: str = ""
     required: bool = False
+    wsl_only: bool = False
     macos: InstallConfig | None = None
     linux: InstallConfig | None = None
 
@@ -135,6 +136,8 @@ class Package(BaseModel):
 
     def get_config_for_platform(self) -> InstallConfig | None:
         """Get install config for current platform."""
+        if self.wsl_only and not is_platform(Platform.WSL):
+            return None
         return self.macos if is_platform(Platform.MACOS) else self.linux
 
 
@@ -824,4 +827,6 @@ def load_packages(manifest_path: Path | None = None) -> list[Package]:
     with open(manifest_path) as f:
         data = yaml.safe_load(f) or {}
 
-    return [Package(**item) for item in data.get("packages", [])]
+    all_packages = [Package(**item) for item in data.get("packages", [])]
+    # Manager methods access pkg.linux directly, bypassing get_config_for_platform()
+    return [p for p in all_packages if not p.wsl_only or is_platform(Platform.WSL)]

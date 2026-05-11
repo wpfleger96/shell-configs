@@ -112,14 +112,14 @@ class ExtensionManager:
 
         return desired
 
-    def get_installed_extensions(self, cli_command: str) -> set[str]:
+    def get_installed_extensions(self, cli_command: str) -> set[str] | None:
         """Query installed extensions via the IDE CLI.
 
         Args:
             cli_command: CLI binary name (e.g., "code", "cursor")
 
         Returns:
-            Set of lowercase extension IDs
+            Set of lowercase extension IDs, or None on failure
         """
         try:
             result = subprocess.run(
@@ -134,7 +134,7 @@ class ExtensionManager:
                     cli_command,
                     result.stderr.strip(),
                 )
-                return set()
+                return None
 
             installed: set[str] = set()
             for line in result.stdout.splitlines():
@@ -144,10 +144,10 @@ class ExtensionManager:
             return installed
         except FileNotFoundError:
             logger.warning("%s not found in PATH", cli_command)
-            return set()
+            return None
         except subprocess.TimeoutExpired:
             logger.warning("%s --list-extensions timed out", cli_command)
-            return set()
+            return None
 
     def compute_diff(
         self,
@@ -303,10 +303,15 @@ class ExtensionManager:
 
         return results
 
-    def export_extensions(self, cli_command: str, shell_name: str | None = None) -> str:
+    def export_extensions(
+        self, cli_command: str, shell_name: str | None = None
+    ) -> str | None:
         """Export currently installed extensions as a sorted newline-separated string.
 
         Filters out builtin extensions to prevent poisoning config files.
+        Returns None if the CLI query fails, empty string if no extensions installed.
         """
         installed = self.get_installed_extensions(cli_command)
+        if installed is None:
+            return None
         return "\n".join(sorted(installed - get_builtin_extensions(shell_name)))

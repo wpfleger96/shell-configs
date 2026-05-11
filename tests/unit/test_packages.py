@@ -4,6 +4,8 @@ import shutil
 
 from pathlib import Path
 
+import pytest
+
 from shell_configs.packages import (
     HomebrewManager,
     InstallConfig,
@@ -13,6 +15,79 @@ from shell_configs.packages import (
     load_packages,
 )
 from shell_configs.platform import Platform, detect_platform, is_platform
+
+
+class TestPackageWslOnly:
+    """Tests for wsl_only package filtering."""
+
+    def test_wsl_only_skipped_on_non_wsl(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.is_platform",
+            lambda p: p == Platform.LINUX,
+        )
+        pkg = Package(
+            name="wslu",
+            command="wslview",
+            wsl_only=True,
+            linux=InstallConfig(method="apt"),
+        )
+        assert pkg.get_config_for_platform() is None
+
+    def test_wsl_only_returns_config_on_wsl(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.is_platform",
+            lambda p: p == Platform.WSL,
+        )
+        linux_config = InstallConfig(method="apt")
+        pkg = Package(
+            name="wslu",
+            command="wslview",
+            wsl_only=True,
+            linux=linux_config,
+        )
+        assert pkg.get_config_for_platform() is linux_config
+
+    def test_non_wsl_only_unchanged(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.is_platform",
+            lambda p: p == Platform.LINUX,
+        )
+        linux_config = InstallConfig(method="apt")
+        pkg = Package(
+            name="expect",
+            linux=linux_config,
+        )
+        assert pkg.get_config_for_platform() is linux_config
+
+    def test_load_packages_filters_wsl_only(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        manifest_content = """\
+packages:
+  - name: git
+    command: git
+    linux:
+      method: apt
+  - name: wslu
+    command: wslview
+    wsl_only: true
+    linux:
+      method: apt
+"""
+        manifest_path = tmp_path / "packages.yaml"
+        manifest_path.write_text(manifest_content)
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.is_platform",
+            lambda p: p == Platform.LINUX,
+        )
+
+        packages = load_packages(manifest_path)
+
+        names = [p.name for p in packages]
+        assert "git" in names
+        assert "wslu" not in names
 
 
 def test_platform_detection() -> None:

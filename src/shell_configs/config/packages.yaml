@@ -127,6 +127,13 @@ packages:
       method: apt
       package: sqlite3
 
+  - name: wslu
+    command: wslview
+    description: "WSL utilities for browser integration"
+    wsl_only: true
+    linux:
+      method: apt
+
   - name: git-delta
     command: delta
     description: "Syntax-highlighting pager for git"
