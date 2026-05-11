@@ -26,10 +26,12 @@ shell_overrides:
 
         # Managed .envrc for personal repos — overrides corporate Artifactory index vars
         # Content is version-controlled here in work.yaml; deployed to disk on shell startup
+        # Uses explicit PyPI URLs (not unset) because ~/.config/uv/uv.toml has index-url
+        # pointing to Artifactory — unset would let that config file win
         _envrc="$HOME/Development/Personal/.envrc"
-        _envrc_content='unset UV_INDEX_URL
-    unset UV_DEFAULT_INDEX
-    unset PIP_INDEX_URL'
+        _envrc_content='export UV_INDEX_URL=https://pypi.org/simple
+    export UV_DEFAULT_INDEX=https://pypi.org/simple
+    export PIP_INDEX_URL=https://pypi.org/simple'
         if [ ! -f "$_envrc" ] || [ "$(cat "$_envrc")" != "$_envrc_content" ]; then
             mkdir -p "$(dirname "$_envrc")"
             printf '%s\n' "$_envrc_content" > "$_envrc"
