@@ -13,3 +13,29 @@ extensions:
 settings_overrides:
   vscode:
     "block.comment": "Three liveshare configs: liveshare.guestApprovalRequired, liveshare.anonymousGuestApproval, and liveshare.shareExternalFiles, have been added to your VS Code config by the Block CPE team. They are a mandatory security requirement which must be met (CPENG-706). Please leave them as-is."
+
+shell_overrides:
+  shared: |
+    ### direnv — per-directory env var overrides ###
+    if command -v direnv > /dev/null 2>&1; then
+        if [ -n "$ZSH_VERSION" ]; then
+            eval "$(direnv hook zsh)"
+        elif [ -n "$BASH_VERSION" ]; then
+            eval "$(direnv hook bash)"
+        fi
+
+        # Managed .envrc for personal repos — overrides corporate Artifactory index vars
+        # Content is version-controlled here in work.yaml; deployed to disk on shell startup
+        # Uses explicit PyPI URLs (not unset) because ~/.config/uv/uv.toml has index-url
+        # pointing to Artifactory — unset would let that config file win
+        _envrc="$HOME/Development/Personal/.envrc"
+        _envrc_content='export UV_INDEX_URL=https://pypi.org/simple
+    export UV_DEFAULT_INDEX=https://pypi.org/simple
+    export PIP_INDEX_URL=https://pypi.org/simple'
+        if [ ! -f "$_envrc" ] || [ "$(cat "$_envrc")" != "$_envrc_content" ]; then
+            mkdir -p "$(dirname "$_envrc")"
+            printf '%s\n' "$_envrc_content" > "$_envrc"
+            direnv allow "$_envrc"
+        fi
+        unset _envrc _envrc_content
+    fi
