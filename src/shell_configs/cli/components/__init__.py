@@ -5,6 +5,7 @@ from __future__ import annotations
 from shell_configs.cli.components.completions import CompletionsComponent
 from shell_configs.cli.components.configs import ConfigsComponent
 from shell_configs.cli.components.extensions import ExtensionsComponent
+from shell_configs.cli.components.gh_extensions import GhExtensionsComponent
 from shell_configs.cli.components.packages import (
     OptionalPackagesComponent,
     RequiredPackagesComponent,
@@ -20,6 +21,7 @@ INSTALL_COMPONENTS: list[Component] = [
     SigningComponent(),
     ScriptsComponent(),
     ExtensionsComponent(),
+    GhExtensionsComponent(),
 ]
 
 STATUS_COMPONENTS: list[Component] = [
@@ -29,6 +31,7 @@ STATUS_COMPONENTS: list[Component] = [
     ExtensionsComponent(),
     ScriptsComponent(),
     SigningComponent(),
+    GhExtensionsComponent(),
 ]
 
 COMPONENTS = INSTALL_COMPONENTS
