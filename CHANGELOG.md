@@ -1,6 +1,26 @@
 # CHANGELOG
 
 
+## v0.34.1 (2026-05-11)
+
+### Bug Fixes
+
+- Prevent shell_overrides["shared"] from injecting into gitconfig
+  ([#23](https://github.com/wpfleger96/shell-configs/pull/23),
+  [`1bfb0a5`](https://github.com/wpfleger96/shell-configs/commit/1bfb0a591d02788b95a9d98624a9b927808ea518))
+
+get_shared_config_content() appended profile.shell_overrides["shared"]
+(shell script) to all shell types including git (INI format), corrupting
+~/.gitconfig and breaking all git commands. The SHELL_CONFIGS_DIR export
+at line 127 already had the correct guard; the profile override block
+didn't. Latent since the method was written — PR #22 was the first time
+a profile defined shell_overrides["shared"], triggering it.
+
+Also restores PSR v10 changelog generation (missing since the v9→v10
+upgrade in 9cfc1ba silently dropped the now-required explicit config)
+and backfills the three skipped entries (v0.33.0, v0.33.1, v0.34.0).
+
+
 ## v0.34.0 (2026-05-11)
 
 ### Features
