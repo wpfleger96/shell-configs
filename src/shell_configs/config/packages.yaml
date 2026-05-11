@@ -143,3 +143,11 @@ packages:
     linux:
       method: script
       install_cmd: "curl -sS https://webi.sh/delta | sh"
+
+  - name: direnv
+    command: direnv
+    description: "Auto-loads/unloads env vars when entering directories with .envrc"
+    macos:
+      method: brew
+    linux:
+      method: apt
