@@ -1,0 +1,3 @@
+extensions:
+  - repo: babarot/gh-infra
+    pin: v0.13.0
