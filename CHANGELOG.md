@@ -2,6 +2,29 @@
 
 <!-- version list -->
 
+## v0.36.4 (2026-05-13)
+
+### Bug Fixes
+
+- Add PSR build_command to sync lockfile on release
+  ([#28](https://github.com/wpfleger96/shell-configs/pull/28),
+  [`600bdb7`](https://github.com/wpfleger96/shell-configs/commit/600bdb7ba004821c2341140fa5322d64a49097d1))
+
+- Delete auto-generated CLI_REFERENCE.md and remove dead links
+  ([#28](https://github.com/wpfleger96/shell-configs/pull/28),
+  [`600bdb7`](https://github.com/wpfleger96/shell-configs/commit/600bdb7ba004821c2341140fa5322d64a49097d1))
+
+- Install uv in PSR Docker container before lockfile sync
+  ([#29](https://github.com/wpfleger96/shell-configs/pull/29),
+  [`d02f3b7`](https://github.com/wpfleger96/shell-configs/commit/d02f3b7ead70e5b0130806a859ab08901460c4d9))
+
+### Refactoring
+
+- Remove dead code, fix stale docs and Justfile
+  ([#28](https://github.com/wpfleger96/shell-configs/pull/28),
+  [`600bdb7`](https://github.com/wpfleger96/shell-configs/commit/600bdb7ba004821c2341140fa5322d64a49097d1))
+
+
 ## v0.36.3 (2026-05-13)
 
 ### Bug Fixes
