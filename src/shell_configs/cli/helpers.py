@@ -61,7 +61,7 @@ def build_context(
         yes=yes,
         profile_name=profile_name,
         profile=active_profile,
-        selected_shells=selected_shells,
+        selected_shells=tuple(selected_shells),
         config_reader=config_reader,
         registry=registry,
     )
