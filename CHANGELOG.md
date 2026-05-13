@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.36.1 (2026-05-13)
+
+### Bug Fixes
+
+- Add PSR v10 changelog insertion flag and backfill missing entries
+  ([#25](https://github.com/wpfleger96/shell-configs/pull/25),
+  [`7c24a04`](https://github.com/wpfleger96/shell-configs/commit/7c24a048221970fcbc85317b248e6ceb40244c68))
+
 
 ## v0.36.0 (2026-05-13)
 
