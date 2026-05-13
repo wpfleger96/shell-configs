@@ -111,7 +111,20 @@ _reset_terminal_title() {
 ### Git - Functions ###
 _git_default_branch() {
     local remote="${1:-origin}"
-    command git symbolic-ref "refs/remotes/$remote/HEAD" 2>/dev/null | sed "s@^refs/remotes/$remote/@@"
+    local branch
+    branch=$(command git symbolic-ref "refs/remotes/$remote/HEAD" 2>/dev/null | sed "s@^refs/remotes/$remote/@@")
+    if [[ -n "$branch" ]]; then
+        echo "$branch"
+        return 0
+    fi
+    if command git show-ref --verify --quiet "refs/remotes/$remote/main" 2>/dev/null; then
+        echo "main"
+        return 0
+    fi
+    if command git show-ref --verify --quiet "refs/remotes/$remote/master" 2>/dev/null; then
+        echo "master"
+        return 0
+    fi
 }
 
 _git_smart_pull() {
@@ -206,19 +219,10 @@ grename() {
 sync-fork() {
     local default_branch
     default_branch=$(_git_default_branch upstream)
-
     if [[ -z "$default_branch" ]]; then
-        # Fallback: check if upstream/main or upstream/master exists
-        if command git show-ref --verify --quiet refs/remotes/upstream/main 2>/dev/null; then
-            default_branch="main"
-        elif command git show-ref --verify --quiet refs/remotes/upstream/master 2>/dev/null; then
-            default_branch="master"
-        else
-            echo "Error: Could not determine upstream default branch"
-            return 1
-        fi
+        echo "Error: Could not determine upstream default branch"
+        return 1
     fi
-
     git checkout && git fetch upstream && git merge "upstream/$default_branch"
 }
 
