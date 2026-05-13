@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.36.2 (2026-05-13)
+
+### Bug Fixes
+
+- Handle bare YAML keys in profile loader
+  ([`9b6b6ed`](https://github.com/wpfleger96/shell-configs/commit/9b6b6edebc44fa8d470f8f9a467a966c2c40b5e3))
+
+
 ## v0.36.1 (2026-05-13)
 
 ### Bug Fixes
