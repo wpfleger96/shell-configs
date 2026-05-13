@@ -2,20 +2,35 @@
 
 from __future__ import annotations
 
-from shell_configs.cli.context import Component, Context
+from shell_configs.cli.context import Component, ComponentPlan, ConfigsPlan, Context
 
 
 class ConfigsComponent(Component):
     label = "configs"
 
-    def install(self, ctx: Context) -> bool:
-        import click
+    def plan(self, ctx: Context) -> ConfigsPlan:
+        from shell_configs.bootstrap import load_auto_update_config
+        from shell_configs.cli.helpers import _compute_diffs_for_shells
+        from shell_configs.manager import ConfigManager
+
+        auto_update_config = load_auto_update_config()
+        manager = ConfigManager(backup_retention=auto_update_config.backup_retention)
+        diffs = _compute_diffs_for_shells(ctx, manager)
+        return ConfigsPlan(has_changes=bool(diffs), diffs=diffs)
+
+    def display_plan(self, plan: ComponentPlan) -> None:
+        from shell_configs.cli.helpers import _render_diffs
+
+        assert isinstance(plan, ConfigsPlan)
+        _render_diffs(plan.diffs)
+
+    def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
+        assert isinstance(plan, ConfigsPlan)
 
         from shell_configs.bootstrap import load_auto_update_config
         from shell_configs.bootstrap.config import save_auto_update_config
-        from shell_configs.cli.helpers import _display_diffs_for_shells
         from shell_configs.display import (
-            console,
+            print_diff,
             print_info,
             print_operation_result,
             print_warning,
@@ -25,18 +40,6 @@ class ConfigsComponent(Component):
 
         auto_update_config = load_auto_update_config()
         manager = ConfigManager(backup_retention=auto_update_config.backup_retention)
-
-        has_diffs = False
-        if not ctx.yes or ctx.dry_run:
-            has_diffs = _display_diffs_for_shells(
-                ctx.selected_shells, ctx.config_reader, manager, profile=ctx.profile
-            )
-
-            if has_diffs and not ctx.dry_run:
-                console.print()
-                if not click.confirm("Apply these changes?"):
-                    print_info("Installation cancelled")
-                    return False
 
         results = {}
         additional_file_results = {}
@@ -72,8 +75,6 @@ class ConfigsComponent(Component):
                 )
                 print_operation_result(result, message)
                 if diff_text and result == OperationResult.UPDATED:
-                    from shell_configs.display import print_diff
-
                     print_diff(diff_text)
                 results[shell.name] = result
 
@@ -122,8 +123,6 @@ class ConfigsComponent(Component):
                     )
                 print_operation_result(result, message)
                 if diff_text and result == OperationResult.UPDATED:
-                    from shell_configs.display import print_diff
-
                     print_diff(diff_text)
                 additional_file_results[str(additional_file.target_path)] = result
 
@@ -139,8 +138,6 @@ class ConfigsComponent(Component):
                 )
                 print_operation_result(result, message)
                 if diff_text and result == OperationResult.UPDATED:
-                    from shell_configs.display import print_diff
-
                     print_diff(diff_text)
                 preferences_results[pref_file.name] = result
 
@@ -168,7 +165,7 @@ class ConfigsComponent(Component):
 
         if total_success > 0 and not ctx.dry_run:
             print_info(f"Successfully installed/updated {total_success} file(s)")
-        elif not has_diffs and not ctx.dry_run:
+        elif not plan.has_changes and not ctx.dry_run:
             print_info("All configurations already in sync")
 
         if not ctx.dry_run and ctx.profile_name is not None:
@@ -180,6 +177,29 @@ class ConfigsComponent(Component):
             )
 
         return True
+
+    def install(self, ctx: Context) -> bool:
+        import click
+
+        from shell_configs.display import console, print_info
+
+        configs_plan = self.plan(ctx)
+
+        if not ctx.yes or ctx.dry_run:
+            self.display_plan(configs_plan)
+
+            if configs_plan.has_changes and not ctx.dry_run:
+                console.print()
+                if not click.confirm("Apply these changes?"):
+                    print_info("Installation cancelled")
+                    return False
+
+        return self.apply(ctx, configs_plan)
+
+    def diff(self, ctx: Context) -> bool:
+        configs_plan = self.plan(ctx)
+        self.display_plan(configs_plan)
+        return configs_plan.has_changes
 
     def status(self, ctx: Context) -> None:
         from pathlib import Path
@@ -302,17 +322,6 @@ class ConfigsComponent(Component):
                     add_additional_file_row(table, path_display, status_str)
 
         console.print(table)
-
-    def diff(self, ctx: Context) -> bool:
-        from shell_configs.bootstrap import load_auto_update_config
-        from shell_configs.cli.helpers import _display_diffs_for_shells
-        from shell_configs.manager import ConfigManager
-
-        auto_update_config = load_auto_update_config()
-        manager = ConfigManager(backup_retention=auto_update_config.backup_retention)
-        return _display_diffs_for_shells(
-            ctx.selected_shells, ctx.config_reader, manager, profile=ctx.profile
-        )
 
     def uninstall(self, ctx: Context) -> None:
         from shell_configs.bootstrap import load_auto_update_config
