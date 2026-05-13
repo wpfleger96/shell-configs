@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v0.37.0 (2026-05-13)
+
+### Bug Fixes
+
+- Install -y should run gh auth refresh, not suppress it
+  ([#30](https://github.com/wpfleger96/shell-configs/pull/30),
+  [`90706b4`](https://github.com/wpfleger96/shell-configs/commit/90706b462b595f612883ab94183e1eebb6f52efd))
+
+- Migrate GhAuthComponent to plan/apply, fix scope reporting
+  ([#30](https://github.com/wpfleger96/shell-configs/pull/30),
+  [`90706b4`](https://github.com/wpfleger96/shell-configs/commit/90706b462b595f612883ab94183e1eebb6f52efd))
+
+### Features
+
+- Add configurable gh CLI auth scope management
+  ([#30](https://github.com/wpfleger96/shell-configs/pull/30),
+  [`90706b4`](https://github.com/wpfleger96/shell-configs/commit/90706b462b595f612883ab94183e1eebb6f52efd))
+
+
 ## v0.36.5 (2026-05-13)
 
 ### Bug Fixes
