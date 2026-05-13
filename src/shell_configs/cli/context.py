@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from shell_configs.config import ConfigReader
@@ -90,9 +90,7 @@ class GhExtensionsPlan(ComponentPlan):
 
 @dataclass
 class ScriptsPlan(ComponentPlan):
-    entries: list[tuple[DiscoveredScript, ScriptStatus]] = field(
-        default_factory=list
-    )
+    entries: list[tuple[DiscoveredScript, ScriptStatus]] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
