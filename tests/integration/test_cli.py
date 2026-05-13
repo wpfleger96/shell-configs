@@ -51,7 +51,7 @@ class TestInstallCommand:
         result = cli_runner.invoke(cli, ["install", "--dry-run"])
 
         assert result.exit_code == 0
-        assert "Would create" in result.output
+        assert "Not installed" in result.output
 
         bashrc = mock_home / ".bashrc"
         assert not bashrc.exists()

@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from shell_configs.cli.context import Component, Context
+from shell_configs.cli.context import (
+    Component,
+    ComponentPlan,
+    Context,
+    OptionalPackagesPlan,
+    RequiredPackagesPlan,
+)
 
 
 class RequiredPackagesComponent(Component):
     label = "required-packages"
 
-    def install(self, ctx: Context) -> bool:
-        if ctx.dry_run:
-            return True
-
-        from shell_configs.display import console, print_warning
+    def plan(self, ctx: Context) -> RequiredPackagesPlan:
         from shell_configs.packages import (
             get_package_manager,
             load_packages_for_profile,
@@ -20,35 +22,139 @@ class RequiredPackagesComponent(Component):
 
         pkg_manager = get_package_manager()
         if not pkg_manager:
-            return True
+            return RequiredPackagesPlan(has_changes=False)
 
         try:
             packages = load_packages_for_profile(ctx.profile)
             required = [pkg for pkg in packages if pkg.required]
-            missing_required = [
-                pkg for pkg in required if not pkg_manager.is_installed(pkg)
-            ]
+            missing = [pkg for pkg in required if not pkg_manager.is_installed(pkg)]
+        except Exception:
+            return RequiredPackagesPlan(has_changes=False)
 
-            if missing_required:
-                console.print(
-                    f"[yellow]Installing {len(missing_required)} required package(s)...[/yellow]"
-                )
-                for pkg in missing_required:
-                    console.print(f"  Installing {pkg.name}...")
-                    success, message = pkg_manager.install(pkg, dry_run=False)
-                    if success:
-                        console.print(f"  [green]✓[/green] {pkg.name}")
-                    else:
-                        console.print(f"  [red]✗[/red] {pkg.name}: {message}")
-                console.print()
+        return RequiredPackagesPlan(has_changes=bool(missing), missing=missing)
+
+    def display_plan(self, plan: ComponentPlan) -> None:
+        if not isinstance(plan, RequiredPackagesPlan):
+            raise TypeError(f"expected RequiredPackagesPlan, got {type(plan).__name__}")
+        if not plan.has_changes:
+            return
+
+        from shell_configs.display import console
+
+        console.print(
+            f"[yellow]Installing {len(plan.missing)} required package(s)...[/yellow]"
+        )
+        for pkg in plan.missing:
+            console.print(f"  {pkg.name}")
+
+    def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
+        if not isinstance(plan, RequiredPackagesPlan):
+            raise TypeError(f"expected RequiredPackagesPlan, got {type(plan).__name__}")
+        if not plan.missing:
+            return True
+
+        from shell_configs.display import console, print_warning
+        from shell_configs.packages import get_package_manager
+
+        pkg_manager = get_package_manager()
+        if not pkg_manager:
+            return True
+
+        try:
+            for pkg in plan.missing:
+                console.print(f"  Installing {pkg.name}...")
+                success, message = pkg_manager.install(pkg, dry_run=False)
+                if success:
+                    console.print(f"  [green]✓[/green] {pkg.name}")
+                else:
+                    console.print(f"  [red]✗[/red] {pkg.name}: {message}")
+            console.print()
         except Exception as e:
             print_warning(f"Error installing required packages: {e}")
 
         return True
 
+    def install(self, ctx: Context) -> bool:
+        if ctx.dry_run:
+            return True
+
+        plan = self.plan(ctx)
+        self.display_plan(plan)
+        return self.apply(ctx, plan)
+
 
 class OptionalPackagesComponent(Component):
     label = "optional-packages"
+
+    def plan(self, ctx: Context) -> OptionalPackagesPlan:
+        from shell_configs.packages import (
+            get_package_manager,
+            load_packages_for_profile,
+        )
+
+        pkg_manager = get_package_manager()
+        if not pkg_manager:
+            return OptionalPackagesPlan(has_changes=False)
+
+        try:
+            packages = load_packages_for_profile(ctx.profile)
+            missing = [pkg for pkg in packages if not pkg_manager.is_installed(pkg)]
+        except Exception:
+            return OptionalPackagesPlan(has_changes=False)
+
+        return OptionalPackagesPlan(
+            has_changes=bool(missing), total=packages, missing=missing
+        )
+
+    def display_plan(self, plan: ComponentPlan) -> None:
+        if not isinstance(plan, OptionalPackagesPlan):
+            raise TypeError(f"expected OptionalPackagesPlan, got {type(plan).__name__}")
+        if not plan.has_changes:
+            return
+
+        from shell_configs.display import console
+
+        console.print()
+        console.print(
+            f"[yellow]⚠[/yellow] {len(plan.missing)}/{len(plan.total)} packages missing"
+        )
+        for pkg in plan.missing:
+            console.print(f"  [yellow]✗[/yellow] {pkg.name}")
+
+    def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
+        if not isinstance(plan, OptionalPackagesPlan):
+            raise TypeError(f"expected OptionalPackagesPlan, got {type(plan).__name__}")
+        if not plan.missing:
+            return True
+
+        from shell_configs.display import console
+        from shell_configs.packages import get_package_manager
+
+        pkg_manager = get_package_manager()
+        if not pkg_manager:
+            return True
+
+        try:
+            total = len(plan.missing)
+            for i, pkg in enumerate(plan.missing, start=1):
+                console.print(f"[dim][{i}/{total}] Installing {pkg.name}...[/dim]")
+                success, message = pkg_manager.install(pkg, dry_run=False)
+
+                if success:
+                    console.print(f"[green]✓[/green] {pkg.name}")
+                else:
+                    console.print(f"[red]✗[/red] {pkg.name}: {message}")
+
+                if i < total:
+                    console.print()
+
+            console.print(
+                f"\n[green]✓[/green] Package installation complete ({total} packages)"
+            )
+        except Exception as e:
+            console.print(f"\n[red]Error installing packages:[/red] {e}")
+
+        return True
 
     def install(self, ctx: Context) -> bool:
         if ctx.dry_run:
@@ -56,120 +162,71 @@ class OptionalPackagesComponent(Component):
 
         from rich.prompt import Confirm
 
-        from shell_configs.display import console, print_info
-        from shell_configs.packages import (
-            get_package_manager,
-            load_packages_for_profile,
-        )
+        from shell_configs.display import print_info
 
-        pkg_manager = get_package_manager()
-        if not pkg_manager:
+        plan = self.plan(ctx)
+
+        if not plan.has_changes:
+            from shell_configs.display import console
+
+            console.print()
+            console.print(
+                f"[green]✓[/green] All {len(plan.total)} packages already installed"
+            )
             return True
 
-        try:
-            packages = load_packages_for_profile(ctx.profile)
-            missing = [pkg for pkg in packages if not pkg_manager.is_installed(pkg)]
+        self.display_plan(plan)
 
-            if missing:
-                console.print()
-                console.print(
-                    f"[yellow]⚠[/yellow] {len(missing)}/{len(packages)} packages missing"
-                )
+        if ctx.yes or Confirm.ask("Install missing packages?", default=True):
+            from shell_configs.display import console
 
-                if ctx.yes or Confirm.ask("Install missing packages?", default=True):
-                    console.print()
-                    total = len(missing)
-                    for i, pkg in enumerate(missing, start=1):
-                        console.print(
-                            f"[dim][{i}/{total}] Installing {pkg.name}...[/dim]"
-                        )
-                        success, message = pkg_manager.install(pkg, dry_run=False)
-
-                        if success:
-                            console.print(f"[green]✓[/green] {pkg.name}")
-                        else:
-                            console.print(f"[red]✗[/red] {pkg.name}: {message}")
-
-                        if i < total:
-                            console.print()
-
-                    console.print(
-                        f"\n[green]✓[/green] Package installation complete ({total} packages)"
-                    )
-                else:
-                    print_info(
-                        "Skipping package installation. Run 'shell-configs packages install' later."
-                    )
-            else:
-                console.print()
-                console.print(
-                    f"[green]✓[/green] All {len(packages)} packages already installed"
-                )
-        except Exception as e:
-            console.print(f"\n[red]Error checking packages:[/red] {e}")
-
-        return True
+            console.print()
+            return self.apply(ctx, plan)
+        else:
+            print_info(
+                "Skipping package installation. Run 'shell-configs packages install' later."
+            )
+            return True
 
     def status(self, ctx: Context) -> None:
         from shell_configs.display import console
-        from shell_configs.packages import (
-            get_package_manager,
-            load_packages_for_profile,
-        )
+        from shell_configs.packages import get_package_manager
 
         console.print("[bold cyan]Packages[/bold cyan]\n")
 
         pkg_manager = get_package_manager()
-        if pkg_manager:
-            try:
-                packages = load_packages_for_profile(ctx.profile)
-                installed = []
-                missing = []
-                for pkg in packages:
-                    if pkg_manager.is_installed(pkg):
-                        installed.append(pkg)
-                    else:
-                        missing.append(pkg)
-
-                if not missing:
-                    console.print(
-                        f"  [green]✓[/green] {len(installed)}/{len(packages)} packages installed ({pkg_manager.display_name})"
-                    )
-                else:
-                    console.print(
-                        f"  [yellow]⚠[/yellow] {len(installed)}/{len(packages)} packages installed ({pkg_manager.display_name})"
-                    )
-                    console.print(
-                        "  [dim]Run 'shell-configs packages status' for details[/dim]"
-                    )
-            except Exception as e:
-                console.print(f"  [red]✗[/red] Error checking packages: {e}")
-        else:
+        if not pkg_manager:
             console.print("  [dim]No package manager available[/dim]")
+            console.print()
+            return
+
+        plan = self.plan(ctx)
+        installed_count = len(plan.total) - len(plan.missing)
+        total_count = len(plan.total)
+        display_name = pkg_manager.display_name
+
+        if not plan.missing:
+            console.print(
+                f"  [green]✓[/green] {installed_count}/{total_count} packages installed ({display_name})"
+            )
+        else:
+            console.print(
+                f"  [yellow]⚠[/yellow] {installed_count}/{total_count} packages installed ({display_name})"
+            )
+            console.print(
+                "  [dim]Run 'shell-configs packages status' for details[/dim]"
+            )
 
         console.print()
 
     def diff(self, ctx: Context) -> bool:
         from shell_configs.display import console
-        from shell_configs.packages import (
-            get_package_manager,
-            load_packages_for_profile,
-        )
 
-        pkg_manager = get_package_manager()
-        if not pkg_manager:
-            return False
-
-        try:
-            packages = load_packages_for_profile(ctx.profile)
-            missing = [pkg for pkg in packages if not pkg_manager.is_installed(pkg)]
-        except Exception:
-            return False
-
-        if not missing:
+        plan = self.plan(ctx)
+        if not plan.has_changes:
             return False
 
         console.print("\n[bold cyan]Packages[/bold cyan]\n")
-        for pkg in missing:
+        for pkg in plan.missing:
             console.print(f"  [yellow]✗[/yellow] {pkg.name} (not installed)")
         return True

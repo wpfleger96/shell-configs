@@ -5,6 +5,8 @@ from __future__ import annotations
 import difflib
 import sys
 
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -14,10 +16,9 @@ from shell_configs.config import ConfigReader
 from shell_configs.shells.base import merge_json_with_profile
 
 if TYPE_CHECKING:
-    from shell_configs.cli.context import Context
+    from shell_configs.cli.context import Context, FileDiff
     from shell_configs.extensions import ExtensionResult
     from shell_configs.manager import ConfigManager
-    from shell_configs.profiles.profile import Profile
     from shell_configs.shells.base import Shell
     from shell_configs.shells.registry import ShellRegistry
 
@@ -61,7 +62,7 @@ def build_context(
         yes=yes,
         profile_name=profile_name,
         profile=active_profile,
-        selected_shells=selected_shells,
+        selected_shells=tuple(selected_shells),
         config_reader=config_reader,
         registry=registry,
     )
@@ -163,24 +164,22 @@ def _print_extension_result(console: Any, result: ExtensionResult) -> None:
         console.print(f"  [red]✗[/red] {result.extension_id}: {result.message}")
 
 
-def _display_diffs_for_shells(
-    selected_shells: list[Shell],
-    config_reader: ConfigReader,
+def _compute_diffs_for_shells(
+    ctx: Context,
     manager: ConfigManager,
-    profile: Profile | None = None,
-) -> bool:
-    """Display diffs for selected shells before install.
+) -> list[FileDiff]:
+    """Compute diffs for all selected shells without rendering anything.
 
-    Returns:
-        True if diffs were found and displayed, False otherwise
+    Returns a list of FileDiff objects describing every file that differs
+    (or is not yet installed). Callers are responsible for display.
     """
-    from rich.syntax import Syntax
+    from shell_configs.cli.context import FileDiff
 
-    from shell_configs.display import console
+    diffs: list[FileDiff] = []
+    config_reader = ctx.config_reader
+    profile = ctx.profile
 
-    found_diffs = False
-
-    for shell in selected_shells:
+    for shell in ctx.selected_shells:
         for config_file in shell.get_config_files():
             repo_content = config_reader.get_config_content(
                 shell.name, config_file.repo_config_name, profile=profile
@@ -195,49 +194,59 @@ def _display_diffs_for_shells(
                 )
 
             repo_content = manager.combine_content(shared_content, repo_content)
-
             section = manager.extract_managed_section(config_file.path)
 
             if section is None:
-                console.print(
-                    f"\n[bold cyan]{shell.display_name}[/bold cyan]: {config_file.path}"
+                diffs.append(
+                    FileDiff(
+                        shell_name=shell.display_name,
+                        file_path=str(config_file.path),
+                        diff_text="",
+                        file_type="config",
+                        current_content="",
+                        desired_content=repo_content,
+                    )
                 )
-                console.print("[yellow]Not installed[/yellow]")
-                found_diffs = True
                 continue
 
             if section.content.strip() == repo_content.strip():
                 continue
 
-            found_diffs = True
-            console.print(
-                f"\n[bold cyan]{shell.display_name}[/bold cyan]: {config_file.path}"
-            )
-
             installed_lines = section.content.splitlines(keepends=True)
             repo_lines = repo_content.splitlines(keepends=True)
-
-            diff_lines = difflib.unified_diff(
-                installed_lines,
-                repo_lines,
-                fromfile="Installed",
-                tofile="Repository",
-                lineterm="",
+            diff_text = "\n".join(
+                difflib.unified_diff(
+                    installed_lines,
+                    repo_lines,
+                    fromfile="Installed",
+                    tofile="Repository",
+                    lineterm="",
+                )
             )
-
-            diff_text = "\n".join(diff_lines)
-            if diff_text:
-                syntax = Syntax(diff_text, "diff", theme="monokai")
-                console.print(syntax)
+            diffs.append(
+                FileDiff(
+                    shell_name=shell.display_name,
+                    file_path=str(config_file.path),
+                    diff_text=diff_text,
+                    file_type="config",
+                    current_content=section.content,
+                    desired_content=repo_content,
+                )
+            )
 
         additional_files = shell.get_additional_files()
         for additional_file in additional_files:
             if not additional_file.target_path.exists():
-                console.print(
-                    f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
+                diffs.append(
+                    FileDiff(
+                        shell_name=shell.display_name,
+                        file_path=str(additional_file.target_path),
+                        diff_text="",
+                        file_type="additional",
+                        current_content="",
+                        desired_content="",
+                    )
                 )
-                console.print("[yellow]Not installed[/yellow]")
-                found_diffs = True
                 continue
 
             if additional_file.base_source_path:
@@ -261,24 +270,34 @@ def _display_diffs_for_shells(
                     additional_file.source_path, additional_file.target_path
                 )
                 if ini_diff:
-                    found_diffs = True
-                    console.print(
-                        f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
+                    diffs.append(
+                        FileDiff(
+                            shell_name=shell.display_name,
+                            file_path=str(additional_file.target_path),
+                            diff_text=ini_diff,
+                            file_type="additional",
+                            current_content="",
+                            desired_content=repo_content,
+                        )
                     )
-                    syntax = Syntax(ini_diff, "diff", theme="monokai")
-                    console.print(syntax)
                 continue
-            elif additional_file.comment_prefix:
+
+            if additional_file.comment_prefix:
                 section = manager.extract_managed_section(
                     additional_file.target_path,
                     comment_prefix=additional_file.comment_prefix,
                 )
                 if section is None:
-                    console.print(
-                        f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
+                    diffs.append(
+                        FileDiff(
+                            shell_name=shell.display_name,
+                            file_path=str(additional_file.target_path),
+                            diff_text="",
+                            file_type="additional",
+                            current_content="",
+                            desired_content=repo_content,
+                        )
                     )
-                    console.print("[yellow]Not installed[/yellow]")
-                    found_diffs = True
                     continue
 
                 if manager.managed_content_matches(section.content, repo_content):
@@ -299,26 +318,27 @@ def _display_diffs_for_shells(
                         continue
                 installed_content = additional_file.target_path.read_text()
 
-            found_diffs = True
-            console.print(
-                f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
-            )
-
             installed_lines = installed_content.splitlines(keepends=True)
             repo_lines = repo_content.splitlines(keepends=True)
-
-            diff_lines = difflib.unified_diff(
-                installed_lines,
-                repo_lines,
-                fromfile="Installed",
-                tofile="Repository",
-                lineterm="",
+            diff_text = "\n".join(
+                difflib.unified_diff(
+                    installed_lines,
+                    repo_lines,
+                    fromfile="Installed",
+                    tofile="Repository",
+                    lineterm="",
+                )
             )
-
-            diff_text = "\n".join(diff_lines)
-            if diff_text:
-                syntax = Syntax(diff_text, "diff", theme="monokai")
-                console.print(syntax)
+            diffs.append(
+                FileDiff(
+                    shell_name=shell.display_name,
+                    file_path=str(additional_file.target_path),
+                    diff_text=diff_text,
+                    file_type="additional",
+                    current_content=installed_content,
+                    desired_content=repo_content,
+                )
+            )
 
         preferences_files = shell.get_preferences_files()
         for pref_file in preferences_files:
@@ -326,11 +346,231 @@ def _display_diffs_for_shells(
                 pref_file.source_path, pref_file.domain
             )
             if pref_diff:
-                found_diffs = True
-                console.print(
-                    f"\n[bold cyan]{shell.display_name}[/bold cyan]: "
-                    f"{pref_file.domain} (preferences)"
+                diffs.append(
+                    FileDiff(
+                        shell_name=shell.display_name,
+                        file_path=pref_file.domain,
+                        diff_text=pref_diff,
+                        file_type="preferences",
+                        current_content="",
+                        desired_content="",
+                    )
                 )
-                console.print(pref_diff)
 
-    return found_diffs
+    return diffs
+
+
+def _render_diffs(diffs: list[FileDiff], console_obj: Any = None) -> None:
+    """Render a list of FileDiff objects to the console.
+
+    Args:
+        diffs: Diffs produced by _compute_diffs_for_shells.
+        console_obj: Rich Console to use; falls back to the shared display console.
+    """
+    from rich.syntax import Syntax
+
+    if console_obj is None:
+        from shell_configs.display import console as console_obj
+
+    for diff in diffs:
+        if diff.file_type == "preferences":
+            console_obj.print(
+                f"\n[bold cyan]{diff.shell_name}[/bold cyan]: "
+                f"{diff.file_path} (preferences)"
+            )
+            console_obj.print(diff.diff_text)
+            continue
+
+        console_obj.print(
+            f"\n[bold cyan]{diff.shell_name}[/bold cyan]: {diff.file_path}"
+        )
+
+        if not diff.diff_text:
+            console_obj.print("[yellow]Not installed[/yellow]")
+            continue
+
+        syntax = Syntax(diff.diff_text, "diff", theme="monokai")
+        console_obj.print(syntax)
+
+
+_BUFFERED_METHODS: frozenset[str] = frozenset({"apply", "uninstall"})
+
+
+def run_components_parallel(
+    components: list[Any],
+    method: str,
+    ctx: Context,
+    plans: dict[Any, Any] | None = None,
+    max_workers: int | None = None,
+) -> dict[Any, Any]:
+    """Run a component method across all components in parallel.
+
+    For ``apply`` and ``uninstall``, each component's console output is captured
+    into a per-thread buffer and replayed atomically in completion order so that
+    output from different components never interleaves.  A Rich Progress bar
+    tracks each component live.
+
+    For ``plan`` (and any other method), no buffering is applied — the method is
+    expected to return data without printing.  A Status spinner shows progress.
+
+    Errors are collected rather than aborting on the first failure.  After all
+    futures settle, per-component errors are printed and partial results are
+    returned.  If *every* component failed the first exception is re-raised.
+    """
+    if not components:
+        return {}
+
+    from rich.console import Console
+
+    from shell_configs.display import _console_override, _real_console
+
+    should_buffer = method in _BUFFERED_METHODS
+    results: dict[Any, Any] = {}
+    errors: dict[Any, BaseException] = {}
+    futures: dict[Future[Any], Any] = {}
+
+    buffers: dict[Any, StringIO] = {}
+    buffered_consoles: dict[Any, Console] = {}
+
+    if should_buffer:
+        for component in components:
+            buf = StringIO()
+            buffers[component] = buf
+            buffered_consoles[component] = Console(
+                file=buf,
+                force_terminal=_real_console.is_terminal,
+                color_system=_real_console.color_system,  # type: ignore[arg-type]
+                highlight=False,
+            )
+
+    def _make_task(comp: Any, override: Console | None = None) -> Any:
+        def _run() -> Any:
+            if override is not None:
+                _console_override.set(override)
+            if method == "apply":
+                plan = (plans or {})[comp]
+                return getattr(comp, method)(ctx, plan)
+            return getattr(comp, method)(ctx)
+
+        return _run
+
+    with ThreadPoolExecutor(max_workers=max_workers or len(components)) as pool:
+        if should_buffer:
+            _run_buffered(
+                pool,
+                components,
+                _make_task,
+                buffered_consoles,
+                buffers,
+                futures,
+                results,
+                errors,
+                _real_console,
+            )
+        else:
+            _run_unbuffered(
+                pool,
+                components,
+                method,
+                _make_task,
+                futures,
+                results,
+                errors,
+                _real_console,
+            )
+
+    if errors:
+        from shell_configs.display import print_error
+
+        for comp, exc in errors.items():
+            print_error(f"{comp.label}: {type(exc).__name__}: {exc}")
+        if len(errors) == len(components):
+            raise next(iter(errors.values()))
+
+    return results
+
+
+def _run_buffered(
+    pool: Any,
+    components: list[Any],
+    make_task: Any,
+    buffered_consoles: dict[Any, Any],
+    buffers: dict[Any, StringIO],
+    futures: dict[Future[Any], Any],
+    results: dict[Any, Any],
+    errors: dict[Any, BaseException],
+    real_console: Any,
+) -> None:
+    """Execute components with per-thread output buffering and a Progress bar."""
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=real_console,
+        transient=True,
+    ) as progress:
+        task_ids: dict[Any, Any] = {}
+        for comp in components:
+            task_ids[comp] = progress.add_task(f"[cyan]{comp.label}[/cyan]", total=None)
+            future = pool.submit(make_task(comp, buffered_consoles[comp]))
+            futures[future] = comp
+
+        for future in as_completed(futures):
+            comp = futures[future]
+            exc = future.exception()
+            if exc is not None:
+                errors[comp] = exc
+                progress.update(
+                    task_ids[comp],
+                    description=f"[red]{comp.label} (failed)[/red]",
+                    completed=True,
+                )
+            else:
+                results[comp] = future.result()
+                progress.update(
+                    task_ids[comp],
+                    description=f"[green]{comp.label}[/green]",
+                    completed=True,
+                )
+
+            buf_content = buffers[comp].getvalue()
+            if buf_content.strip():
+                real_console.print(f"\n[bold cyan]{comp.label}[/bold cyan]")
+                real_console.file.write(buf_content)
+                real_console.file.flush()
+
+
+def _run_unbuffered(
+    pool: Any,
+    components: list[Any],
+    method: str,
+    make_task: Any,
+    futures: dict[Future[Any], Any],
+    results: dict[Any, Any],
+    errors: dict[Any, BaseException],
+    real_console: Any,
+) -> None:
+    """Execute components under a Status spinner (no output buffering)."""
+    from shell_configs.cli.context import ComponentPlan
+    from shell_configs.display import print_warning
+
+    with real_console.status(f"Running {method}...") as status:
+        for comp in components:
+            future = pool.submit(make_task(comp))
+            futures[future] = comp
+
+        completed = 0
+        for future in as_completed(futures):
+            comp = futures[future]
+            completed += 1
+            exc = future.exception()
+            if exc is not None:
+                if method == "plan":
+                    print_warning(f"{comp.label} plan failed: {exc}")
+                    results[comp] = ComponentPlan(has_changes=False)
+                else:
+                    errors[comp] = exc
+            else:
+                results[comp] = future.result()
+            status.update(f"Running {method}... ({completed}/{len(components)} done)")

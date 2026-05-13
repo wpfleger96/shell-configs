@@ -2,13 +2,53 @@
 
 from __future__ import annotations
 
-import sys
-
-from shell_configs.cli.context import Component, Context
+from shell_configs.cli.context import Component, ComponentPlan, Context, SigningPlan
 
 
 class SigningComponent(Component):
     label = "signing"
+
+    def plan(self, ctx: Context) -> SigningPlan:
+        from shell_configs.bootstrap import is_command_available
+
+        if not is_command_available("gh"):
+            return SigningPlan(has_changes=True, gh_available=False)
+
+        from shell_configs.signing import setup_signing
+
+        results = setup_signing(auto_fix=False, interactive=False)
+        failed = [r for r in results if not r.success and not r.skipped]
+        return SigningPlan(has_changes=bool(failed), results=results, failed=failed)
+
+    def display_plan(self, plan: ComponentPlan) -> None:
+        if not isinstance(plan, SigningPlan):
+            raise TypeError(f"expected SigningPlan, got {type(plan).__name__}")
+        if not plan.has_changes:
+            return
+
+        from shell_configs.display import console
+
+        console.print("\n[bold cyan]SSH Key Lifecycle[/bold cyan]\n")
+
+        if not plan.gh_available:
+            console.print(
+                "  [dim]gh not installed — signing validation will run after packages are installed[/dim]"
+            )
+            return
+
+        for r in plan.failed:
+            console.print(f"  [yellow]⚠[/yellow] {r.message}")
+
+    def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
+        if not isinstance(plan, SigningPlan):
+            raise TypeError(f"expected SigningPlan, got {type(plan).__name__}")
+        if not plan.has_changes:
+            return True
+
+        from shell_configs.signing import setup_signing
+
+        results = setup_signing(auto_fix=True, interactive=False)
+        return all(r.success or r.skipped for r in results)
 
     def install(self, ctx: Context) -> bool:
         if ctx.dry_run:
@@ -21,14 +61,11 @@ class SigningComponent(Component):
 
         console.print()
         console.print("[yellow]Validating SSH key lifecycle...[/yellow]")
-        interactive = sys.stdin.isatty()
-        signing_results = setup_signing(
-            auto_fix=ctx.yes
-            or Confirm.ask(
-                "Set up SSH key lifecycle (generate, auth, sign)?", default=True
-            ),
-            interactive=interactive,
+
+        auto_fix = ctx.yes or Confirm.ask(
+            "Set up SSH key lifecycle (generate, auth, sign)?", default=True
         )
+        signing_results = setup_signing(auto_fix=auto_fix, interactive=False)
         for r in signing_results:
             if r.skipped:
                 console.print(f"[yellow]⚠[/yellow] {r.message}")
@@ -55,16 +92,6 @@ class SigningComponent(Component):
         console.print()
 
     def diff(self, ctx: Context) -> bool:
-        from shell_configs.display import console
-        from shell_configs.signing import setup_signing
-
-        signing_results = setup_signing(auto_fix=False, interactive=False)
-        failed = [r for r in signing_results if not r.success and not r.skipped]
-
-        if not failed:
-            return False
-
-        console.print("\n[bold cyan]SSH Key Lifecycle[/bold cyan]\n")
-        for r in failed:
-            console.print(f"  [yellow]⚠[/yellow] {r.message}")
-        return True
+        plan = self.plan(ctx)
+        self.display_plan(plan)
+        return plan.has_changes
