@@ -5,7 +5,8 @@ from __future__ import annotations
 import difflib
 import sys
 
-from concurrent.futures import FIRST_EXCEPTION, Future, ThreadPoolExecutor, wait
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -18,7 +19,6 @@ if TYPE_CHECKING:
     from shell_configs.cli.context import Context, FileDiff
     from shell_configs.extensions import ExtensionResult
     from shell_configs.manager import ConfigManager
-    from shell_configs.profiles.profile import Profile
     from shell_configs.shells.base import Shell
     from shell_configs.shells.registry import ShellRegistry
 
@@ -167,7 +167,6 @@ def _print_extension_result(console: Any, result: ExtensionResult) -> None:
 def _compute_diffs_for_shells(
     ctx: Context,
     manager: ConfigManager,
-    console_obj: Any = None,
 ) -> list[FileDiff]:
     """Compute diffs for all selected shells without rendering anything.
 
@@ -394,86 +393,184 @@ def _render_diffs(diffs: list[FileDiff], console_obj: Any = None) -> None:
         console_obj.print(syntax)
 
 
-def _display_diffs_for_shells(
-    selected_shells: list[Shell],
-    config_reader: ConfigReader,
-    manager: ConfigManager,
-    profile: Profile | None = None,
-) -> bool:
-    """Display diffs for selected shells before install.
-
-    Returns:
-        True if diffs were found and displayed, False otherwise
-    """
-    from shell_configs.cli.context import Context
-    from shell_configs.shells.registry import ShellRegistry
-
-    ctx = Context(
-        dry_run=False,
-        yes=False,
-        profile_name=None,
-        profile=profile,
-        selected_shells=tuple(selected_shells),
-        config_reader=config_reader,
-        registry=ShellRegistry(),
-    )
-    diffs = _compute_diffs_for_shells(ctx, manager)
-    if diffs:
-        _render_diffs(diffs)
-    return bool(diffs)
+_BUFFERED_METHODS: frozenset[str] = frozenset({"apply", "uninstall"})
 
 
 def run_components_parallel(
-    components: list,
+    components: list[Any],
     method: str,
     ctx: Context,
-    plans: dict | None = None,
+    plans: dict[Any, Any] | None = None,
     max_workers: int | None = None,
-) -> dict:
+) -> dict[Any, Any]:
     """Run a component method across all components in parallel.
 
-    Args:
-        components: List of Component instances.
-        method: Method name to call ("plan", "apply", "status").
-        ctx: Context object (frozen, safe to share).
-        plans: For "apply", the plan dict keyed by component.
-        max_workers: Thread pool size (defaults to len(components)).
+    For ``apply`` and ``uninstall``, each component's console output is captured
+    into a per-thread buffer and replayed atomically in completion order so that
+    output from different components never interleaves.  A Rich Progress bar
+    tracks each component live.
 
-    Returns:
-        Dict mapping component to its method's return value.
+    For ``plan`` (and any other method), no buffering is applied — the method is
+    expected to return data without printing.  A Status spinner shows progress.
+
+    Errors are collected rather than aborting on the first failure.  After all
+    futures settle, per-component errors are printed and partial results are
+    returned.  If *every* component failed the first exception is re-raised.
     """
-    from rich.status import Status
+    if not components:
+        return {}
 
-    from shell_configs.display import console
+    from rich.console import Console
 
-    results: dict = {}
-    futures: dict[Future, Any] = {}
+    from shell_configs.display import _console_override, _real_console
+
+    should_buffer = method in _BUFFERED_METHODS
+    results: dict[Any, Any] = {}
+    errors: dict[Any, BaseException] = {}
+    futures: dict[Future[Any], Any] = {}
+
+    buffers: dict[Any, StringIO] = {}
+    buffered_consoles: dict[Any, Console] = {}
+
+    if should_buffer:
+        for component in components:
+            buf = StringIO()
+            buffers[component] = buf
+            buffered_consoles[component] = Console(
+                file=buf,
+                force_terminal=_real_console.is_terminal,
+                color_system=_real_console.color_system,  # type: ignore[arg-type]
+                highlight=False,
+            )
+
+    def _make_task(comp: Any, override: Console | None = None) -> Any:
+        def _run() -> Any:
+            if override is not None:
+                _console_override.set(override)
+            if method == "apply":
+                plan = (plans or {})[comp]
+                return getattr(comp, method)(ctx, plan)
+            return getattr(comp, method)(ctx)
+
+        return _run
 
     with ThreadPoolExecutor(max_workers=max_workers or len(components)) as pool:
-        with Status(f"Running {method}...", console=console) as status:
-            for component in components:
-                if method == "apply":
-                    plan = (plans or {})[component]
-                    future = pool.submit(getattr(component, method), ctx, plan)
-                else:
-                    future = pool.submit(getattr(component, method), ctx)
-                futures[future] = component
+        if should_buffer:
+            _run_buffered(
+                pool,
+                components,
+                _make_task,
+                buffered_consoles,
+                buffers,
+                futures,
+                results,
+                errors,
+                _real_console,
+            )
+        else:
+            _run_unbuffered(
+                pool,
+                components,
+                method,
+                _make_task,
+                futures,
+                results,
+                errors,
+                _real_console,
+            )
 
-            done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
+    if errors:
+        from shell_configs.display import print_error
 
-            for future in not_done:
-                future.cancel()
-
-            for future in done:
-                exc = future.exception()
-                if exc is not None:
-                    raise exc
-
-            for future in done:
-                component = futures[future]
-                results[component] = future.result()
-                status.update(
-                    f"Running {method}... ({len(results)}/{len(components)} done)"
-                )
+        for comp, exc in errors.items():
+            print_error(f"{comp.label}: {type(exc).__name__}: {exc}")
+        if len(errors) == len(components):
+            raise next(iter(errors.values()))
 
     return results
+
+
+def _run_buffered(
+    pool: Any,
+    components: list[Any],
+    make_task: Any,
+    buffered_consoles: dict[Any, Any],
+    buffers: dict[Any, StringIO],
+    futures: dict[Future[Any], Any],
+    results: dict[Any, Any],
+    errors: dict[Any, BaseException],
+    real_console: Any,
+) -> None:
+    """Execute components with per-thread output buffering and a Progress bar."""
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=real_console,
+        transient=True,
+    ) as progress:
+        task_ids: dict[Any, Any] = {}
+        for comp in components:
+            task_ids[comp] = progress.add_task(f"[cyan]{comp.label}[/cyan]", total=None)
+            future = pool.submit(make_task(comp, buffered_consoles[comp]))
+            futures[future] = comp
+
+        for future in as_completed(futures):
+            comp = futures[future]
+            exc = future.exception()
+            if exc is not None:
+                errors[comp] = exc
+                progress.update(
+                    task_ids[comp],
+                    description=f"[red]{comp.label} (failed)[/red]",
+                    completed=True,
+                )
+            else:
+                results[comp] = future.result()
+                progress.update(
+                    task_ids[comp],
+                    description=f"[green]{comp.label}[/green]",
+                    completed=True,
+                )
+
+            buf_content = buffers[comp].getvalue()
+            if buf_content.strip():
+                real_console.print(f"\n[bold cyan]{comp.label}[/bold cyan]")
+                real_console.file.write(buf_content)
+                real_console.file.flush()
+
+
+def _run_unbuffered(
+    pool: Any,
+    components: list[Any],
+    method: str,
+    make_task: Any,
+    futures: dict[Future[Any], Any],
+    results: dict[Any, Any],
+    errors: dict[Any, BaseException],
+    real_console: Any,
+) -> None:
+    """Execute components under a Status spinner (no output buffering)."""
+    from shell_configs.cli.context import ComponentPlan
+    from shell_configs.display import print_warning
+
+    with real_console.status(f"Running {method}...") as status:
+        for comp in components:
+            future = pool.submit(make_task(comp))
+            futures[future] = comp
+
+        completed = 0
+        for future in as_completed(futures):
+            comp = futures[future]
+            completed += 1
+            exc = future.exception()
+            if exc is not None:
+                if method == "plan":
+                    print_warning(f"{comp.label} plan failed: {exc}")
+                    results[comp] = ComponentPlan(has_changes=False)
+                else:
+                    errors[comp] = exc
+            else:
+                results[comp] = future.result()
+            status.update(f"Running {method}... ({completed}/{len(components)} done)")

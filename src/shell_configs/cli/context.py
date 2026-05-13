@@ -72,6 +72,7 @@ class OptionalPackagesPlan(ComponentPlan):
 class SigningPlan(ComponentPlan):
     results: list[StepResult] = field(default_factory=list)
     failed: list[StepResult] = field(default_factory=list)
+    gh_available: bool = True
 
 
 @dataclass
@@ -86,6 +87,7 @@ class GhExtensionsPlan(ComponentPlan):
     installed: dict[str, str | None] = field(default_factory=dict)
     missing: list[GhExtension] = field(default_factory=list)
     extra: set[str] = field(default_factory=set)
+    gh_available: bool = True
 
 
 @dataclass

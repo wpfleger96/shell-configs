@@ -28,7 +28,8 @@ class ScriptsComponent(Component):
         return ScriptsPlan(has_changes=has_changes, entries=entries)
 
     def display_plan(self, plan: ComponentPlan) -> None:
-        assert isinstance(plan, ScriptsPlan)
+        if not isinstance(plan, ScriptsPlan):
+            raise TypeError(f"expected ScriptsPlan, got {type(plan).__name__}")
         if not plan.has_changes:
             return
 
@@ -50,7 +51,8 @@ class ScriptsComponent(Component):
                 console.print(f"  {target_dir / entry.name}: {label}")
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        assert isinstance(plan, ScriptsPlan)
+        if not isinstance(plan, ScriptsPlan):
+            raise TypeError(f"expected ScriptsPlan, got {type(plan).__name__}")
         if not plan.has_changes:
             return True
 

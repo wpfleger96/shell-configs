@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from shell_configs.cli.context import Component, ComponentPlan, Context, ExtensionsPlan
 
 
@@ -14,8 +16,8 @@ class ExtensionsComponent(Component):
 
         ext_manager = ExtensionManager()
         ide_shells = _get_extension_shells(ctx.registry)
-        per_shell: dict = {}
-        ignored_per_shell: dict = {}
+        per_shell: dict[str, Any] = {}
+        ignored_per_shell: dict[str, frozenset[str]] = {}
 
         for shell in ide_shells:
             invoker = shell.get_extension_invoker()
@@ -44,7 +46,8 @@ class ExtensionsComponent(Component):
         )
 
     def display_plan(self, plan: ComponentPlan) -> None:
-        assert isinstance(plan, ExtensionsPlan)
+        if not isinstance(plan, ExtensionsPlan):
+            raise TypeError(f"expected ExtensionsPlan, got {type(plan).__name__}")
         from shell_configs.display import console
 
         found_diffs = False
@@ -75,7 +78,8 @@ class ExtensionsComponent(Component):
                     console.print(f"      [dim]+[/dim] {ext_id}")
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        assert isinstance(plan, ExtensionsPlan)
+        if not isinstance(plan, ExtensionsPlan):
+            raise TypeError(f"expected ExtensionsPlan, got {type(plan).__name__}")
         if ctx.dry_run:
             return True
 

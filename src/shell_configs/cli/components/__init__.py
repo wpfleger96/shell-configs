@@ -34,4 +34,10 @@ STATUS_COMPONENTS: list[Component] = [
     GhExtensionsComponent(),
 ]
 
-COMPONENTS = INSTALL_COMPONENTS
+DIFF_COMPONENTS = INSTALL_COMPONENTS
+
+# Only components with real uninstall() overrides; the other 5 inherit the base no-op.
+UNINSTALL_COMPONENTS: list[Component] = [
+    ConfigsComponent(),
+    ScriptsComponent(),
+]

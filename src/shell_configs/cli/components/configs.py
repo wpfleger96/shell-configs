@@ -21,11 +21,13 @@ class ConfigsComponent(Component):
     def display_plan(self, plan: ComponentPlan) -> None:
         from shell_configs.cli.helpers import _render_diffs
 
-        assert isinstance(plan, ConfigsPlan)
+        if not isinstance(plan, ConfigsPlan):
+            raise TypeError(f"expected ConfigsPlan, got {type(plan).__name__}")
         _render_diffs(plan.diffs)
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        assert isinstance(plan, ConfigsPlan)
+        if not isinstance(plan, ConfigsPlan):
+            raise TypeError(f"expected ConfigsPlan, got {type(plan).__name__}")
 
         from shell_configs.bootstrap import load_auto_update_config
         from shell_configs.bootstrap.config import save_auto_update_config

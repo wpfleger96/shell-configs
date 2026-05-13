@@ -20,7 +20,7 @@ from shell_configs.cli.helpers import (
 @click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
 def uninstall(shells: list[str] | None, yes: bool) -> None:
     """Remove managed configuration sections."""
-    from shell_configs.cli.components import COMPONENTS
+    from shell_configs.cli.components import UNINSTALL_COMPONENTS
     from shell_configs.cli.context import Context
     from shell_configs.config import ConfigReader
     from shell_configs.display import print_info, print_warning
@@ -49,9 +49,9 @@ def uninstall(shells: list[str] | None, yes: bool) -> None:
         yes=yes,
         profile_name=None,
         profile=None,
-        selected_shells=selected_shells,
+        selected_shells=tuple(selected_shells),
         config_reader=config_reader,
         registry=registry,
     )
 
-    run_components_parallel(COMPONENTS, "uninstall", ctx)
+    run_components_parallel(UNINSTALL_COMPONENTS, "uninstall", ctx)

@@ -68,30 +68,33 @@ def install(
     if ctx.dry_run:
         return
 
+    from shell_configs.cli.components.gh_extensions import GhExtensionsComponent
+    from shell_configs.cli.components.packages import RequiredPackagesComponent
+    from shell_configs.cli.components.signing import SigningComponent
+
     # RequiredPackages installs tooling (e.g. gh) that later components depend on
-    required_pkg = INSTALL_COMPONENTS[0]
-    if plans[required_pkg].has_changes:
-        required_pkg.apply(ctx, plans[required_pkg])
-
-    remaining = INSTALL_COMPONENTS[1:]
-
     signing_comp = None
     gh_ext_comp = None
+    required_pkg = None
     parallel_comps = []
-    for comp in remaining:
-        if comp.label == "signing":
+    for comp in INSTALL_COMPONENTS:
+        if isinstance(comp, RequiredPackagesComponent):
+            required_pkg = comp
+        elif isinstance(comp, SigningComponent):
             signing_comp = comp
-        elif comp.label == "gh-extensions":
+        elif isinstance(comp, GhExtensionsComponent):
             gh_ext_comp = comp
         else:
             parallel_comps.append(comp)
 
-    if parallel_comps:
-        parallel_plans = {c: plans[c] for c in parallel_comps if plans[c].has_changes}
-        if parallel_plans:
-            run_components_parallel(
-                list(parallel_plans.keys()), "apply", ctx, plans=parallel_plans
-            )
+    if required_pkg and plans[required_pkg].has_changes:
+        required_pkg.apply(ctx, plans[required_pkg])
+
+    parallel_plans = {c: plans[c] for c in parallel_comps if plans[c].has_changes}
+    if parallel_plans:
+        run_components_parallel(
+            list(parallel_plans.keys()), "apply", ctx, plans=parallel_plans
+        )
 
     # gh auth state is mutated by signing; run sequentially to avoid races
     if signing_comp and plans[signing_comp].has_changes:

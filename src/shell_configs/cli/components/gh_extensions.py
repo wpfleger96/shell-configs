@@ -14,9 +14,20 @@ class GhExtensionsComponent(Component):
     label = "gh-extensions"
 
     def plan(self, ctx: Context) -> GhExtensionsPlan:
-        from shell_configs.gh_extensions import list_installed, load_extensions
+        from shell_configs.bootstrap import is_command_available
+        from shell_configs.gh_extensions import load_extensions
 
         desired = load_extensions()
+
+        if not is_command_available("gh"):
+            return GhExtensionsPlan(
+                has_changes=True,
+                gh_available=False,
+                desired=desired,
+            )
+
+        from shell_configs.gh_extensions import list_installed
+
         installed = list_installed()
         missing = [ext for ext in desired if ext.repo not in installed]
         extra = set(installed.keys()) - {ext.repo for ext in desired}
@@ -30,20 +41,29 @@ class GhExtensionsComponent(Component):
         )
 
     def display_plan(self, plan: ComponentPlan) -> None:
-        assert isinstance(plan, GhExtensionsPlan)
+        if not isinstance(plan, GhExtensionsPlan):
+            raise TypeError(f"expected GhExtensionsPlan, got {type(plan).__name__}")
         if not plan.has_changes:
             return
 
         from shell_configs.display import console
 
         console.print("\n[bold cyan]gh CLI Extensions[/bold cyan]\n")
+
+        if not plan.gh_available:
+            console.print(
+                "  [dim]gh not installed — will be installed by required packages first[/dim]"
+            )
+            return
+
         for ext in plan.missing:
             console.print(f"  [yellow]✗[/yellow] {ext.repo} (not installed)")
         for ext_name in sorted(plan.extra):
             console.print(f"  [dim]+[/dim] {ext_name} (not in manifest)")
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        assert isinstance(plan, GhExtensionsPlan)
+        if not isinstance(plan, GhExtensionsPlan):
+            raise TypeError(f"expected GhExtensionsPlan, got {type(plan).__name__}")
         if not plan.missing:
             return True
 

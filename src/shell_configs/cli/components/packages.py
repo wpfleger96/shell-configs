@@ -34,7 +34,8 @@ class RequiredPackagesComponent(Component):
         return RequiredPackagesPlan(has_changes=bool(missing), missing=missing)
 
     def display_plan(self, plan: ComponentPlan) -> None:
-        assert isinstance(plan, RequiredPackagesPlan)
+        if not isinstance(plan, RequiredPackagesPlan):
+            raise TypeError(f"expected RequiredPackagesPlan, got {type(plan).__name__}")
         if not plan.has_changes:
             return
 
@@ -47,7 +48,8 @@ class RequiredPackagesComponent(Component):
             console.print(f"  {pkg.name}")
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        assert isinstance(plan, RequiredPackagesPlan)
+        if not isinstance(plan, RequiredPackagesPlan):
+            raise TypeError(f"expected RequiredPackagesPlan, got {type(plan).__name__}")
         if not plan.missing:
             return True
 
@@ -105,7 +107,8 @@ class OptionalPackagesComponent(Component):
         )
 
     def display_plan(self, plan: ComponentPlan) -> None:
-        assert isinstance(plan, OptionalPackagesPlan)
+        if not isinstance(plan, OptionalPackagesPlan):
+            raise TypeError(f"expected OptionalPackagesPlan, got {type(plan).__name__}")
         if not plan.has_changes:
             return
 
@@ -119,7 +122,8 @@ class OptionalPackagesComponent(Component):
             console.print(f"  [yellow]✗[/yellow] {pkg.name}")
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        assert isinstance(plan, OptionalPackagesPlan)
+        if not isinstance(plan, OptionalPackagesPlan):
+            raise TypeError(f"expected OptionalPackagesPlan, got {type(plan).__name__}")
         if not plan.missing:
             return True
 

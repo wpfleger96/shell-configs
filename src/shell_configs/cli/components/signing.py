@@ -9,6 +9,11 @@ class SigningComponent(Component):
     label = "signing"
 
     def plan(self, ctx: Context) -> SigningPlan:
+        from shell_configs.bootstrap import is_command_available
+
+        if not is_command_available("gh"):
+            return SigningPlan(has_changes=True, gh_available=False)
+
         from shell_configs.signing import setup_signing
 
         results = setup_signing(auto_fix=False, interactive=False)
@@ -16,18 +21,27 @@ class SigningComponent(Component):
         return SigningPlan(has_changes=bool(failed), results=results, failed=failed)
 
     def display_plan(self, plan: ComponentPlan) -> None:
-        assert isinstance(plan, SigningPlan)
+        if not isinstance(plan, SigningPlan):
+            raise TypeError(f"expected SigningPlan, got {type(plan).__name__}")
         if not plan.has_changes:
             return
 
         from shell_configs.display import console
 
         console.print("\n[bold cyan]SSH Key Lifecycle[/bold cyan]\n")
+
+        if not plan.gh_available:
+            console.print(
+                "  [dim]gh not installed — signing validation will run after packages are installed[/dim]"
+            )
+            return
+
         for r in plan.failed:
             console.print(f"  [yellow]⚠[/yellow] {r.message}")
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        assert isinstance(plan, SigningPlan)
+        if not isinstance(plan, SigningPlan):
+            raise TypeError(f"expected SigningPlan, got {type(plan).__name__}")
         if not plan.has_changes:
             return True
 
