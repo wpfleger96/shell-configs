@@ -17,3 +17,6 @@ ms-vscode.makefile-tools
 # Utilities
 ms-vscode.powershell
 tomoki1207.pdf
+
+# Agents
+anthropic.claude-code

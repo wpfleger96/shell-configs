@@ -3,13 +3,6 @@ description: Work laptop profile (Block)
 extends: default
 
 extensions:
-  vscode:
-    add:
-      - anthropic.claude-code
-  cursor:
-    add:
-      - anthropic.claude-code
-
 settings_overrides:
   vscode:
     "block.comment": "Three liveshare configs: liveshare.guestApprovalRequired, liveshare.anonymousGuestApproval, and liveshare.shareExternalFiles, have been added to your VS Code config by the Block CPE team. They are a mandatory security requirement which must be met (CPENG-706). Please leave them as-is."
