@@ -8,10 +8,6 @@ default: sync type-check lint-python-check lint-shell-check format-python-check 
 sync:
     uv sync
 
-# Documentation
-docs:
-    uv run python script/generate_cli_docs.py
-
 # Code Quality - Check variants
 type-check:
     uv run mypy .

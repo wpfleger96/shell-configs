@@ -11,7 +11,6 @@ Designed to be self-contained and easily extractable for use in other projects.
 from .config import (
     AutoUpdateConfig,
     get_config_dir,
-    get_config_path,
     load_auto_update_config,
     save_auto_update_config,
 )
@@ -25,18 +24,14 @@ from .installer import (
 )
 from .updater import (
     UPDATABLE_TOOLS,
-    ToolSpec,
-    UpdateInfo,
-    check_github_updates,
     check_tool_updates,
     get_tool_by_id,
     perform_github_update,
 )
-from .version import is_newer, parse_version
+from .version import is_newer
 
 __all__ = [
     "is_newer",
-    "parse_version",
     "UV_NOT_FOUND_ERROR",
     "get_tool_config_dir",
     "get_tool_version",
@@ -44,15 +39,11 @@ __all__ = [
     "is_command_available",
     "uninstall_tool",
     "UPDATABLE_TOOLS",
-    "ToolSpec",
-    "UpdateInfo",
-    "check_github_updates",
     "check_tool_updates",
     "get_tool_by_id",
     "perform_github_update",
     "AutoUpdateConfig",
     "get_config_dir",
-    "get_config_path",
     "load_auto_update_config",
     "save_auto_update_config",
 ]
