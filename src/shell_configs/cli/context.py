@@ -76,6 +76,13 @@ class SigningPlan(ComponentPlan):
 
 
 @dataclass
+class GhAuthPlan(ComponentPlan):
+    auth_ok: bool = True
+    missing_scopes: list[str] = field(default_factory=list)
+    gh_available: bool = True
+
+
+@dataclass
 class ExtensionsPlan(ComponentPlan):
     per_shell: dict[str, ExtensionDiff] = field(default_factory=dict)
     ignored_per_shell: dict[str, frozenset[str]] = field(default_factory=dict)

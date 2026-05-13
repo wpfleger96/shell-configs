@@ -1,0 +1,4 @@
+scopes:
+  - admin:public_key
+  - admin:ssh_signing_key
+  - workflow

@@ -153,38 +153,39 @@ def ensure_gh_scopes(
 ) -> tuple[bool, str]:
     """Ensure required OAuth scopes for key management."""
     if scopes is None:
-        scopes = ["admin:public_key", "admin:ssh_signing_key"]
+        from shell_configs.gh_auth import load_desired_scopes
 
-    status_result = _run(
-        ["gh", "auth", "status"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    if status_result.returncode == 0:
-        output = f"{status_result.stdout}\n{status_result.stderr}"
-        for line in output.splitlines():
-            if "Token scopes:" in line:
-                scopes_str = line.split("Token scopes:", 1)[1].strip()
-                current_scopes = {s.strip().strip("'\"") for s in scopes_str.split(",")}
-                if all(s in current_scopes for s in scopes):
-                    return True, "Required OAuth scopes are present"
-                break
+        scopes = load_desired_scopes()
+
+    from shell_configs.gh_auth import get_current_gh_scopes
+
+    current_scopes = get_current_gh_scopes()
+    missing = [s for s in scopes if s not in current_scopes]
+    if not missing:
+        return True, "Required OAuth scopes are present"
 
     if not interactive:
         return (
             False,
-            f"Missing OAuth scopes ({', '.join(scopes)}). Run 'shell-configs signing --fix' interactively",
+            f"Missing OAuth scopes ({', '.join(missing)}). Run 'shell-configs signing --fix' interactively",
         )
 
-    scopes_arg = ",".join(scopes)
+    scopes_arg = ",".join(missing)
     refresh_result = _run(
         ["gh", "auth", "refresh", "-h", "github.com", "-s", scopes_arg],
         timeout=120,
     )
-    if refresh_result.returncode == 0:
-        return True, "OAuth scopes granted"
-    return False, "Failed to refresh OAuth scopes"
+    if refresh_result.returncode != 0:
+        return False, "Failed to refresh OAuth scopes"
+
+    updated = get_current_gh_scopes()
+    still_missing = [s for s in scopes if s not in updated]
+    if still_missing:
+        return (
+            False,
+            f"OAuth refresh succeeded but scopes still missing: {', '.join(still_missing)}",
+        )
+    return True, "OAuth scopes granted"
 
 
 def upload_auth_key(key_path: Path) -> tuple[bool, str]:
@@ -516,7 +517,10 @@ def setup_signing(
     if dry_run:
         results.append(StepResult("gh_scopes", True, "Would ensure OAuth scopes"))
     else:
-        ok, msg = ensure_gh_scopes(interactive=interactive)
+        ok, msg = ensure_gh_scopes(
+            scopes=["admin:public_key", "admin:ssh_signing_key"],
+            interactive=interactive,
+        )
         results.append(
             StepResult("gh_scopes", ok, msg, skipped=not ok and not interactive)
         )
@@ -632,7 +636,9 @@ def _validate_all_steps(key_path: Path | None) -> list[StepResult]:
 
     gh_authed = ok
     if gh_authed:
-        ok, msg = ensure_gh_scopes(interactive=False)
+        ok, msg = ensure_gh_scopes(
+            scopes=["admin:public_key", "admin:ssh_signing_key"], interactive=False
+        )
         results.append(StepResult("gh_scopes", ok, msg))
         gh_has_scopes = ok
     else:
