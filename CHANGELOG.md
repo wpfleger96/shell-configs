@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v0.36.3 (2026-05-13)
+
+### Bug Fixes
+
+- Temporarily switch gh-infra to personal fork
+  ([#27](https://github.com/wpfleger96/shell-configs/pull/27),
+  [`66d5329`](https://github.com/wpfleger96/shell-configs/commit/66d53298508b85c3bf2afe015817dc3bb1b973d9))
+
+
 ## v0.36.2 (2026-05-13)
 
 ### Bug Fixes
