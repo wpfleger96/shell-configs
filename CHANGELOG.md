@@ -1,5 +1,58 @@
 # CHANGELOG
 
+<!-- version list -->
+
+
+## v0.36.0 (2026-05-13)
+
+### Features
+
+- **extensions**: Add `list` command, remove `export`
+  ([`a1426dc`](https://github.com/wpfleger96/shell-configs/commit/a1426dc592d20aab83ae9139b5f0d5401f4df140))
+
+No command showed individual extensions with their install status — `status` only had counts,
+  `diff` only showed discrepancies, and `export` dumped raw names for one IDE with no context. The
+  new `extensions list` shows a per-IDE table with every extension and its status (installed,
+  missing, extra, builtin).
+
+### Bug Fixes
+
+- Add main/master fallback to _git_default_branch
+  ([`bcff354`](https://github.com/wpfleger96/shell-configs/commit/bcff354a33d2f25e33dd277f88377607b1498844))
+
+git symbolic-ref refs/remotes/origin/HEAD is only set at clone time and never updated — repos
+  created via git init + git remote add lack it entirely. Fall back to checking for main then master
+  via show-ref. Removes the now-redundant inline fallback from sync-fork.
+
+- Claude code extension keeps getting reinstalled by CLI anyway
+  ([`bd685af`](https://github.com/wpfleger96/shell-configs/commit/bd685af5be97aea0eb527203f58bd1c8ad4a5def))
+
+
+## v0.35.0 (2026-05-13)
+
+### Features
+
+- Add VS Code Local (Windows-side) extension management on WSL
+  ([`0e297ae`](https://github.com/wpfleger96/shell-configs/commit/0e297aeef758384e84092938ff70bca53b327534))
+
+VS Code on WSL has two separate extension hosts — WSL:Ubuntu (remote) and Local (Windows-side) —
+  but shell-configs only managed WSL extensions. UI-only extensions like tomoki1207.pdf and
+  mathiasfrohlich.kotlin were installed into WSL where VS Code couldn't run them ("Install
+  Locally").
+
+Introduces ExtensionInvoker abstraction to support PowerShell-based CLI invocation for the
+  Windows-side code.cmd from WSL. Adds VSCodeLocalShell (registered on WSL only) with a dedicated
+  extensions-local.txt config. Also adds ms-vscode.powershell, ms-python.vscode-python-envs, and
+  ms-python.vscode-pylance to the shared extension config.
+
+
+## v0.34.2 (2026-05-11)
+
+### Bug Fixes
+
+- Backfill missing CHANGELOG entry for v0.34.1
+  ([`b623c45`](https://github.com/wpfleger96/shell-configs/commit/b623c45b6d10b827ef7afe5ed980919e9b8bf7a1))
+
 
 ## v0.34.1 (2026-05-11)
 
