@@ -230,7 +230,9 @@ class TestEnsureGhScopes:
                 stderr="",
             ),
         )
-        ok, msg = ensure_gh_scopes(interactive=False)
+        ok, msg = ensure_gh_scopes(
+            scopes=["admin:public_key", "admin:ssh_signing_key"], interactive=False
+        )
         assert ok is True
         assert "present" in msg
 
@@ -246,7 +248,9 @@ class TestEnsureGhScopes:
                 stderr="",
             ),
         )
-        ok, msg = ensure_gh_scopes(interactive=False)
+        ok, msg = ensure_gh_scopes(
+            scopes=["admin:public_key", "admin:ssh_signing_key"], interactive=False
+        )
         assert ok is False
         assert "Missing OAuth scopes" in msg
 
@@ -263,7 +267,9 @@ class TestEnsureGhScopes:
                 ),
             ),
         )
-        ok, msg = ensure_gh_scopes(interactive=False)
+        ok, msg = ensure_gh_scopes(
+            scopes=["admin:public_key", "admin:ssh_signing_key"], interactive=False
+        )
         assert ok is True
 
     def test_returns_false_when_gh_auth_fails(self, monkeypatch):
@@ -273,7 +279,9 @@ class TestEnsureGhScopes:
                 a[0], 1, stdout="", stderr="not logged in"
             ),
         )
-        ok, msg = ensure_gh_scopes(interactive=False)
+        ok, msg = ensure_gh_scopes(
+            scopes=["admin:public_key", "admin:ssh_signing_key"], interactive=False
+        )
         assert ok is False
 
     def test_parses_scopes_when_split_across_streams(self, monkeypatch):
@@ -286,7 +294,9 @@ class TestEnsureGhScopes:
                 stderr="  - Token scopes: 'admin:public_key', 'admin:ssh_signing_key'\n",
             ),
         )
-        ok, msg = ensure_gh_scopes(interactive=False)
+        ok, msg = ensure_gh_scopes(
+            scopes=["admin:public_key", "admin:ssh_signing_key"], interactive=False
+        )
         assert ok is True
         assert "present" in msg
 

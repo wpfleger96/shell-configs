@@ -153,7 +153,9 @@ def ensure_gh_scopes(
 ) -> tuple[bool, str]:
     """Ensure required OAuth scopes for key management."""
     if scopes is None:
-        scopes = ["admin:public_key", "admin:ssh_signing_key"]
+        from shell_configs.gh_auth import load_desired_scopes
+
+        scopes = load_desired_scopes()
 
     status_result = _run(
         ["gh", "auth", "status"],
