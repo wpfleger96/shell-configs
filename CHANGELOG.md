@@ -2,6 +2,43 @@
 
 <!-- version list -->
 
+## v0.36.5 (2026-05-13)
+
+### Bug Fixes
+
+- Address code review findings for parallel executor
+  ([#26](https://github.com/wpfleger96/shell-configs/pull/26),
+  [`74c7b10`](https://github.com/wpfleger96/shell-configs/commit/74c7b108588e583d30af22d6099443585b706ca3))
+
+### Chores
+
+- Remove unused Any import from context.py
+  ([#26](https://github.com/wpfleger96/shell-configs/pull/26),
+  [`74c7b10`](https://github.com/wpfleger96/shell-configs/commit/74c7b108588e583d30af22d6099443585b706ca3))
+
+### Refactoring
+
+- Add plan/apply component interface and plan dataclasses
+  ([#26](https://github.com/wpfleger96/shell-configs/pull/26),
+  [`74c7b10`](https://github.com/wpfleger96/shell-configs/commit/74c7b108588e583d30af22d6099443585b706ca3))
+
+- Parallel plan/apply architecture for CLI components
+  ([#26](https://github.com/wpfleger96/shell-configs/pull/26),
+  [`74c7b10`](https://github.com/wpfleger96/shell-configs/commit/74c7b108588e583d30af22d6099443585b706ca3))
+
+- Rewrite commands to use parallel plan/apply flow
+  ([#26](https://github.com/wpfleger96/shell-configs/pull/26),
+  [`74c7b10`](https://github.com/wpfleger96/shell-configs/commit/74c7b108588e583d30af22d6099443585b706ca3))
+
+- Split all components into plan/apply and add parallel executor
+  ([#26](https://github.com/wpfleger96/shell-configs/pull/26),
+  [`74c7b10`](https://github.com/wpfleger96/shell-configs/commit/74c7b108588e583d30af22d6099443585b706ca3))
+
+- Split ConfigsComponent into plan/apply phases
+  ([#26](https://github.com/wpfleger96/shell-configs/pull/26),
+  [`74c7b10`](https://github.com/wpfleger96/shell-configs/commit/74c7b108588e583d30af22d6099443585b706ca3))
+
+
 ## v0.36.4 (2026-05-13)
 
 ### Bug Fixes
