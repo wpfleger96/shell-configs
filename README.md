@@ -63,7 +63,7 @@ choco install just
 
 ## Commands
 
-See [CLI Reference](docs/CLI_REFERENCE.md) for complete command documentation.
+Run `uv run shell-configs --help` or `uv run shell-configs <command> --help` for complete command documentation.
 
 **Quick start examples:**
 - `uv run shell-configs setup` - Install shell-configs permanently (with auto-upgrade check)
