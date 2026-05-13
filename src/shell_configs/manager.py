@@ -339,8 +339,6 @@ class ConfigManager:
 
             diff_text = None
             if existing_section:
-                import difflib
-
                 old_lines = existing_section.content.splitlines(keepends=True)
                 new_content = self.strip_json_outer_brackets(final_content)
                 new_lines = new_content.splitlines(keepends=True)
@@ -720,8 +718,6 @@ class ConfigManager:
 
             diff_text = None
             if target_path.exists():
-                import difflib
-
                 old_lines = target_path.read_text().splitlines(keepends=True)
                 new_lines = content.splitlines(keepends=True)
                 diff_lines = difflib.unified_diff(

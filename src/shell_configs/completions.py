@@ -47,7 +47,7 @@ def detect_shell() -> str | None:
     return shell_name if shell_name in SHELL_REGISTRY else None
 
 
-def get_shell_config_candidates(shell: str) -> list[Path]:
+def _get_shell_config_candidates(shell: str) -> list[Path]:
     """Return candidate config files for a shell, checking which exist.
 
     Args:
@@ -71,7 +71,7 @@ def find_config_file(shell: str) -> Path | None:
     Returns:
         Path to config file, or None if no candidates exist
     """
-    candidates = get_shell_config_candidates(shell)
+    candidates = _get_shell_config_candidates(shell)
     return candidates[0] if candidates else None
 
 
@@ -137,7 +137,7 @@ def install_completion(shell: str, dry_run: bool = False) -> tuple[bool, str]:
         return (
             False,
             f"No {shell} config file found. Expected one of: "
-            + ", ".join(str(p) for p in get_shell_config_candidates(shell)),
+            + ", ".join(str(p) for p in _get_shell_config_candidates(shell)),
         )
 
     if is_completion_installed(config_path):

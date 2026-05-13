@@ -262,13 +262,12 @@ def find_stale_github_keys(
         parts = line.split("\t")
         if len(parts) < 4:
             continue
-        title, gh_key_id, key_type_field, fingerprint = (
+        title, _, key_type_field, fingerprint = (
             parts[0],
             parts[1],
             parts[2],
             parts[3] if len(parts) > 3 else "",
         )
-        _ = gh_key_id
         if fingerprint and fingerprint != current_fp:
             stale.append(
                 StaleKeyInfo(

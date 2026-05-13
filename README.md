@@ -48,7 +48,6 @@ choco install just
 | Command | Description |
 |---------|-------------|
 | `just` | Quick quality checks (sync, type-check, lint, format check) |
-| `just setup` | First-time setup (sync deps + install git hooks) |
 | `just check` | Quick quality checks (no tests) |
 | `just check-all` | All checks including tests |
 | `just test` | Run all tests |
@@ -56,8 +55,8 @@ choco install just
 | `just test-integration` | Run integration tests only |
 | `just test-cli` | Run CLI tests only |
 | `just test-cov` | Run tests with coverage report |
-| `just lint` | Fix linting issues |
-| `just format` | Auto-format code |
+| `just lint-python` | Fix Python linting issues |
+| `just format-python` | Auto-format Python code |
 | `just type-check` | Run mypy type checking |
 | `just pre-commit` | Full pre-commit workflow |
 | `just --list` | List all available commands |

@@ -67,6 +67,9 @@ src/shell_configs/
 ├── display.py                  # Rich console output formatting
 ├── signing.py                  # SSH signing key validation/setup
 ├── completions.py              # Shell completion generation
+├── gh_extensions.py            # gh CLI extension management
+├── extensions.py               # IDE extension management (VSCode/Cursor)
+├── script_manager.py           # Script discovery, installation, and management
 ├── platform.py                 # Platform detection (Linux/macOS/WSL)
 ├── shells/                     # Shell implementations
 │   ├── base.py                 # Shell ABC (ConfigFile, validation interface)

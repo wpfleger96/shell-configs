@@ -19,10 +19,13 @@ Commands:
   cleanup      Clean up old backup files created by shell-configs.
   completions  Manage shell tab completion.
   diff         Show differences between repository and installed...
+  extensions   Manage IDE extensions for VSCode and Cursor.
   info         Show installation source and version info for shell-configs.
   install      Install or update managed configuration sections.
   list-shells  List all available shell configurations.
   packages     Manage system packages required by shell-configs.
+  profile      Manage configuration profiles.
+  scripts      Manage utility scripts distributed by shell-configs.
   setup        One-command setup for shell-configs.
   signing      Validate SSH signing key is registered with GitHub.
   status       Show the status of managed configurations.
@@ -312,5 +315,206 @@ Usage: shell-configs validate [OPTIONS]
 Options:
   --shells TEXT  Comma-separated list of shells to validate
   --help         Show this message and exit.
+```
+
+## `shell-configs extensions`
+
+```
+Usage: shell-configs extensions [OPTIONS] COMMAND [ARGS]...
+
+  Manage IDE extensions for VSCode and Cursor.
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  diff     Show differences between desired and installed extensions.
+  install  Install (and optionally prune) extensions for each IDE.
+  list     List all extensions for each IDE with their install status.
+  status   Show extension sync status for each IDE.
+```
+
+## `shell-configs extensions diff`
+
+```
+Usage: shell-configs extensions diff [OPTIONS]
+
+  Show differences between desired and installed extensions.
+
+Options:
+  --shells TEXT   Comma-separated list of IDEs (e.g., vscode,cursor)
+  --profile TEXT  Profile to use
+  --help          Show this message and exit.
+```
+
+## `shell-configs extensions install`
+
+```
+Usage: shell-configs extensions install [OPTIONS]
+
+  Install (and optionally prune) extensions for each IDE.
+
+Options:
+  --shells TEXT   Comma-separated list of IDEs (e.g., vscode,cursor)
+  --prune         Uninstall extensions not in the desired list
+  --dry-run       Show what would be done without doing it
+  -y, --yes       Auto-confirm without prompting
+  --profile TEXT  Profile to use
+  --help          Show this message and exit.
+```
+
+## `shell-configs extensions list`
+
+```
+Usage: shell-configs extensions list [OPTIONS]
+
+  List all extensions for each IDE with their install status.
+
+Options:
+  --shells TEXT   Comma-separated list of IDEs (e.g., vscode,cursor)
+  --profile TEXT  Profile to use
+  --help          Show this message and exit.
+```
+
+## `shell-configs extensions status`
+
+```
+Usage: shell-configs extensions status [OPTIONS]
+
+  Show extension sync status for each IDE.
+
+Options:
+  --shells TEXT   Comma-separated list of IDEs (e.g., vscode,cursor)
+  --profile TEXT  Profile to use
+  --help          Show this message and exit.
+```
+
+## `shell-configs profile`
+
+```
+Usage: shell-configs profile [OPTIONS] COMMAND [ARGS]...
+
+  Manage configuration profiles.
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  current  Show the currently active profile.
+  list     List all available profiles.
+  show     Show profile YAML.
+  switch   Switch the active profile.
+```
+
+## `shell-configs profile current`
+
+```
+Usage: shell-configs profile current [OPTIONS]
+
+  Show the currently active profile.
+
+Options:
+  --help  Show this message and exit.
+```
+
+## `shell-configs profile list`
+
+```
+Usage: shell-configs profile list [OPTIONS]
+
+  List all available profiles.
+
+Options:
+  --help  Show this message and exit.
+```
+
+## `shell-configs profile show`
+
+```
+Usage: shell-configs profile show [OPTIONS] NAME
+
+  Show profile YAML. Use --resolved to see fully inherited values.
+
+Options:
+  --resolved  Show fully inherited result
+  --help      Show this message and exit.
+```
+
+## `shell-configs profile switch`
+
+```
+Usage: shell-configs profile switch [OPTIONS] NAME
+
+  Switch the active profile.
+
+Options:
+  --help  Show this message and exit.
+```
+
+## `shell-configs scripts`
+
+```
+Usage: shell-configs scripts [OPTIONS] COMMAND [ARGS]...
+
+  Manage utility scripts distributed by shell-configs.
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  install    Install utility scripts to ~/.local/bin.
+  list       List available scripts.
+  status     Show installation status of managed scripts.
+  uninstall  Remove shell-configs-managed scripts from ~/.local/bin.
+```
+
+## `shell-configs scripts install`
+
+```
+Usage: shell-configs scripts install [OPTIONS]
+
+  Install utility scripts to ~/.local/bin.
+
+Options:
+  --dry-run  Show what would be installed
+  -y, --yes  Auto-confirm without prompting
+  --help     Show this message and exit.
+```
+
+## `shell-configs scripts list`
+
+```
+Usage: shell-configs scripts list [OPTIONS]
+
+  List available scripts.
+
+Options:
+  --all   Show scripts for all platforms
+  --help  Show this message and exit.
+```
+
+## `shell-configs scripts status`
+
+```
+Usage: shell-configs scripts status [OPTIONS]
+
+  Show installation status of managed scripts.
+
+Options:
+  --help  Show this message and exit.
+```
+
+## `shell-configs scripts uninstall`
+
+```
+Usage: shell-configs scripts uninstall [OPTIONS]
+
+  Remove shell-configs-managed scripts from ~/.local/bin.
+
+Options:
+  --dry-run  Show what would be removed
+  -y, --yes  Auto-confirm without prompting
+  --force    Remove even user-modified scripts
+  --help     Show this message and exit.
 ```
 
