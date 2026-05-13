@@ -68,11 +68,13 @@ def install(
     if ctx.dry_run:
         return
 
+    from shell_configs.cli.components.gh_auth import GhAuthComponent
     from shell_configs.cli.components.gh_extensions import GhExtensionsComponent
     from shell_configs.cli.components.packages import RequiredPackagesComponent
     from shell_configs.cli.components.signing import SigningComponent
 
     # RequiredPackages installs tooling (e.g. gh) that later components depend on
+    gh_auth_comp = None
     signing_comp = None
     gh_ext_comp = None
     required_pkg = None
@@ -80,6 +82,8 @@ def install(
     for comp in INSTALL_COMPONENTS:
         if isinstance(comp, RequiredPackagesComponent):
             required_pkg = comp
+        elif isinstance(comp, GhAuthComponent):
+            gh_auth_comp = comp
         elif isinstance(comp, SigningComponent):
             signing_comp = comp
         elif isinstance(comp, GhExtensionsComponent):
@@ -96,7 +100,9 @@ def install(
             list(parallel_plans.keys()), "apply", ctx, plans=parallel_plans
         )
 
-    # gh auth state is mutated by signing; run sequentially to avoid races
+    # gh auth state is mutated by these components; run sequentially to avoid races
+    if gh_auth_comp and plans[gh_auth_comp].has_changes:
+        gh_auth_comp.apply(ctx, plans[gh_auth_comp])
     if signing_comp and plans[signing_comp].has_changes:
         signing_comp.apply(ctx, plans[signing_comp])
     if gh_ext_comp and plans[gh_ext_comp].has_changes:

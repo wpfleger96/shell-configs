@@ -253,6 +253,8 @@ class TestEnsureGhScopes:
         )
         assert ok is False
         assert "Missing OAuth scopes" in msg
+        assert "admin:public_key" in msg
+        assert "admin:ssh_signing_key" not in msg
 
     def test_parses_scopes_from_stderr_fallback(self, monkeypatch):
         monkeypatch.setattr(
