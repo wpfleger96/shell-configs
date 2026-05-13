@@ -5,6 +5,7 @@ from __future__ import annotations
 import difflib
 import sys
 
+from concurrent.futures import FIRST_EXCEPTION, Future, ThreadPoolExecutor, wait
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -14,7 +15,7 @@ from shell_configs.config import ConfigReader
 from shell_configs.shells.base import merge_json_with_profile
 
 if TYPE_CHECKING:
-    from shell_configs.cli.context import Context
+    from shell_configs.cli.context import Context, FileDiff
     from shell_configs.extensions import ExtensionResult
     from shell_configs.manager import ConfigManager
     from shell_configs.profiles.profile import Profile
@@ -163,24 +164,23 @@ def _print_extension_result(console: Any, result: ExtensionResult) -> None:
         console.print(f"  [red]✗[/red] {result.extension_id}: {result.message}")
 
 
-def _display_diffs_for_shells(
-    selected_shells: list[Shell],
-    config_reader: ConfigReader,
+def _compute_diffs_for_shells(
+    ctx: Context,
     manager: ConfigManager,
-    profile: Profile | None = None,
-) -> bool:
-    """Display diffs for selected shells before install.
+    console_obj: Any = None,
+) -> list[FileDiff]:
+    """Compute diffs for all selected shells without rendering anything.
 
-    Returns:
-        True if diffs were found and displayed, False otherwise
+    Returns a list of FileDiff objects describing every file that differs
+    (or is not yet installed). Callers are responsible for display.
     """
-    from rich.syntax import Syntax
+    from shell_configs.cli.context import FileDiff
 
-    from shell_configs.display import console
+    diffs: list[FileDiff] = []
+    config_reader = ctx.config_reader
+    profile = ctx.profile
 
-    found_diffs = False
-
-    for shell in selected_shells:
+    for shell in ctx.selected_shells:
         for config_file in shell.get_config_files():
             repo_content = config_reader.get_config_content(
                 shell.name, config_file.repo_config_name, profile=profile
@@ -195,49 +195,59 @@ def _display_diffs_for_shells(
                 )
 
             repo_content = manager.combine_content(shared_content, repo_content)
-
             section = manager.extract_managed_section(config_file.path)
 
             if section is None:
-                console.print(
-                    f"\n[bold cyan]{shell.display_name}[/bold cyan]: {config_file.path}"
+                diffs.append(
+                    FileDiff(
+                        shell_name=shell.display_name,
+                        file_path=str(config_file.path),
+                        diff_text="",
+                        file_type="config",
+                        current_content="",
+                        desired_content=repo_content,
+                    )
                 )
-                console.print("[yellow]Not installed[/yellow]")
-                found_diffs = True
                 continue
 
             if section.content.strip() == repo_content.strip():
                 continue
 
-            found_diffs = True
-            console.print(
-                f"\n[bold cyan]{shell.display_name}[/bold cyan]: {config_file.path}"
-            )
-
             installed_lines = section.content.splitlines(keepends=True)
             repo_lines = repo_content.splitlines(keepends=True)
-
-            diff_lines = difflib.unified_diff(
-                installed_lines,
-                repo_lines,
-                fromfile="Installed",
-                tofile="Repository",
-                lineterm="",
+            diff_text = "\n".join(
+                difflib.unified_diff(
+                    installed_lines,
+                    repo_lines,
+                    fromfile="Installed",
+                    tofile="Repository",
+                    lineterm="",
+                )
             )
-
-            diff_text = "\n".join(diff_lines)
-            if diff_text:
-                syntax = Syntax(diff_text, "diff", theme="monokai")
-                console.print(syntax)
+            diffs.append(
+                FileDiff(
+                    shell_name=shell.display_name,
+                    file_path=str(config_file.path),
+                    diff_text=diff_text,
+                    file_type="config",
+                    current_content=section.content,
+                    desired_content=repo_content,
+                )
+            )
 
         additional_files = shell.get_additional_files()
         for additional_file in additional_files:
             if not additional_file.target_path.exists():
-                console.print(
-                    f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
+                diffs.append(
+                    FileDiff(
+                        shell_name=shell.display_name,
+                        file_path=str(additional_file.target_path),
+                        diff_text="",
+                        file_type="additional",
+                        current_content="",
+                        desired_content="",
+                    )
                 )
-                console.print("[yellow]Not installed[/yellow]")
-                found_diffs = True
                 continue
 
             if additional_file.base_source_path:
@@ -261,24 +271,34 @@ def _display_diffs_for_shells(
                     additional_file.source_path, additional_file.target_path
                 )
                 if ini_diff:
-                    found_diffs = True
-                    console.print(
-                        f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
+                    diffs.append(
+                        FileDiff(
+                            shell_name=shell.display_name,
+                            file_path=str(additional_file.target_path),
+                            diff_text=ini_diff,
+                            file_type="additional",
+                            current_content="",
+                            desired_content=repo_content,
+                        )
                     )
-                    syntax = Syntax(ini_diff, "diff", theme="monokai")
-                    console.print(syntax)
                 continue
-            elif additional_file.comment_prefix:
+
+            if additional_file.comment_prefix:
                 section = manager.extract_managed_section(
                     additional_file.target_path,
                     comment_prefix=additional_file.comment_prefix,
                 )
                 if section is None:
-                    console.print(
-                        f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
+                    diffs.append(
+                        FileDiff(
+                            shell_name=shell.display_name,
+                            file_path=str(additional_file.target_path),
+                            diff_text="",
+                            file_type="additional",
+                            current_content="",
+                            desired_content=repo_content,
+                        )
                     )
-                    console.print("[yellow]Not installed[/yellow]")
-                    found_diffs = True
                     continue
 
                 if manager.managed_content_matches(section.content, repo_content):
@@ -299,26 +319,27 @@ def _display_diffs_for_shells(
                         continue
                 installed_content = additional_file.target_path.read_text()
 
-            found_diffs = True
-            console.print(
-                f"\n[bold cyan]{shell.display_name}[/bold cyan]: {additional_file.target_path}"
-            )
-
             installed_lines = installed_content.splitlines(keepends=True)
             repo_lines = repo_content.splitlines(keepends=True)
-
-            diff_lines = difflib.unified_diff(
-                installed_lines,
-                repo_lines,
-                fromfile="Installed",
-                tofile="Repository",
-                lineterm="",
+            diff_text = "\n".join(
+                difflib.unified_diff(
+                    installed_lines,
+                    repo_lines,
+                    fromfile="Installed",
+                    tofile="Repository",
+                    lineterm="",
+                )
             )
-
-            diff_text = "\n".join(diff_lines)
-            if diff_text:
-                syntax = Syntax(diff_text, "diff", theme="monokai")
-                console.print(syntax)
+            diffs.append(
+                FileDiff(
+                    shell_name=shell.display_name,
+                    file_path=str(additional_file.target_path),
+                    diff_text=diff_text,
+                    file_type="additional",
+                    current_content=installed_content,
+                    desired_content=repo_content,
+                )
+            )
 
         preferences_files = shell.get_preferences_files()
         for pref_file in preferences_files:
@@ -326,11 +347,133 @@ def _display_diffs_for_shells(
                 pref_file.source_path, pref_file.domain
             )
             if pref_diff:
-                found_diffs = True
-                console.print(
-                    f"\n[bold cyan]{shell.display_name}[/bold cyan]: "
-                    f"{pref_file.domain} (preferences)"
+                diffs.append(
+                    FileDiff(
+                        shell_name=shell.display_name,
+                        file_path=pref_file.domain,
+                        diff_text=pref_diff,
+                        file_type="preferences",
+                        current_content="",
+                        desired_content="",
+                    )
                 )
-                console.print(pref_diff)
 
-    return found_diffs
+    return diffs
+
+
+def _render_diffs(diffs: list[FileDiff], console_obj: Any = None) -> None:
+    """Render a list of FileDiff objects to the console.
+
+    Args:
+        diffs: Diffs produced by _compute_diffs_for_shells.
+        console_obj: Rich Console to use; falls back to the shared display console.
+    """
+    from rich.syntax import Syntax
+
+    if console_obj is None:
+        from shell_configs.display import console as console_obj
+
+    for diff in diffs:
+        if diff.file_type == "preferences":
+            console_obj.print(
+                f"\n[bold cyan]{diff.shell_name}[/bold cyan]: "
+                f"{diff.file_path} (preferences)"
+            )
+            console_obj.print(diff.diff_text)
+            continue
+
+        console_obj.print(
+            f"\n[bold cyan]{diff.shell_name}[/bold cyan]: {diff.file_path}"
+        )
+
+        if not diff.diff_text:
+            console_obj.print("[yellow]Not installed[/yellow]")
+            continue
+
+        syntax = Syntax(diff.diff_text, "diff", theme="monokai")
+        console_obj.print(syntax)
+
+
+def _display_diffs_for_shells(
+    selected_shells: list[Shell],
+    config_reader: ConfigReader,
+    manager: ConfigManager,
+    profile: Profile | None = None,
+) -> bool:
+    """Display diffs for selected shells before install.
+
+    Returns:
+        True if diffs were found and displayed, False otherwise
+    """
+    from shell_configs.cli.context import Context
+    from shell_configs.shells.registry import ShellRegistry
+
+    ctx = Context(
+        dry_run=False,
+        yes=False,
+        profile_name=None,
+        profile=profile,
+        selected_shells=tuple(selected_shells),
+        config_reader=config_reader,
+        registry=ShellRegistry(),
+    )
+    diffs = _compute_diffs_for_shells(ctx, manager)
+    if diffs:
+        _render_diffs(diffs)
+    return bool(diffs)
+
+
+def run_components_parallel(
+    components: list,
+    method: str,
+    ctx: Context,
+    plans: dict | None = None,
+    max_workers: int | None = None,
+) -> dict:
+    """Run a component method across all components in parallel.
+
+    Args:
+        components: List of Component instances.
+        method: Method name to call ("plan", "apply", "status").
+        ctx: Context object (frozen, safe to share).
+        plans: For "apply", the plan dict keyed by component.
+        max_workers: Thread pool size (defaults to len(components)).
+
+    Returns:
+        Dict mapping component to its method's return value.
+    """
+    from rich.status import Status
+
+    from shell_configs.display import console
+
+    results: dict = {}
+    futures: dict[Future, Any] = {}
+
+    with ThreadPoolExecutor(max_workers=max_workers or len(components)) as pool:
+        with Status(f"Running {method}...", console=console) as status:
+            for component in components:
+                if method == "apply":
+                    plan = (plans or {})[component]
+                    future = pool.submit(getattr(component, method), ctx, plan)
+                else:
+                    future = pool.submit(getattr(component, method), ctx)
+                futures[future] = component
+
+            done, not_done = wait(futures, return_when=FIRST_EXCEPTION)
+
+            for future in not_done:
+                future.cancel()
+
+            for future in done:
+                exc = future.exception()
+                if exc is not None:
+                    raise exc
+
+            for future in done:
+                component = futures[future]
+                results[component] = future.result()
+                status.update(
+                    f"Running {method}... ({len(results)}/{len(components)} done)"
+                )
+
+    return results

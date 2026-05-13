@@ -2,11 +2,83 @@
 
 from __future__ import annotations
 
-from shell_configs.cli.context import Component, Context
+from shell_configs.cli.context import Component, ComponentPlan, Context, ScriptsPlan
 
 
 class ScriptsComponent(Component):
     label = "scripts"
+
+    def plan(self, ctx: Context) -> ScriptsPlan:
+        from shell_configs.script_manager import (
+            ScriptManifest,
+            ScriptStatus,
+            discover_scripts,
+            get_default_manifest_path,
+            get_default_target_dir,
+            get_script_status,
+        )
+
+        target_dir = get_default_target_dir()
+        manifest = ScriptManifest(get_default_manifest_path())
+        entries = [
+            (entry, get_script_status(entry, target_dir, manifest))
+            for entry in discover_scripts()
+        ]
+        has_changes = any(status != ScriptStatus.INSTALLED for _, status in entries)
+        return ScriptsPlan(has_changes=has_changes, entries=entries)
+
+    def display_plan(self, plan: ComponentPlan) -> None:
+        assert isinstance(plan, ScriptsPlan)
+        if not plan.has_changes:
+            return
+
+        from shell_configs.display import console
+        from shell_configs.script_manager import ScriptStatus, get_default_target_dir
+
+        target_dir = get_default_target_dir()
+        status_labels = {
+            ScriptStatus.MISSING: "[red]not installed[/red]",
+            ScriptStatus.OUTDATED: "[yellow]outdated[/yellow]",
+            ScriptStatus.MODIFIED: "[yellow]modified[/yellow]",
+            ScriptStatus.COLLISION: "[yellow]exists (not ours)[/yellow]",
+        }
+
+        console.print("\n[bold cyan]Scripts[/bold cyan]\n")
+        for entry, st in plan.entries:
+            if st != ScriptStatus.INSTALLED:
+                label = status_labels.get(st, st.value)
+                console.print(f"  {target_dir / entry.name}: {label}")
+
+    def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
+        assert isinstance(plan, ScriptsPlan)
+        if not plan.has_changes:
+            return True
+
+        from shell_configs.script_manager import (
+            InstallResult,
+            ScriptManifest,
+            ScriptStatus,
+            get_default_manifest_path,
+            get_default_target_dir,
+            install_script,
+        )
+
+        target_dir = get_default_target_dir()
+        manifest = ScriptManifest(get_default_manifest_path())
+        success = True
+        for entry, status in plan.entries:
+            if status == ScriptStatus.INSTALLED:
+                continue
+            result, _ = install_script(entry, target_dir, manifest, dry_run=False)
+            if result not in (
+                InstallResult.INSTALLED,
+                InstallResult.UPDATED,
+                InstallResult.ALREADY_SYNCED,
+                InstallResult.COLLISION,
+                InstallResult.SKIPPED_PLATFORM,
+            ):
+                success = False
+        return success
 
     def install(self, ctx: Context) -> bool:
         from shell_configs.display import console
@@ -53,75 +125,34 @@ class ScriptsComponent(Component):
 
     def status(self, ctx: Context) -> None:
         from shell_configs.display import console
-        from shell_configs.script_manager import (
-            ScriptManifest,
-            ScriptStatus,
-            discover_scripts,
-            get_default_manifest_path,
-            get_default_target_dir,
-            get_script_status,
-        )
+        from shell_configs.script_manager import ScriptStatus
+
+        plan = self.plan(ctx)
 
         console.print("[bold cyan]Scripts[/bold cyan]\n")
 
-        scripts_target = get_default_target_dir()
-        scripts_manifest = ScriptManifest(get_default_manifest_path())
-        script_entries = discover_scripts()
-        scripts_installed = sum(
-            1
-            for e in script_entries
-            if get_script_status(e, scripts_target, scripts_manifest)
-            == ScriptStatus.INSTALLED
-        )
-        scripts_total = len(script_entries)
-        if scripts_total == 0:
+        total = len(plan.entries)
+        installed = sum(1 for _, st in plan.entries if st == ScriptStatus.INSTALLED)
+
+        if total == 0:
             console.print("  [dim]No scripts available for this platform[/dim]")
-        elif scripts_installed == scripts_total:
+        elif installed == total:
             console.print(
-                f"  [green]✓[/green] {scripts_installed}/{scripts_total} scripts installed (~/.local/bin)"
+                f"  [green]✓[/green] {installed}/{total} scripts installed (~/.local/bin)"
             )
         else:
             console.print(
-                f"  [yellow]⚠[/yellow] {scripts_installed}/{scripts_total} scripts installed "
-                f"({scripts_total - scripts_installed} missing)"
+                f"  [yellow]⚠[/yellow] {installed}/{total} scripts installed "
+                f"({total - installed} missing)"
             )
             console.print("  [dim]Run 'shell-configs scripts status' for details[/dim]")
 
         console.print()
 
     def diff(self, ctx: Context) -> bool:
-        from shell_configs.display import console
-        from shell_configs.script_manager import (
-            ScriptManifest,
-            ScriptStatus,
-            discover_scripts,
-            get_default_manifest_path,
-            get_default_target_dir,
-            get_script_status,
-        )
-
-        scripts_target = get_default_target_dir()
-        scripts_manifest = ScriptManifest(get_default_manifest_path())
-        out_of_sync = []
-        for entry in discover_scripts():
-            st = get_script_status(entry, scripts_target, scripts_manifest)
-            if st != ScriptStatus.INSTALLED:
-                out_of_sync.append((entry, st))
-
-        if not out_of_sync:
-            return False
-
-        console.print("\n[bold cyan]Scripts[/bold cyan]\n")
-        status_labels = {
-            ScriptStatus.MISSING: "[red]not installed[/red]",
-            ScriptStatus.OUTDATED: "[yellow]outdated[/yellow]",
-            ScriptStatus.MODIFIED: "[yellow]modified[/yellow]",
-            ScriptStatus.COLLISION: "[yellow]exists (not ours)[/yellow]",
-        }
-        for entry, st in out_of_sync:
-            label = status_labels.get(st, st.value)
-            console.print(f"  {scripts_target / entry.name}: {label}")
-        return True
+        plan = self.plan(ctx)
+        self.display_plan(plan)
+        return plan.has_changes
 
     def uninstall(self, ctx: Context) -> None:
         from shell_configs.display import print_operation_result, print_warning
