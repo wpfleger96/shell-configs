@@ -66,7 +66,7 @@ class GhAuthComponent(Component):
         console.print()
         console.print("[yellow]Ensuring GitHub CLI auth and scopes...[/yellow]")
 
-        interactive = sys.stdin.isatty() and not ctx.yes
+        interactive = sys.stdin.isatty()
 
         auth_ok, auth_msg = ensure_gh_auth(interactive=interactive)
         if auth_ok:

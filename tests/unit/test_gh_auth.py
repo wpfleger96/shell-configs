@@ -326,7 +326,9 @@ class TestGhAuthComponent:
 
         assert result is False
 
-    def test_apply_respects_ctx_yes(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_apply_interactive_depends_on_tty_not_yes(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         from shell_configs.cli.components.gh_auth import GhAuthComponent
         from shell_configs.cli.context import GhAuthPlan
 
@@ -348,7 +350,7 @@ class TestGhAuthComponent:
         plan = GhAuthPlan(has_changes=True, missing_scopes=["workflow"])
         component.apply(self._make_ctx(yes=True), plan)
 
-        assert captured_interactive is False
+        assert captured_interactive is True
 
     def test_status_not_authed(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from shell_configs.cli.components.gh_auth import GhAuthComponent
