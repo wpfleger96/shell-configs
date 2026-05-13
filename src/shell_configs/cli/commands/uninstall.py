@@ -1,10 +1,14 @@
-"""Uninstall command — loops over COMPONENTS calling uninstall()."""
+"""Uninstall command — parallel component uninstall."""
 
 from __future__ import annotations
 
 import click
 
-from shell_configs.cli.helpers import _get_selected_shells, parse_shell_filter
+from shell_configs.cli.helpers import (
+    _get_selected_shells,
+    parse_shell_filter,
+    run_components_parallel,
+)
 
 
 @click.command()
@@ -25,6 +29,7 @@ def uninstall(shells: list[str] | None, yes: bool) -> None:
     registry = ShellRegistry()
     config_reader = ConfigReader()
 
+    # use_all=True so uninstall works even for shells without config files
     selected_shells = _get_selected_shells(registry, shells, use_all=True)
 
     if not selected_shells:
@@ -49,5 +54,4 @@ def uninstall(shells: list[str] | None, yes: bool) -> None:
         registry=registry,
     )
 
-    for component in COMPONENTS:
-        component.uninstall(ctx)
+    run_components_parallel(COMPONENTS, "uninstall", ctx)

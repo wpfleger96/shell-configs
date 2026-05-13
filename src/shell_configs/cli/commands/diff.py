@@ -1,10 +1,14 @@
-"""Diff command — loops over COMPONENTS calling diff()."""
+"""Diff command — parallel plan, sequential display."""
 
 from __future__ import annotations
 
 import click
 
-from shell_configs.cli.helpers import build_context, parse_shell_filter
+from shell_configs.cli.helpers import (
+    build_context,
+    parse_shell_filter,
+    run_components_parallel,
+)
 
 
 @click.command()
@@ -24,10 +28,14 @@ def diff(shells: list[str] | None, profile_name: str | None) -> None:
         print_warning("No shell configurations found")
         return
 
+    plans = run_components_parallel(COMPONENTS, "plan", ctx)
+
     found_diffs = False
     for component in COMPONENTS:
-        if component.diff(ctx):
+        plan = plans[component]
+        if plan.has_changes:
             found_diffs = True
+            component.display_plan(plan)
 
     if not found_diffs:
         print_info("All configurations are in sync")
