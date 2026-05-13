@@ -398,20 +398,3 @@ class ExtensionManager:
                 )
 
         return results
-
-    def export_extensions(
-        self,
-        cli_command: str | None = None,
-        shell_name: str | None = None,
-        *,
-        invoker: ExtensionInvoker | None = None,
-    ) -> str | None:
-        """Export currently installed extensions as a sorted newline-separated string.
-
-        Filters out builtin extensions to prevent poisoning config files.
-        Returns None if the CLI query fails, empty string if no extensions installed.
-        """
-        installed = self.get_installed_extensions(cli_command, invoker=invoker)
-        if installed is None:
-            return None
-        return "\n".join(sorted(installed - get_builtin_extensions(shell_name)))

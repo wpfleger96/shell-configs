@@ -110,3 +110,178 @@ class TestExtensionsCLI:
         assert "Ignoring built-in extensions from config" in result.output
         assert "github.copilot-chat" in result.output
         assert "Would install" not in result.output
+
+
+@pytest.mark.unit
+@pytest.mark.cli
+class TestExtensionsListCLI:
+    """Tests for extensions list command."""
+
+    def test_list_shows_installed_extensions(
+        self,
+        extension_config_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        mock_home: Path,
+    ) -> None:
+        (extension_config_dir / "editor" / "extensions.txt").write_text("golang.go\n")
+        (extension_config_dir / "vscode" / "extensions.txt").write_text("")
+        monkeypatch.setattr(
+            "shell_configs.extensions.ExtensionManager.get_installed_extensions",
+            lambda self, cli_command=None, **kwargs: {"golang.go"},
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["extensions", "list", "--shells", "vscode"])
+
+        assert result.exit_code == 0
+        assert "golang.go" in result.output
+        assert "installed" in result.output
+
+    def test_list_shows_missing_extensions(
+        self,
+        extension_config_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        mock_home: Path,
+    ) -> None:
+        (extension_config_dir / "editor" / "extensions.txt").write_text("golang.go\n")
+        (extension_config_dir / "vscode" / "extensions.txt").write_text("")
+        monkeypatch.setattr(
+            "shell_configs.extensions.ExtensionManager.get_installed_extensions",
+            lambda self, cli_command=None, **kwargs: set(),
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["extensions", "list", "--shells", "vscode"])
+
+        assert result.exit_code == 0
+        assert "golang.go" in result.output
+        assert "missing" in result.output
+
+    def test_list_shows_extra_extensions(
+        self,
+        extension_config_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        mock_home: Path,
+    ) -> None:
+        (extension_config_dir / "editor" / "extensions.txt").write_text("golang.go\n")
+        (extension_config_dir / "vscode" / "extensions.txt").write_text("")
+        monkeypatch.setattr(
+            "shell_configs.extensions.ExtensionManager.get_installed_extensions",
+            lambda self, cli_command=None, **kwargs: {"golang.go", "some.extra"},
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["extensions", "list", "--shells", "vscode"])
+
+        assert result.exit_code == 0
+        assert "some.extra" in result.output
+        assert "extra" in result.output
+
+    def test_list_shows_builtin_as_builtin(
+        self,
+        extension_config_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        mock_home: Path,
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.extensions.ExtensionManager.get_installed_extensions",
+            lambda self, cli_command=None, **kwargs: set(),
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["extensions", "list", "--shells", "vscode"])
+
+        assert result.exit_code == 0
+        assert "github.copilot-chat" in result.output
+        assert "builtin" in result.output
+
+    def test_list_no_data_available(
+        self,
+        extension_config_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        mock_home: Path,
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.extensions.ExtensionManager.get_installed_extensions",
+            lambda self, cli_command=None, **kwargs: None,
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["extensions", "list", "--shells", "vscode"])
+
+        assert result.exit_code == 0
+        assert "No extension data available" in result.output
+
+    def test_list_no_ide_shells_found(
+        self,
+        extension_config_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        mock_home: Path,
+    ) -> None:
+        # bash has no extension CLI/invoker, so the filtered IDE list is empty
+        runner = CliRunner()
+        result = runner.invoke(cli, ["extensions", "list", "--shells", "bash"])
+
+        assert result.exit_code == 0
+        assert "No IDEs with extension management found" in result.output
+
+    def test_list_multiple_ides_shows_table_per_ide(
+        self,
+        extension_config_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        mock_home: Path,
+    ) -> None:
+        (extension_config_dir / "editor" / "extensions.txt").write_text("golang.go\n")
+        (extension_config_dir / "vscode" / "extensions.txt").write_text("")
+        (extension_config_dir / "cursor").mkdir(exist_ok=True)
+        (extension_config_dir / "cursor" / "extensions.txt").write_text("")
+        monkeypatch.setattr(
+            "shell_configs.shells.cursor.get_config_dir", lambda: extension_config_dir
+        )
+        monkeypatch.setattr(
+            "shell_configs.extensions.ExtensionManager.get_installed_extensions",
+            lambda self, cli_command=None, **kwargs: {"golang.go"},
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["extensions", "list", "--shells", "vscode,cursor"])
+
+        assert result.exit_code == 0
+        # Both IDE tables should appear in output
+        assert "VS Code" in result.output
+        assert "Cursor" in result.output
+        assert "golang.go" in result.output
+
+    def test_list_profile_adds_extensions(
+        self,
+        extension_config_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        mock_home: Path,
+    ) -> None:
+        import yaml
+
+        (extension_config_dir / "editor" / "extensions.txt").write_text("")
+        (extension_config_dir / "vscode" / "extensions.txt").write_text("")
+        profiles_dir = extension_config_dir / "profiles"
+        profiles_dir.mkdir(parents=True, exist_ok=True)
+        (profiles_dir / "work.yaml").write_text(
+            yaml.dump(
+                {
+                    "name": "work",
+                    "extensions": {"vscode": {"add": ["ms-vscode.powershell"]}},
+                }
+            )
+        )
+        monkeypatch.setattr(
+            "shell_configs.extensions.ExtensionManager.get_installed_extensions",
+            lambda self, cli_command=None, **kwargs: set(),
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli, ["extensions", "list", "--shells", "vscode", "--profile", "work"]
+        )
+
+        assert result.exit_code == 0
+        assert "ms-vscode.powershell" in result.output
+        assert "missing" in result.output

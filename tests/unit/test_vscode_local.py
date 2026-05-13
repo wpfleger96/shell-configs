@@ -279,18 +279,6 @@ class TestExtensionManagerWithInvoker:
         assert not results[0].success
         assert results[0].status == ExtensionResultStatus.FAILED
 
-    def test_export_via_invoker(self):
-        invoker = CliExtensionInvoker("code")
-        manager = ExtensionManager()
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = subprocess.CompletedProcess(
-                args=[], returncode=0, stdout="golang.go\nrust-lang.rust-analyzer\n"
-            )
-            output = manager.export_extensions(shell_name="vscode", invoker=invoker)
-
-        assert output == "golang.go\nrust-lang.rust-analyzer"
-
     def test_powershell_invoker_integration(self):
         win_path = "C:\\Users\\test\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\code.cmd"
         invoker = PowerShellExtensionInvoker(win_path)

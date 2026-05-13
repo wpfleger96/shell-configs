@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-
 import click
 
 from shell_configs.cli.helpers import (
@@ -277,42 +275,76 @@ def extensions_install(
         print_info("\nDry run complete. Use without --dry-run to apply changes.")
 
 
-@extensions.command(name="export")
+@extensions.command(name="list")
 @click.option(
-    "--shell",
-    "shell_name",
-    required=True,
-    help="IDE to export from (e.g., vscode, cursor)",
+    "--shells",
+    callback=parse_shell_filter,
+    help="Comma-separated list of IDEs (e.g., vscode,cursor)",
 )
-def extensions_export(shell_name: str) -> None:
-    """Export currently installed extensions for an IDE."""
-    from shell_configs.display import console, print_error
+@click.option("--profile", "profile_name", default=None, help="Profile to use")
+def extensions_list(shells: list[str] | None, profile_name: str | None) -> None:
+    """List all extensions for each IDE with their install status."""
+    from rich.table import Table
+
+    from shell_configs.display import console, print_info
     from shell_configs.extensions import ExtensionManager
+    from shell_configs.profiles import ProfileLoader, resolve_active_profile
     from shell_configs.shells.registry import ShellRegistry
 
+    config_reader = ConfigReader()
     registry = ShellRegistry()
+    profile_loader = ProfileLoader(config_reader.config_dir)
+    active_profile = resolve_active_profile(profile_name, profile_loader)
     ext_manager = ExtensionManager()
 
-    shells, invalid = registry.filter_by_names([shell_name])
-    if invalid or not shells:
-        print_error(f"Unknown shell: {shell_name}")
-        console.print(f"[dim]Available: {', '.join(registry.get_names())}[/dim]")
-        sys.exit(1)
+    ide_shells = _get_extension_shells(registry, shells)
+    if not ide_shells:
+        console.print("[yellow]No IDEs with extension management found[/yellow]")
+        return
 
-    shell = shells[0]
-    invoker = shell.get_extension_invoker()
-    cli_cmd = shell.get_extension_cli()
-    if invoker is None and cli_cmd is None:
-        print_error(f"{shell.display_name} does not support extension management")
-        sys.exit(1)
+    any_output = False
+    for shell in ide_shells:
+        invoker = shell.get_extension_invoker()
+        cli_cmd = shell.get_extension_cli()
+        if invoker is None and cli_cmd is None:
+            continue
 
-    output = ext_manager.export_extensions(
-        cli_cmd, shell_name=shell.name, invoker=invoker
-    )
-    if output is None:
-        print_error(f"Failed to query {shell.display_name} extensions")
-        sys.exit(1)
-    elif output:
-        console.print(output)
-    else:
-        console.print("[dim]No extensions installed[/dim]")
+        desired = ext_manager.load_desired_extensions(
+            shell.name, shell.get_extension_list_paths(), profile=active_profile
+        )
+        installed = ext_manager.get_installed_extensions(cli_cmd, invoker=invoker)
+        if installed is None:
+            continue
+        diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
+
+        rows: list[tuple[str, str]] = []
+        for ext_id in diff.matched:
+            rows.append((ext_id, "[green]✓ installed[/green]"))
+        for ext_id in diff.missing:
+            rows.append((ext_id, "[yellow]✗ missing[/yellow]"))
+        for ext_id in diff.extra:
+            rows.append((ext_id, "[dim]+ extra[/dim]"))
+        for ext_id in diff.ignored:
+            rows.append((ext_id, "[dim]~ builtin[/dim]"))
+
+        if not rows:
+            continue
+
+        any_output = True
+        table = Table(
+            title=shell.display_name,
+            show_header=True,
+            header_style="bold",
+            title_style="bold cyan",
+            title_justify="left",
+        )
+        table.add_column("Extension")
+        table.add_column("Status")
+
+        for ext_id, status in sorted(rows, key=lambda r: r[0]):
+            table.add_row(ext_id, status)
+
+        console.print(table)
+
+    if not any_output:
+        print_info("No extension data available")
