@@ -1,3 +1,2 @@
 extensions:
-  - repo: babarot/gh-infra
-    pin: v0.13.0
+  - repo: wpfleger96/gh-infra
