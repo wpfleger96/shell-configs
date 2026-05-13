@@ -77,10 +77,10 @@ class ProfileLoader:
             name=data.get("name", name),
             description=data.get("description", ""),
             extends=data.get("extends"),
-            settings_overrides=data.get("settings_overrides", {}),
-            shell_overrides=data.get("shell_overrides", {}),
-            packages=data.get("packages", {}),
-            extensions=data.get("extensions", {}),
+            settings_overrides=data.get("settings_overrides") or {},
+            shell_overrides=data.get("shell_overrides") or {},
+            packages=data.get("packages") or {},
+            extensions=data.get("extensions") or {},
         )
 
     def resolve_profile(self, name: str) -> Profile:

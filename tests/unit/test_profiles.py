@@ -268,6 +268,32 @@ class TestProfileInheritance:
         assert "corp-tool" in p.packages.get("remove", [])
         assert "shared-tool" in p.packages.get("add", [])
 
+    def test_bare_yaml_keys_parsed_as_none(self, temp_dir):
+        """Bare YAML keys (e.g. `extensions:` with no value) parse as None."""
+        profiles_dir = temp_dir / "profiles"
+        profiles_dir.mkdir(exist_ok=True)
+        (profiles_dir / "default.yaml").write_text(
+            yaml.dump(
+                {
+                    "name": "default",
+                    "settings_overrides": {"vscode": {"key": "val"}},
+                    "shell_overrides": {"shared": "export A=1"},
+                    "packages": {"add": ["pkg-a"]},
+                    "extensions": {"vscode": {"add": ["ext-a"]}},
+                }
+            )
+        )
+        (profiles_dir / "child.yaml").write_text(
+            "name: child\nextends: default\n"
+            "settings_overrides:\nshell_overrides:\npackages:\nextensions:\n"
+        )
+        loader = ProfileLoader(temp_dir)
+        p = loader.resolve_profile("child")
+        assert p.settings_overrides == {"vscode": {"key": "val"}}
+        assert p.shell_overrides == {"shared": "export A=1"}
+        assert "pkg-a" in p.packages.get("add", [])
+        assert "ext-a" in p.extensions.get("vscode", {}).get("add", [])
+
     def test_default_fallback_no_file(self, temp_dir):
         loader = ProfileLoader(temp_dir)
         p = loader.resolve_profile("default")
