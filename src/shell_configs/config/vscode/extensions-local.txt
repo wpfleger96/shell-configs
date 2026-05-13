@@ -1,14 +1,12 @@
-# Shared IDE extensions (both VSCode and Cursor)
+# VS Code Local (Windows-side) extensions
+# Includes UI-only extensions and workspace extensions that VS Code
+# mirrors to the Local host for remote development support
 
 # Languages
-golang.go
 mathiasfrohlich.kotlin
 ms-python.debugpy
 ms-python.python
 ms-python.vscode-pylance
-ms-python.vscode-python-envs
-rust-lang.rust-analyzer
-shopify.ruby-lsp
 
 # Infrastructure
 hashicorp.terraform

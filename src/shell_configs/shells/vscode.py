@@ -1,11 +1,17 @@
 """VS Code IDE configuration."""
 
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from shell_configs.config import get_config_dir
 from shell_configs.platform import Platform, is_platform
 from shell_configs.shells.base import AdditionalFile, ConfigFile, Shell
 from shell_configs.shells.utils import get_windows_username
+
+if TYPE_CHECKING:
+    from shell_configs.extensions import ExtensionInvoker
 
 
 class VSCodeShell(Shell):
@@ -95,4 +101,69 @@ class VSCodeShell(Shell):
         Returns:
             File suffix for JSON files
         """
+        return ".json"
+
+
+class VSCodeLocalShell(Shell):
+    """VS Code Windows-side (Local) extension management from WSL.
+
+    Only active on WSL. Manages the Local extension host using PowerShell
+    to invoke the Windows code.cmd binary.
+    """
+
+    @property
+    def name(self) -> str:
+        return "vscode-local"
+
+    @property
+    def display_name(self) -> str:
+        return "VS Code (Local)"
+
+    def _find_windows_code_cmd(self) -> tuple[str, Path] | None:
+        """Find the Windows-side code.cmd path.
+
+        Returns:
+            Tuple of (Windows backslash path for PowerShell, WSL-accessible Path)
+            or None if not found.
+        """
+        win_user = get_windows_username()
+        if not win_user:
+            return None
+        win_path = (
+            f"C:\\Users\\{win_user}\\AppData\\Local\\Programs"
+            f"\\Microsoft VS Code\\bin\\code.cmd"
+        )
+        wsl_path = Path(
+            f"/mnt/c/Users/{win_user}/AppData/Local/Programs"
+            f"/Microsoft VS Code/bin/code.cmd"
+        )
+        if not wsl_path.exists():
+            return None
+        return win_path, wsl_path
+
+    def get_extension_invoker(self) -> ExtensionInvoker | None:
+        if not is_platform(Platform.WSL):
+            return None
+        result = self._find_windows_code_cmd()
+        if result is None:
+            return None
+        win_path, _ = result
+        from shell_configs.extensions import PowerShellExtensionInvoker
+
+        return PowerShellExtensionInvoker(win_code_cmd_path=win_path)
+
+    def get_extension_list_paths(self) -> list[Path]:
+        config_dir = get_config_dir()
+        return [config_dir / "vscode" / "extensions-local.txt"]
+
+    def get_config_files(self) -> list[ConfigFile]:
+        return []
+
+    def get_additional_files(self) -> list[AdditionalFile]:
+        return []
+
+    def _get_validation_command(self, temp_file: Path) -> list[str]:
+        return ["true"]
+
+    def _get_temp_suffix(self) -> str:
         return ".json"

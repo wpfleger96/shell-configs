@@ -42,7 +42,7 @@ class TestExtensionsCLI:
     ) -> None:
         monkeypatch.setattr(
             "shell_configs.extensions.ExtensionManager.get_installed_extensions",
-            lambda self, cli_command: set(),
+            lambda self, cli_command=None, **kwargs: set(),
         )
 
         runner = CliRunner()
@@ -61,7 +61,7 @@ class TestExtensionsCLI:
         (extension_config_dir / "editor" / "extensions.txt").write_text("golang.go\n")
         monkeypatch.setattr(
             "shell_configs.extensions.ExtensionManager.get_installed_extensions",
-            lambda self, cli_command: set(),
+            lambda self, cli_command=None, **kwargs: set(),
         )
 
         runner = CliRunner()
@@ -79,7 +79,7 @@ class TestExtensionsCLI:
     ) -> None:
         monkeypatch.setattr(
             "shell_configs.extensions.ExtensionManager.get_installed_extensions",
-            lambda self, cli_command: set(),
+            lambda self, cli_command=None, **kwargs: set(),
         )
 
         runner = CliRunner()
@@ -97,7 +97,7 @@ class TestExtensionsCLI:
     ) -> None:
         monkeypatch.setattr(
             "shell_configs.extensions.ExtensionManager.get_installed_extensions",
-            lambda self, cli_command: set(),
+            lambda self, cli_command=None, **kwargs: set(),
         )
 
         runner = CliRunner()

@@ -5,7 +5,7 @@ from shell_configs.shells.bash import BashShell
 from shell_configs.shells.cursor import CursorShell
 from shell_configs.shells.git import GitShell
 from shell_configs.shells.iterm2 import ITerm2Shell
-from shell_configs.shells.vscode import VSCodeShell
+from shell_configs.shells.vscode import VSCodeLocalShell, VSCodeShell
 from shell_configs.shells.xdg import XdgShell
 from shell_configs.shells.zsh import ZshShell
 
@@ -20,6 +20,8 @@ class ShellRegistry:
 
     def _register_default_shells(self) -> None:
         """Register the default shell implementations."""
+        from shell_configs.platform import Platform, is_platform
+
         self.register(BashShell())
         self.register(ZshShell())
         self.register(GitShell())
@@ -27,6 +29,8 @@ class ShellRegistry:
         self.register(ITerm2Shell())
         self.register(CursorShell())
         self.register(VSCodeShell())
+        if is_platform(Platform.WSL):
+            self.register(VSCodeLocalShell())
 
     def register(self, shell: Shell) -> None:
         """Register a shell implementation.

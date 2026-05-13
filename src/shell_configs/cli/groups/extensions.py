@@ -58,14 +58,15 @@ def extensions_status(shells: list[str] | None, profile_name: str | None) -> Non
     ignored_by_shell: list[tuple[str, frozenset[str]]] = []
 
     for shell in ide_shells:
+        invoker = shell.get_extension_invoker()
         cli_cmd = shell.get_extension_cli()
-        if cli_cmd is None:
+        if invoker is None and cli_cmd is None:
             continue
 
         desired = ext_manager.load_desired_extensions(
             shell.name, shell.get_extension_list_paths(), profile=active_profile
         )
-        installed = ext_manager.get_installed_extensions(cli_cmd)
+        installed = ext_manager.get_installed_extensions(cli_cmd, invoker=invoker)
         if installed is None:
             continue
         diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
@@ -123,14 +124,15 @@ def extensions_diff(shells: list[str] | None, profile_name: str | None) -> None:
 
     found_diffs = False
     for shell in ide_shells:
+        invoker = shell.get_extension_invoker()
         cli_cmd = shell.get_extension_cli()
-        if cli_cmd is None:
+        if invoker is None and cli_cmd is None:
             continue
 
         desired = ext_manager.load_desired_extensions(
             shell.name, shell.get_extension_list_paths(), profile=active_profile
         )
-        installed = ext_manager.get_installed_extensions(cli_cmd)
+        installed = ext_manager.get_installed_extensions(cli_cmd, invoker=invoker)
         if installed is None:
             continue
         diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
@@ -202,14 +204,15 @@ def extensions_install(
 
     any_activity = False
     for shell in ide_shells:
+        invoker = shell.get_extension_invoker()
         cli_cmd = shell.get_extension_cli()
-        if cli_cmd is None:
+        if invoker is None and cli_cmd is None:
             continue
 
         desired = ext_manager.load_desired_extensions(
             shell.name, shell.get_extension_list_paths(), profile=active_profile
         )
-        installed = ext_manager.get_installed_extensions(cli_cmd)
+        installed = ext_manager.get_installed_extensions(cli_cmd, invoker=invoker)
         if installed is None:
             continue
         diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
@@ -246,7 +249,7 @@ def extensions_install(
 
             if to_install:
                 results = ext_manager.install_extensions(
-                    cli_cmd, set(to_install), dry_run=dry_run
+                    cli_cmd, set(to_install), dry_run=dry_run, invoker=invoker
                 )
                 for r in results:
                     _print_extension_result(console, r)
@@ -262,7 +265,7 @@ def extensions_install(
 
             if to_uninstall:
                 results = ext_manager.uninstall_extensions(
-                    cli_cmd, set(to_uninstall), dry_run=dry_run
+                    cli_cmd, set(to_uninstall), dry_run=dry_run, invoker=invoker
                 )
                 for r in results:
                     _print_extension_result(console, r)
@@ -297,12 +300,15 @@ def extensions_export(shell_name: str) -> None:
         sys.exit(1)
 
     shell = shells[0]
+    invoker = shell.get_extension_invoker()
     cli_cmd = shell.get_extension_cli()
-    if cli_cmd is None:
+    if invoker is None and cli_cmd is None:
         print_error(f"{shell.display_name} does not support extension management")
         sys.exit(1)
 
-    output = ext_manager.export_extensions(cli_cmd, shell_name=shell.name)
+    output = ext_manager.export_extensions(
+        cli_cmd, shell_name=shell.name, invoker=invoker
+    )
     if output is None:
         print_error(f"Failed to query {shell.display_name} extensions")
         sys.exit(1)

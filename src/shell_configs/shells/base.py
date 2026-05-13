@@ -8,7 +8,10 @@ import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from shell_configs.extensions import ExtensionInvoker
 
 
 @dataclass
@@ -192,6 +195,15 @@ class Shell(ABC):
         """Get the CLI command for managing extensions (e.g., "code", "cursor").
 
         Returns None for shells that don't manage extensions.
+        """
+        return None
+
+    def get_extension_invoker(self) -> "ExtensionInvoker | None":
+        """Get an ExtensionInvoker for this shell.
+
+        When an invoker is returned, callers use it instead of get_extension_cli().
+        Returns None by default; override in shells that need non-standard CLI
+        invocation (e.g., PowerShell-based invocation on WSL).
         """
         return None
 

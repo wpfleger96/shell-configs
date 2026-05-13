@@ -27,8 +27,9 @@ class ExtensionsComponent(Component):
 
         any_ext_activity = False
         for shell in ide_shells:
+            invoker = shell.get_extension_invoker()
             cli_cmd = shell.get_extension_cli()
-            if cli_cmd is None:
+            if invoker is None and cli_cmd is None:
                 continue
 
             desired = ext_manager.load_desired_extensions(
@@ -36,7 +37,7 @@ class ExtensionsComponent(Component):
                 shell.get_extension_list_paths(),
                 profile=ctx.profile,
             )
-            installed = ext_manager.get_installed_extensions(cli_cmd)
+            installed = ext_manager.get_installed_extensions(cli_cmd, invoker=invoker)
             if installed is None:
                 continue
             diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
@@ -73,7 +74,7 @@ class ExtensionsComponent(Component):
                     f"  [yellow]Installing {len(diff.missing)} missing extension(s)...[/yellow]"
                 )
             ext_results = ext_manager.install_extensions(
-                cli_cmd, set(diff.missing), dry_run=ctx.dry_run
+                cli_cmd, set(diff.missing), dry_run=ctx.dry_run, invoker=invoker
             )
             for ext_r in ext_results:
                 _print_extension_result(console, ext_r)
@@ -94,14 +95,17 @@ class ExtensionsComponent(Component):
         ext_manager = ExtensionManager()
         ide_shells = _get_extension_shells(ctx.registry)
         for shell in ide_shells:
+            invoker = shell.get_extension_invoker()
             cli_cmd = shell.get_extension_cli()
-            if cli_cmd is None:
+            if invoker is None and cli_cmd is None:
                 continue
 
             ext_desired = ext_manager.load_desired_extensions(
                 shell.name, shell.get_extension_list_paths(), profile=ctx.profile
             )
-            ext_installed = ext_manager.get_installed_extensions(cli_cmd)
+            ext_installed = ext_manager.get_installed_extensions(
+                cli_cmd, invoker=invoker
+            )
             if ext_installed is None:
                 continue
             ext_diff = ext_manager.compute_diff(
@@ -141,14 +145,15 @@ class ExtensionsComponent(Component):
 
         found_diffs = False
         for shell in ide_shells:
+            invoker = shell.get_extension_invoker()
             cli_cmd = shell.get_extension_cli()
-            if cli_cmd is None:
+            if invoker is None and cli_cmd is None:
                 continue
 
             desired = ext_manager.load_desired_extensions(
                 shell.name, shell.get_extension_list_paths(), profile=ctx.profile
             )
-            installed = ext_manager.get_installed_extensions(cli_cmd)
+            installed = ext_manager.get_installed_extensions(cli_cmd, invoker=invoker)
             if installed is None:
                 continue
             diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)

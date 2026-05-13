@@ -122,7 +122,11 @@ def _get_extension_shells(
     else:
         selected = registry.get_all()
 
-    return [s for s in selected if s.get_extension_cli() is not None]
+    return [
+        s
+        for s in selected
+        if s.get_extension_cli() is not None or s.get_extension_invoker() is not None
+    ]
 
 
 def _print_ignored_builtin_extensions(

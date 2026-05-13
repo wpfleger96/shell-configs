@@ -4,6 +4,7 @@ import logging
 import re
 import subprocess
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -18,8 +19,77 @@ _EXTENSION_ID_RE = re.compile(r"^[a-z0-9_-]+\.[a-z0-9_-]+$")
 
 BUILTIN_EXTENSIONS: dict[str, set[str]] = {
     "vscode": {"github.copilot-chat"},
+    "vscode-local": {"ms-vscode-remote.remote-wsl"},
     "cursor": {"anysphere.cursorpyright", "github.copilot-chat"},
 }
+
+
+class ExtensionInvoker(ABC):
+    """Encapsulates how to invoke a VS Code-compatible CLI for extension management."""
+
+    @abstractmethod
+    def list_command(self) -> list[str]: ...
+
+    @abstractmethod
+    def install_command(self, ext_id: str) -> list[str]: ...
+
+    @abstractmethod
+    def uninstall_command(self, ext_id: str) -> list[str]: ...
+
+    @property
+    @abstractmethod
+    def display_name(self) -> str: ...
+
+
+@dataclass(frozen=True)
+class CliExtensionInvoker(ExtensionInvoker):
+    """Standard CLI-based invoker (e.g., 'code', 'cursor')."""
+
+    cli: str
+
+    @property
+    def display_name(self) -> str:
+        return self.cli
+
+    def list_command(self) -> list[str]:
+        return [self.cli, "--list-extensions"]
+
+    def install_command(self, ext_id: str) -> list[str]:
+        return [self.cli, "--install-extension", ext_id, "--force"]
+
+    def uninstall_command(self, ext_id: str) -> list[str]:
+        return [self.cli, "--uninstall-extension", ext_id]
+
+
+@dataclass(frozen=True)
+class PowerShellExtensionInvoker(ExtensionInvoker):
+    """PowerShell-based invoker for Windows-side VS Code from WSL."""
+
+    win_code_cmd_path: str
+
+    @property
+    def display_name(self) -> str:
+        return "powershell.exe"
+
+    def _ps_command(self, args: str) -> list[str]:
+        return [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            f"$ErrorActionPreference = 'SilentlyContinue'; "
+            f"& '{self.win_code_cmd_path}' {args} 2>$null; "
+            f"exit $LASTEXITCODE",
+        ]
+
+    def list_command(self) -> list[str]:
+        return self._ps_command("--list-extensions")
+
+    def install_command(self, ext_id: str) -> list[str]:
+        return self._ps_command(f"--install-extension {ext_id} --force")
+
+    def uninstall_command(self, ext_id: str) -> list[str]:
+        return self._ps_command(f"--uninstall-extension {ext_id}")
 
 
 def get_builtin_extensions(shell_name: str | None) -> frozenset[str]:
@@ -112,18 +182,26 @@ class ExtensionManager:
 
         return desired
 
-    def get_installed_extensions(self, cli_command: str) -> set[str] | None:
+    def get_installed_extensions(
+        self, cli_command: str | None = None, *, invoker: ExtensionInvoker | None = None
+    ) -> set[str] | None:
         """Query installed extensions via the IDE CLI.
 
         Args:
             cli_command: CLI binary name (e.g., "code", "cursor")
+            invoker: ExtensionInvoker to use (takes precedence over cli_command)
 
         Returns:
             Set of lowercase extension IDs, or None on failure
         """
+        if invoker is None:
+            if cli_command is None:
+                return None
+            invoker = CliExtensionInvoker(cli_command)
+
         try:
             result = subprocess.run(
-                [cli_command, "--list-extensions"],
+                invoker.list_command(),
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -131,7 +209,7 @@ class ExtensionManager:
             if result.returncode != 0:
                 logger.warning(
                     "%s --list-extensions failed: %s",
-                    cli_command,
+                    invoker.display_name,
                     result.stderr.strip(),
                 )
                 return None
@@ -143,10 +221,10 @@ class ExtensionManager:
                     installed.add(stripped)
             return installed
         except FileNotFoundError:
-            logger.warning("%s not found in PATH", cli_command)
+            logger.warning("%s not found in PATH", invoker.display_name)
             return None
         except subprocess.TimeoutExpired:
-            logger.warning("%s --list-extensions timed out", cli_command)
+            logger.warning("%s --list-extensions timed out", invoker.display_name)
             return None
 
     def compute_diff(
@@ -180,14 +258,23 @@ class ExtensionManager:
 
     def install_extensions(
         self,
-        cli_command: str,
-        extensions: set[str],
+        cli_command: str | None = None,
+        extensions: set[str] | None = None,
         dry_run: bool = False,
+        *,
+        invoker: ExtensionInvoker | None = None,
     ) -> list[ExtensionResult]:
         """Install extensions via the IDE CLI.
 
         Continues on individual failures to handle marketplace gaps gracefully.
         """
+        if extensions is None:
+            extensions = set()
+        if invoker is None:
+            if cli_command is None:
+                return []
+            invoker = CliExtensionInvoker(cli_command)
+
         results: list[ExtensionResult] = []
         for ext_id in sorted(extensions):
             if dry_run:
@@ -196,7 +283,7 @@ class ExtensionManager:
 
             try:
                 result = subprocess.run(
-                    [cli_command, "--install-extension", ext_id, "--force"],
+                    invoker.install_command(ext_id),
                     capture_output=True,
                     text=True,
                     timeout=120,
@@ -228,7 +315,7 @@ class ExtensionManager:
                     ExtensionResult(
                         ext_id,
                         False,
-                        f"{cli_command} not found in PATH",
+                        f"{invoker.display_name} not found in PATH",
                         status=ExtensionResultStatus.FAILED,
                     )
                 )
@@ -247,11 +334,20 @@ class ExtensionManager:
 
     def uninstall_extensions(
         self,
-        cli_command: str,
-        extensions: set[str],
+        cli_command: str | None = None,
+        extensions: set[str] | None = None,
         dry_run: bool = False,
+        *,
+        invoker: ExtensionInvoker | None = None,
     ) -> list[ExtensionResult]:
         """Uninstall extensions via the IDE CLI."""
+        if extensions is None:
+            extensions = set()
+        if invoker is None:
+            if cli_command is None:
+                return []
+            invoker = CliExtensionInvoker(cli_command)
+
         results: list[ExtensionResult] = []
         for ext_id in sorted(extensions):
             if dry_run:
@@ -262,7 +358,7 @@ class ExtensionManager:
 
             try:
                 result = subprocess.run(
-                    [cli_command, "--uninstall-extension", ext_id],
+                    invoker.uninstall_command(ext_id),
                     capture_output=True,
                     text=True,
                     timeout=60,
@@ -286,7 +382,7 @@ class ExtensionManager:
                     ExtensionResult(
                         ext_id,
                         False,
-                        f"{cli_command} not found in PATH",
+                        f"{invoker.display_name} not found in PATH",
                         status=ExtensionResultStatus.FAILED,
                     )
                 )
@@ -304,14 +400,18 @@ class ExtensionManager:
         return results
 
     def export_extensions(
-        self, cli_command: str, shell_name: str | None = None
+        self,
+        cli_command: str | None = None,
+        shell_name: str | None = None,
+        *,
+        invoker: ExtensionInvoker | None = None,
     ) -> str | None:
         """Export currently installed extensions as a sorted newline-separated string.
 
         Filters out builtin extensions to prevent poisoning config files.
         Returns None if the CLI query fails, empty string if no extensions installed.
         """
-        installed = self.get_installed_extensions(cli_command)
+        installed = self.get_installed_extensions(cli_command, invoker=invoker)
         if installed is None:
             return None
         return "\n".join(sorted(installed - get_builtin_extensions(shell_name)))
