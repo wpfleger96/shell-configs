@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.37.1 (2026-05-14)
+
+### Bug Fixes
+
+- Add --script flag to transcribe shebang for uv 0.11+
+  ([`0f561d4`](https://github.com/wpfleger96/shell-configs/commit/0f561d493786c9472e4928667e9ace97d9856766))
+
+
 ## v0.37.0 (2026-05-13)
 
 ### Bug Fixes
