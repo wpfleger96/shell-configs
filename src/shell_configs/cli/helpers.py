@@ -393,7 +393,7 @@ def _render_diffs(diffs: list[FileDiff], console_obj: Any = None) -> None:
         console_obj.print(syntax)
 
 
-_BUFFERED_METHODS: frozenset[str] = frozenset({"apply", "uninstall"})
+_BUFFERED_METHODS: frozenset[str] = frozenset({"apply", "uninstall", "status"})
 
 
 def run_components_parallel(
@@ -405,10 +405,10 @@ def run_components_parallel(
 ) -> dict[Any, Any]:
     """Run a component method across all components in parallel.
 
-    For ``apply`` and ``uninstall``, each component's console output is captured
-    into a per-thread buffer and replayed atomically in completion order so that
-    output from different components never interleaves.  A Rich Progress bar
-    tracks each component live.
+    For methods in ``_BUFFERED_METHODS`` (``apply``, ``uninstall``, ``status``),
+    each component's console output is captured into a per-thread buffer and
+    replayed atomically in completion order so that output from different
+    components never interleaves.  A Rich Progress bar tracks each component live.
 
     For ``plan`` (and any other method), no buffering is applied — the method is
     expected to return data without printing.  A Status spinner shows progress.

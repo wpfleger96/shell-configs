@@ -1,10 +1,14 @@
-"""Status command — loops over STATUS_COMPONENTS calling status()."""
+"""Status command — parallel status across STATUS_COMPONENTS."""
 
 from __future__ import annotations
 
 import click
 
-from shell_configs.cli.helpers import build_context, parse_shell_filter
+from shell_configs.cli.helpers import (
+    build_context,
+    parse_shell_filter,
+    run_components_parallel,
+)
 
 
 @click.command()
@@ -27,7 +31,6 @@ def status(shells: list[str] | None, profile_name: str | None) -> None:
 
     console.print(f"[bold]Platform:[/bold] {detect_platform().display_name}\n")
 
-    for component in STATUS_COMPONENTS:
-        component.status(ctx)
+    run_components_parallel(STATUS_COMPONENTS, "status", ctx)
 
     console.print()
