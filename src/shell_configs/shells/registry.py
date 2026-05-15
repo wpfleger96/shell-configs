@@ -2,7 +2,7 @@
 
 from shell_configs.shells.base import Shell
 from shell_configs.shells.bash import BashShell
-from shell_configs.shells.cursor import CursorShell
+from shell_configs.shells.cursor import CursorLocalShell, CursorShell
 from shell_configs.shells.git import GitShell
 from shell_configs.shells.iterm2 import ITerm2Shell
 from shell_configs.shells.vscode import VSCodeLocalShell, VSCodeShell
@@ -30,6 +30,7 @@ class ShellRegistry:
         self.register(CursorShell())
         self.register(VSCodeShell())
         if is_platform(Platform.WSL):
+            self.register(CursorLocalShell())
             self.register(VSCodeLocalShell())
 
     def register(self, shell: Shell) -> None:

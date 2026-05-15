@@ -1,0 +1,16 @@
+# Cursor Local (Windows-side) extensions
+# Includes UI-only extensions and workspace extensions that Cursor
+# mirrors to the Local host for remote development support
+
+# Languages
+mathiasfrohlich.kotlin
+ms-python.debugpy
+ms-python.python
+
+# Infrastructure
+hashicorp.terraform
+ms-vscode.makefile-tools
+
+# Utilities
+ms-vscode.powershell
+tomoki1207.pdf

@@ -21,6 +21,7 @@ BUILTIN_EXTENSIONS: dict[str, set[str]] = {
     "vscode": {"github.copilot-chat"},
     "vscode-local": {"ms-vscode-remote.remote-wsl"},
     "cursor": {"anysphere.cursorpyright", "github.copilot-chat"},
+    "cursor-local": {"anysphere.remote-wsl", "anysphere.cursorpyright"},
 }
 
 
