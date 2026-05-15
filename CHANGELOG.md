@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.38.1 (2026-05-15)
+
+### Bug Fixes
+
+- Revert ci.yml to split lint/format recipe names
+  ([`131a4ea`](https://github.com/wpfleger96/shell-configs/commit/131a4ea1e3ff01e567526ee577d2f11a697f36dd))
+
+
 ## v0.38.0 (2026-05-15)
 
 ### Bug Fixes
