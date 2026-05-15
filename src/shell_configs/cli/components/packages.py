@@ -165,8 +165,6 @@ class OptionalPackagesComponent(Component):
 
         import click
 
-        from shell_configs.display import print_info
-
         plan = self.plan(ctx)
 
         if not plan.has_changes:
@@ -174,7 +172,7 @@ class OptionalPackagesComponent(Component):
 
             console.print()
             console.print(
-                f"[green]✓[/green] All {len(plan.total)} packages already installed"
+                f"[dim]✓[/dim] All {len(plan.total)} packages already installed"
             )
             return True
 
@@ -186,9 +184,9 @@ class OptionalPackagesComponent(Component):
             console.print()
             return self.apply(ctx, plan)
         else:
-            print_info(
-                "Skipping package installation. Run 'shell-configs packages install' later."
-            )
+            from shell_configs.display import print_hint
+
+            print_hint("Run 'shell-configs packages install' to install later.")
             return True
 
     def status(self, ctx: Context) -> None:
@@ -214,9 +212,9 @@ class OptionalPackagesComponent(Component):
             console.print(
                 f"  [yellow]⚠[/yellow] {installed_count}/{total_count} packages installed ({display_name})"
             )
-            console.print(
-                "  [dim]Run 'shell-configs packages status' for details[/dim]"
-            )
+            from shell_configs.display import print_hint
+
+            print_hint("Run 'shell-configs packages status' for details")
 
         console.print()
 

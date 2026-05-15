@@ -21,15 +21,14 @@ def completions() -> None:
 def completions_bash() -> None:
     """Output bash completion script for manual installation."""
     from shell_configs.completions import generate_completion_script
-    from shell_configs.display import console, print_error
+    from shell_configs.display import console, print_error, print_hint
 
     try:
         script = generate_completion_script("bash")
         console.print(script)
-        console.print(
-            "\n[dim]To install: Add the above to your ~/.bashrc or run:[/dim]"
+        print_hint(
+            "Add the above to your ~/.bashrc or run: shell-configs completions install"
         )
-        console.print("[dim]  shell-configs completions install[/dim]")
     except Exception as e:
         print_error(f"Error generating completion script: {e}")
         sys.exit(1)
@@ -39,13 +38,14 @@ def completions_bash() -> None:
 def completions_zsh() -> None:
     """Output zsh completion script for manual installation."""
     from shell_configs.completions import generate_completion_script
-    from shell_configs.display import console, print_error
+    from shell_configs.display import console, print_error, print_hint
 
     try:
         script = generate_completion_script("zsh")
         console.print(script)
-        console.print("\n[dim]To install: Add the above to your ~/.zshrc or run:[/dim]")
-        console.print("[dim]  shell-configs completions install[/dim]")
+        print_hint(
+            "Add the above to your ~/.zshrc or run: shell-configs completions install"
+        )
     except Exception as e:
         print_error(f"Error generating completion script: {e}")
         sys.exit(1)
@@ -124,7 +124,7 @@ def completions_status() -> None:
         get_supported_shells,
         is_completion_installed,
     )
-    from shell_configs.display import console
+    from shell_configs.display import console, print_hint
 
     detected_shell = detect_shell()
     console.print("[bold cyan]Shell Completions Status[/bold cyan]\n")
@@ -156,4 +156,4 @@ def completions_status() -> None:
         table.add_row(shell_name, status, config_str)
 
     console.print(table)
-    console.print("\n[dim]To install: shell-configs completions install[/dim]")
+    print_hint("To install: shell-configs completions install")

@@ -117,7 +117,7 @@ def profile_switch(name: str) -> None:
         load_auto_update_config,
         save_auto_update_config,
     )
-    from shell_configs.display import console, print_error
+    from shell_configs.display import console, print_error, print_hint
     from shell_configs.profiles import ProfileLoader
 
     config_reader = ConfigReader()
@@ -137,4 +137,4 @@ def profile_switch(name: str) -> None:
         )
     )
     console.print(f"[green]✓[/green] Switched to profile '{name}'")
-    console.print("[dim]Run 'shell-configs install' to apply.[/dim]")
+    print_hint("Run 'shell-configs install' to apply.")

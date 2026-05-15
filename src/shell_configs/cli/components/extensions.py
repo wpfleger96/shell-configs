@@ -146,7 +146,7 @@ class ExtensionsComponent(Component):
 
         if not any_ext_activity:
             console.print()
-            console.print("[green]✓[/green] All IDE extensions already in sync")
+            console.print("[dim]✓[/dim] All IDE extensions already in sync")
 
         return True
 
@@ -197,9 +197,9 @@ class ExtensionsComponent(Component):
                     f"  [yellow]⚠[/yellow] {shell.display_name}: "
                     f"{len(ext_diff.matched)}/{len(ext_desired)} synced ({', '.join(parts)})"
                 )
-                console.print(
-                    "  [dim]Run 'shell-configs extensions diff' for details[/dim]"
-                )
+                from shell_configs.display import print_hint
+
+                print_hint("Run 'shell-configs extensions diff' for details")
 
         console.print()
 

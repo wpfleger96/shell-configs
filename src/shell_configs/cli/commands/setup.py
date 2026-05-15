@@ -207,12 +207,10 @@ def setup(
                     dry_run=dry_run,
                     source_dir=scripts_source,
                 )
-                if result in (
-                    InstallResult.INSTALLED,
-                    InstallResult.UPDATED,
-                    InstallResult.ALREADY_SYNCED,
-                ):
+                if result in (InstallResult.INSTALLED, InstallResult.UPDATED):
                     console.print(f"[green]✓[/green] {message}")
+                elif result == InstallResult.ALREADY_SYNCED:
+                    console.print(f"[dim]✓[/dim] {message}")
                 elif result == InstallResult.COLLISION:
                     console.print(f"[yellow]⚠[/yellow] {message}")
                 elif result in (

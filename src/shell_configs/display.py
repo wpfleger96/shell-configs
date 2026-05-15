@@ -66,6 +66,10 @@ def print_info(message: str) -> None:
     get_console().print(f"[blue]ℹ[/blue] {message}")
 
 
+def print_hint(message: str) -> None:
+    get_console().print(f"[yellow]💡[/yellow] {message}")
+
+
 def print_operation_result(result: OperationResult, message: str) -> None:
     """Print an operation result with appropriate formatting."""
     cons = get_console()

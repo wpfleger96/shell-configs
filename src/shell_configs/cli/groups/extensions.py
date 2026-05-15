@@ -184,7 +184,7 @@ def extensions_install(
     profile_name: str | None,
 ) -> None:
     """Install (and optionally prune) extensions for each IDE."""
-    from shell_configs.display import console, print_info
+    from shell_configs.display import console, print_hint, print_info
     from shell_configs.extensions import ExtensionManager
     from shell_configs.profiles import ProfileLoader, resolve_active_profile
     from shell_configs.shells.registry import ShellRegistry
@@ -272,7 +272,7 @@ def extensions_install(
         print_info("All IDE extensions are already in sync")
 
     if dry_run and any_activity:
-        print_info("\nDry run complete. Use without --dry-run to apply changes.")
+        print_hint("Use without --dry-run to apply changes.")
 
 
 @extensions.command(name="list")

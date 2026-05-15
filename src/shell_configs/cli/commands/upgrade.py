@@ -29,7 +29,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         perform_github_update,
     )
     from shell_configs.bootstrap.installer import make_github_install_url
-    from shell_configs.display import console, print_error, print_warning
+    from shell_configs.display import console, print_error, print_hint, print_warning
 
     tools = [t for t in UPDATABLE_TOOLS if t.is_installed()]
 
@@ -88,7 +88,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
 
     if check:
         if tool_updates:
-            console.print("\nRun [bold]shell-configs upgrade[/bold] to install")
+            print_hint("Run 'shell-configs upgrade' to install")
         return
 
     if not force and not yes:
@@ -118,9 +118,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
                     f"[green]✓[/green] {tool.display_name} upgraded successfully!"
                 )
             else:
-                console.print(
-                    f"[green]✓[/green] {tool.display_name} is already up to date"
-                )
+                console.print(f"[dim]✓[/dim] {tool.display_name} is already up to date")
         else:
             print_error(f"{tool.display_name} upgrade failed: {msg}")
 

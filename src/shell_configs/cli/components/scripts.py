@@ -108,12 +108,10 @@ class ScriptsComponent(Component):
                 )
                 if script_result == InstallResult.COLLISION:
                     console.print(f"[yellow]⚠[/yellow] {msg}")
-                elif script_result in (
-                    InstallResult.INSTALLED,
-                    InstallResult.UPDATED,
-                    InstallResult.ALREADY_SYNCED,
-                ):
+                elif script_result in (InstallResult.INSTALLED, InstallResult.UPDATED):
                     console.print(f"[green]✓[/green] {msg}")
+                elif script_result == InstallResult.ALREADY_SYNCED:
+                    console.print(f"[dim]✓[/dim] {msg}")
                 elif script_result in (
                     InstallResult.WOULD_INSTALL,
                     InstallResult.WOULD_UPDATE,
@@ -146,7 +144,9 @@ class ScriptsComponent(Component):
                 f"  [yellow]⚠[/yellow] {installed}/{total} scripts installed "
                 f"({total - installed} missing)"
             )
-            console.print("  [dim]Run 'shell-configs scripts status' for details[/dim]")
+            from shell_configs.display import print_hint
+
+            print_hint("Run 'shell-configs scripts status' for details")
 
         console.print()
 

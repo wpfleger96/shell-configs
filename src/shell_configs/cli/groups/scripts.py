@@ -52,7 +52,7 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
             console.print(f"[yellow]⚠[/yellow] {message}")
             collisions.append(entry.name)
         elif result == InstallResult.ALREADY_SYNCED:
-            console.print(f"[green]✓[/green] {message}")
+            console.print(f"[dim]✓[/dim] {message}")
         elif result in (InstallResult.INSTALLED, InstallResult.UPDATED):
             console.print(f"[green]✓[/green] {message}")
         elif result in (InstallResult.WOULD_INSTALL, InstallResult.WOULD_UPDATE):

@@ -102,7 +102,7 @@ class GhExtensionsComponent(Component):
         plan = self.plan(ctx)
 
         if not plan.missing:
-            console.print("[green]✓[/green] All gh extensions already installed")
+            console.print("[dim]✓[/dim] All gh extensions already installed")
             return True
 
         return self.apply(ctx, plan)

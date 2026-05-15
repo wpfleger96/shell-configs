@@ -19,7 +19,7 @@ def info() -> None:
         check_tool_updates,
     )
     from shell_configs.bootstrap.installer import get_tool_source
-    from shell_configs.display import console
+    from shell_configs.display import console, print_hint
 
     table = Table(title="shell-configs Installation Info", show_header=True)
     table.add_column("Tool", style="cyan")
@@ -56,4 +56,4 @@ def info() -> None:
     console.print(table)
 
     if has_updates:
-        console.print("\n[dim]Run 'shell-configs upgrade' to install updates.[/dim]")
+        print_hint("Run 'shell-configs upgrade' to install updates.")
