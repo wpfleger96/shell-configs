@@ -1,2 +1,3 @@
 extensions:
   - repo: wpfleger96/gh-infra
+    build_path: ./cmd/gh-infra/

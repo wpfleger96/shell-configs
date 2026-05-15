@@ -15,7 +15,7 @@ class GhExtensionsComponent(Component):
 
     def plan(self, ctx: Context) -> GhExtensionsPlan:
         from shell_configs.bootstrap import is_command_available
-        from shell_configs.gh_extensions import load_extensions
+        from shell_configs.gh_extensions import command_name, load_extensions
 
         desired = load_extensions()
 
@@ -29,8 +29,16 @@ class GhExtensionsComponent(Component):
         from shell_configs.gh_extensions import list_installed
 
         installed = list_installed()
-        missing = [ext for ext in desired if ext.repo not in installed]
-        extra = set(installed.keys()) - {ext.repo for ext in desired}
+        missing = [
+            ext
+            for ext in desired
+            if ext.repo not in installed and command_name(ext.repo) not in installed
+        ]
+        desired_keys = {ext.repo for ext in desired}
+        desired_cmd_names = {command_name(ext.repo) for ext in desired}
+        extra = {
+            k for k in installed if k not in desired_keys and k not in desired_cmd_names
+        }
 
         return GhExtensionsPlan(
             has_changes=bool(missing) or bool(extra),
@@ -72,7 +80,9 @@ class GhExtensionsComponent(Component):
 
         all_ok = True
         for ext in plan.missing:
-            success, msg = install_extension(ext.repo, pin=ext.pin, dry_run=ctx.dry_run)
+            success, msg = install_extension(
+                ext.repo, pin=ext.pin, dry_run=ctx.dry_run, build_path=ext.build_path
+            )
             if ctx.dry_run:
                 console.print(f"[dim]→[/dim] {msg}")
             elif success:

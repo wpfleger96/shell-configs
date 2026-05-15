@@ -1,1 +1,2 @@
 # VSCode-only extensions (Microsoft-proprietary, unavailable on OpenVSX)
+ms-python.vscode-pylance
