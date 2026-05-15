@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v0.39.0 (2026-05-15)
+
+### Features
+
+- Add backup-resmed script for SD card data backup
+  ([#34](https://github.com/wpfleger96/shell-configs/pull/34),
+  [`d068d6a`](https://github.com/wpfleger96/shell-configs/commit/d068d6abaca12cac1961d6597ad05ec3d1a219c9))
+
+
 ## v0.38.2 (2026-05-15)
 
 ### Bug Fixes
