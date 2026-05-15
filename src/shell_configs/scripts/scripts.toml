@@ -12,3 +12,6 @@ platforms = ["macos"]
 
 [new-laptop-setup]
 platforms = ["macos"]
+
+[backup-resmed]
+platforms = ["wsl", "macos"]
