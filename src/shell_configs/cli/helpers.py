@@ -552,12 +552,16 @@ def _run_buffered(
                     completed=True,
                 )
 
+    first = True
     for comp in components:
         buf_content = buffers[comp].getvalue()
         if buf_content.strip():
-            real_console.print(f"\n[bold cyan]{comp.display_name}[/bold cyan]")
+            if not first:
+                real_console.print()
+            real_console.print(f"[bold cyan]{comp.display_name}[/bold cyan]")
+            first = False
             try:
-                real_console.file.write(buf_content)
+                real_console.file.write(buf_content.rstrip("\n") + "\n")
                 real_console.file.flush()
             except OSError:
                 pass
