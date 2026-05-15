@@ -18,6 +18,7 @@ STUB_COMMANDS = {
     "cursor",
     "defaults",
     "gh",
+    "go",
     "ssh",
     "ssh-add",
 }
