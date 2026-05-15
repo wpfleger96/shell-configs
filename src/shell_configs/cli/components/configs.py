@@ -7,6 +7,7 @@ from shell_configs.cli.context import Component, ComponentPlan, ConfigsPlan, Con
 
 class ConfigsComponent(Component):
     label = "configs"
+    display_name = "Configs"
 
     def plan(self, ctx: Context) -> ConfigsPlan:
         from shell_configs.bootstrap import load_auto_update_config
@@ -324,6 +325,7 @@ class ConfigsComponent(Component):
                     add_additional_file_row(table, path_display, status_str)
 
         console.print(table)
+        console.print()
 
     def uninstall(self, ctx: Context) -> None:
         from shell_configs.bootstrap import load_auto_update_config

@@ -7,6 +7,7 @@ from shell_configs.cli.context import Component, Context
 
 class CompletionsComponent(Component):
     label = "completions"
+    display_name = "Shell Completions"
 
     def status(self, ctx: Context) -> None:
         from shell_configs.completions import (
@@ -17,7 +18,7 @@ class CompletionsComponent(Component):
         )
         from shell_configs.display import console
 
-        console.print("[bold cyan]Shell Completions[/bold cyan]\n")
+        console.print(f"[bold cyan]{self.display_name}[/bold cyan]\n")
 
         detected_shell = detect_shell()
         if detected_shell:
@@ -28,7 +29,7 @@ class CompletionsComponent(Component):
                 )
             else:
                 console.print(
-                    f"  [yellow]○[/yellow] {detected_shell} completion not installed "
+                    f"  [yellow]⚠[/yellow] {detected_shell} completion not installed "
                     "(run: shell-configs completions install)"
                 )
         else:

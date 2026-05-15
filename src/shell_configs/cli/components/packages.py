@@ -13,6 +13,7 @@ from shell_configs.cli.context import (
 
 class RequiredPackagesComponent(Component):
     label = "required-packages"
+    display_name = "Required Packages"
 
     def plan(self, ctx: Context) -> RequiredPackagesPlan:
         from shell_configs.packages import (
@@ -41,6 +42,7 @@ class RequiredPackagesComponent(Component):
 
         from shell_configs.display import console
 
+        console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
         console.print(
             f"[yellow]Installing {len(plan.missing)} required package(s)...[/yellow]"
         )
@@ -85,6 +87,7 @@ class RequiredPackagesComponent(Component):
 
 class OptionalPackagesComponent(Component):
     label = "optional-packages"
+    display_name = "Packages"
 
     def plan(self, ctx: Context) -> OptionalPackagesPlan:
         from shell_configs.packages import (
@@ -114,12 +117,12 @@ class OptionalPackagesComponent(Component):
 
         from shell_configs.display import console
 
-        console.print()
+        console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
         console.print(
             f"[yellow]⚠[/yellow] {len(plan.missing)}/{len(plan.total)} packages missing"
         )
         for pkg in plan.missing:
-            console.print(f"  [yellow]✗[/yellow] {pkg.name}")
+            console.print(f"  [red]✗[/red] {pkg.name}")
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
         if not isinstance(plan, OptionalPackagesPlan):
@@ -192,7 +195,7 @@ class OptionalPackagesComponent(Component):
         from shell_configs.display import console
         from shell_configs.packages import get_package_manager
 
-        console.print("[bold cyan]Packages[/bold cyan]\n")
+        console.print(f"[bold cyan]{self.display_name}[/bold cyan]\n")
 
         pkg_manager = get_package_manager()
         if not pkg_manager:
@@ -226,7 +229,7 @@ class OptionalPackagesComponent(Component):
         if not plan.has_changes:
             return False
 
-        console.print("\n[bold cyan]Packages[/bold cyan]\n")
+        console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
         for pkg in plan.missing:
             console.print(f"  [yellow]✗[/yellow] {pkg.name} (not installed)")
         return True

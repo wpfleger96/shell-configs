@@ -109,6 +109,7 @@ class ScriptsPlan(ComponentPlan):
 
 class Component:
     label: str = ""
+    display_name: str = ""
 
     def plan(self, ctx: Context) -> ComponentPlan:
         """Compute what needs to change (read-only, no prompts, no writes)."""

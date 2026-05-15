@@ -9,6 +9,7 @@ from shell_configs.cli.context import Component, ComponentPlan, Context, Extensi
 
 class ExtensionsComponent(Component):
     label = "extensions"
+    display_name = "Extensions"
 
     def plan(self, ctx: Context) -> ExtensionsPlan:
         from shell_configs.cli.helpers import _get_extension_shells
@@ -56,7 +57,7 @@ class ExtensionsComponent(Component):
                 continue
 
             if not found_diffs:
-                console.print("\n[bold cyan]Extensions[/bold cyan]")
+                console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
             found_diffs = True
             console.print(f"\n  [bold]{shell_name}[/bold]")
 
@@ -70,10 +71,10 @@ class ExtensionsComponent(Component):
             if diff.missing:
                 console.print(f"    [yellow]Missing ({len(diff.missing)}):[/yellow]")
                 for ext_id in sorted(diff.missing):
-                    console.print(f"      [yellow]✗[/yellow] {ext_id}")
+                    console.print(f"      [red]✗[/red] {ext_id}")
 
             if diff.extra:
-                console.print(f"    [dim]Extra ({len(diff.extra)}):[/dim]")
+                console.print(f"    [dim]Unmanaged ({len(diff.extra)}):[/dim]")
                 for ext_id in sorted(diff.extra):
                     console.print(f"      [dim]+[/dim] {ext_id}")
 
@@ -158,7 +159,7 @@ class ExtensionsComponent(Component):
         from shell_configs.display import console
         from shell_configs.extensions import ExtensionManager
 
-        console.print("[bold cyan]Extensions[/bold cyan]\n")
+        console.print(f"[bold cyan]{self.display_name}[/bold cyan]\n")
 
         ext_manager = ExtensionManager()
 
@@ -193,7 +194,7 @@ class ExtensionsComponent(Component):
                 if ext_diff.missing:
                     parts.append(f"{len(ext_diff.missing)} missing")
                 if ext_diff.extra:
-                    parts.append(f"{len(ext_diff.extra)} extra")
+                    parts.append(f"{len(ext_diff.extra)} unmanaged")
                 console.print(
                     f"  [yellow]⚠[/yellow] {shell.display_name}: "
                     f"{len(ext_diff.matched)}/{len(ext_desired)} synced ({', '.join(parts)})"

@@ -18,7 +18,7 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
     """Install utility scripts to ~/.local/bin."""
     from rich.prompt import Confirm
 
-    from shell_configs.display import console
+    from shell_configs.display import console, print_info, print_warning
     from shell_configs.script_manager import (
         InstallResult,
         ScriptManifest,
@@ -33,7 +33,7 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
     entries = discover_scripts()
 
     if not entries:
-        console.print("[yellow]No scripts available for this platform[/yellow]")
+        print_warning("No scripts available for this platform")
         return
 
     if not dry_run and not yes:
@@ -44,7 +44,7 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
             console.print(f"  {entry.name}")
         console.print()
         if not Confirm.ask("Proceed?", default=True):
-            console.print("[dim]Cancelled[/dim]")
+            print_info("Cancelled")
             return
 
     collisions = []
@@ -65,9 +65,9 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
             console.print(f"[red]✗[/red] {message}")
 
     if collisions:
-        console.print(
-            f"\n[yellow]⚠ {len(collisions)} collision(s) skipped. "
-            "Remove the existing file(s) first, then re-run install.[/yellow]"
+        print_warning(
+            f"{len(collisions)} collision(s) skipped. "
+            "Remove the existing file(s) first, then re-run install."
         )
 
 
@@ -79,7 +79,7 @@ def scripts_uninstall(dry_run: bool, yes: bool, force: bool) -> None:
     """Remove shell-configs-managed scripts from ~/.local/bin."""
     from rich.prompt import Confirm
 
-    from shell_configs.display import console
+    from shell_configs.display import console, print_info
     from shell_configs.script_manager import (
         ScriptManifest,
         UninstallResult,
@@ -105,7 +105,7 @@ def scripts_uninstall(dry_run: bool, yes: bool, force: bool) -> None:
             console.print(f"  {name}")
         console.print()
         if not Confirm.ask("Proceed?", default=True):
-            console.print("[dim]Cancelled[/dim]")
+            print_info("Cancelled")
             return
 
     for name in names:
@@ -142,7 +142,7 @@ def scripts_status() -> None:
     target_dir = get_default_target_dir()
     manifest = ScriptManifest(get_default_manifest_path())
 
-    table = Table(show_header=True)
+    table = Table(show_header=True, header_style="bold")
     table.add_column("Script")
     table.add_column("Status")
 
@@ -185,7 +185,7 @@ def scripts_list(include_all: bool) -> None:
     current = detect_platform()
     entries = discover_scripts(include_all=include_all)
 
-    table = Table(show_header=True)
+    table = Table(show_header=True, header_style="bold")
     table.add_column("Script")
     table.add_column("Platforms")
 

@@ -17,7 +17,6 @@ def cleanup(dry_run: bool, keep: int | None, yes: bool) -> None:
     """Clean up old backup files created by shell-configs."""
     from collections import defaultdict
 
-    from rich.prompt import Confirm
     from rich.table import Table
 
     from shell_configs.bootstrap import load_auto_update_config
@@ -32,7 +31,7 @@ def cleanup(dry_run: bool, keep: int | None, yes: bool) -> None:
     registry = ShellRegistry()
     all_shells = registry.get_all()
 
-    console.print("[cyan]Scanning for shell-configs backup files...[/cyan]\n")
+    console.print("[bold cyan]Scanning for shell-configs backup files...[/bold cyan]\n")
 
     backup_by_config: dict[Path, list[Path]] = defaultdict(list)
     backup_dir_map: dict[Path, Path] = {}
@@ -114,7 +113,9 @@ def cleanup(dry_run: bool, keep: int | None, yes: bool) -> None:
         return
 
     if not yes:
-        if not Confirm.ask(f"Remove {to_remove_count} old backup files?", default=True):
+        if not click.confirm(
+            f"Remove {to_remove_count} old backup files?", default=True
+        ):
             print_info("Cleanup cancelled")
             return
 

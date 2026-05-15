@@ -27,7 +27,7 @@ def profile_list() -> None:
     auto_config = load_auto_update_config()
     active_name = auto_config.active_profile or "default"
 
-    table = Table(show_header=True)
+    table = Table(show_header=True, header_style="bold")
     table.add_column("Profile")
     table.add_column("Description")
     table.add_column("Extends")
@@ -55,7 +55,7 @@ def profile_show(name: str, resolved: bool) -> None:
     """Show profile YAML. Use --resolved to see fully inherited values."""
     import yaml
 
-    from shell_configs.display import console
+    from shell_configs.display import console, print_error
     from shell_configs.profiles import ProfileLoader
 
     config_reader = ConfigReader()
@@ -75,7 +75,7 @@ def profile_show(name: str, resolved: bool) -> None:
                         "name: default\ndescription: Default profile (no overrides)"
                     )
                     return
-                console.print(f"[red]Error:[/red] Profile '{name}' not found")
+                print_error(f"Profile '{name}' not found")
                 return
             data = yaml.safe_load(profile_path.read_text()) or {}
 
@@ -83,14 +83,14 @@ def profile_show(name: str, resolved: bool) -> None:
             yaml.dump(data, default_flow_style=False, sort_keys=False).rstrip()
         )
     except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(str(e))
 
 
 @profile.command(name="current")
 def profile_current() -> None:
     """Show the currently active profile."""
     from shell_configs.bootstrap.config import load_auto_update_config
-    from shell_configs.display import console
+    from shell_configs.display import console, print_error
     from shell_configs.profiles import ProfileLoader
 
     config_reader = ConfigReader()
@@ -106,7 +106,7 @@ def profile_current() -> None:
         if p.extends:
             console.print(f"[dim]Extends: {p.extends}[/dim]")
     except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(str(e))
 
 
 @profile.command(name="switch")
@@ -117,7 +117,7 @@ def profile_switch(name: str) -> None:
         load_auto_update_config,
         save_auto_update_config,
     )
-    from shell_configs.display import console
+    from shell_configs.display import console, print_error
     from shell_configs.profiles import ProfileLoader
 
     config_reader = ConfigReader()
@@ -126,7 +126,7 @@ def profile_switch(name: str) -> None:
     try:
         loader.load_profile(name)
     except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(str(e))
         return
 
     auto_config = load_auto_update_config()

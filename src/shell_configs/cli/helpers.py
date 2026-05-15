@@ -405,13 +405,17 @@ def run_components_parallel(
 ) -> dict[Any, Any]:
     """Run a component method across all components in parallel.
 
+    Both paths use a Rich Progress bar with one spinner row per component that
+    turns green or red on completion.
+
     For methods in ``_BUFFERED_METHODS`` (``apply``, ``uninstall``, ``status``),
     each component's console output is captured into a per-thread buffer and
     replayed atomically in completion order so that output from different
-    components never interleaves.  A Rich Progress bar tracks each component live.
+    components never interleaves.
 
     For ``plan`` (and any other method), no buffering is applied — the method is
-    expected to return data without printing.  A Status spinner shows progress.
+    expected to return data without printing, and output goes directly to the
+    console as it arrives.
 
     Errors are collected rather than aborting on the first failure.  After all
     futures settle, per-component errors are printed and partial results are
@@ -504,6 +508,8 @@ def _run_buffered(
     """Execute components with per-thread output buffering and a Progress bar."""
     from rich.progress import Progress, SpinnerColumn, TextColumn
 
+    completed_order: list[Any] = []
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -533,12 +539,13 @@ def _run_buffered(
                     description=f"[green]{comp.label}[/green]",
                     completed=True,
                 )
+            completed_order.append(comp)
 
-            buf_content = buffers[comp].getvalue()
-            if buf_content.strip():
-                real_console.print(f"\n[bold cyan]{comp.label}[/bold cyan]")
-                real_console.file.write(buf_content)
-                real_console.file.flush()
+    for comp in completed_order:
+        buf_content = buffers[comp].getvalue()
+        if buf_content.strip():
+            real_console.file.write(buf_content)
+            real_console.file.flush()
 
 
 def _run_unbuffered(
@@ -551,19 +558,26 @@ def _run_unbuffered(
     errors: dict[Any, BaseException],
     real_console: Any,
 ) -> None:
-    """Execute components under a Status spinner (no output buffering)."""
+    """Execute components under a Progress bar (no output buffering)."""
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+
     from shell_configs.cli.context import ComponentPlan
     from shell_configs.display import print_warning
 
-    with real_console.status(f"Running {method}...") as status:
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=real_console,
+        transient=True,
+    ) as progress:
+        task_ids: dict[Any, Any] = {}
         for comp in components:
+            task_ids[comp] = progress.add_task(f"[cyan]{comp.label}[/cyan]", total=None)
             future = pool.submit(make_task(comp))
             futures[future] = comp
 
-        completed = 0
         for future in as_completed(futures):
             comp = futures[future]
-            completed += 1
             exc = future.exception()
             if exc is not None:
                 if method == "plan":
@@ -571,6 +585,15 @@ def _run_unbuffered(
                     results[comp] = ComponentPlan(has_changes=False)
                 else:
                     errors[comp] = exc
+                progress.update(
+                    task_ids[comp],
+                    description=f"[red]{comp.label} (failed)[/red]",
+                    completed=True,
+                )
             else:
                 results[comp] = future.result()
-            status.update(f"Running {method}... ({completed}/{len(components)} done)")
+                progress.update(
+                    task_ids[comp],
+                    description=f"[green]{comp.label}[/green]",
+                    completed=True,
+                )
