@@ -49,7 +49,7 @@ class ExtensionsComponent(Component):
     def display_plan(self, plan: ComponentPlan) -> None:
         if not isinstance(plan, ExtensionsPlan):
             raise TypeError(f"expected ExtensionsPlan, got {type(plan).__name__}")
-        from shell_configs.display import console
+        from shell_configs.display import console, print_error
 
         found_diffs = False
         for shell_name, diff in plan.per_shell.items():
@@ -71,7 +71,7 @@ class ExtensionsComponent(Component):
             if diff.missing:
                 console.print(f"    [yellow]Missing ({len(diff.missing)}):[/yellow]")
                 for ext_id in sorted(diff.missing):
-                    console.print(f"      [red]✗[/red] {ext_id}")
+                    print_error(ext_id, indent=6)
 
             if diff.extra:
                 console.print(f"    [dim]Unmanaged ({len(diff.extra)}):[/dim]")
@@ -193,12 +193,13 @@ class ExtensionsComponent(Component):
                     parts.append(f"{len(ext_diff.missing)} missing")
                 if ext_diff.extra:
                     parts.append(f"{len(ext_diff.extra)} unmanaged")
-                console.print(
-                    f"  [yellow]⚠[/yellow] {shell.display_name}: "
-                    f"{len(ext_diff.matched)}/{len(ext_desired)} synced ({', '.join(parts)})"
-                )
-                from shell_configs.display import print_hint
+                from shell_configs.display import print_hint, print_warning
 
+                print_warning(
+                    f"{shell.display_name}: "
+                    f"{len(ext_diff.matched)}/{len(ext_desired)} synced ({', '.join(parts)})",
+                    indent=2,
+                )
                 print_hint("Run 'shell-configs extensions diff' for details")
 
         console.print()

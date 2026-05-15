@@ -29,7 +29,13 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         perform_github_update,
     )
     from shell_configs.bootstrap.installer import make_github_install_url
-    from shell_configs.display import console, print_error, print_hint, print_warning
+    from shell_configs.display import (
+        console,
+        print_error,
+        print_hint,
+        print_info,
+        print_warning,
+    )
 
     tools = [t for t in UPDATABLE_TOOLS if t.is_installed()]
 
@@ -97,7 +103,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         else:
             prompt = f"\nInstall {len(tool_updates)} updates?"
         if not click.confirm(prompt, default=True):
-            print_warning("Cancelled")
+            print_info("Cancelled")
             return
 
     upgraded_tools = []

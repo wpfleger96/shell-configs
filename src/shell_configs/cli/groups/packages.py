@@ -21,7 +21,12 @@ def packages() -> None:
 @click.option("--profile", "profile_name", default=None, help="Profile to use")
 def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None:
     """Install required system packages."""
-    from shell_configs.display import console, print_error, print_hint, print_info
+    from shell_configs.display import (
+        console,
+        print_error,
+        print_hint,
+        print_info,
+    )
     from shell_configs.packages import (
         get_package_manager,
         load_packages_for_profile,
@@ -102,7 +107,7 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
             else:
                 console.print(f"[green]✓[/green] {pkg.name}")
         else:
-            console.print(f"[red]✗[/red] {pkg.name}: {message}")
+            print_error(f"{pkg.name}: {message}")
 
         if not dry_run and i < total:
             console.print()
@@ -119,7 +124,12 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
 @click.option("--profile", "profile_name", default=None, help="Profile to use")
 def packages_status(profile_name: str | None) -> None:
     """Show status of required packages."""
-    from shell_configs.display import console, print_error, print_hint, print_info
+    from shell_configs.display import (
+        console,
+        print_error,
+        print_hint,
+        print_info,
+    )
     from shell_configs.packages import get_package_manager, load_packages_for_profile
     from shell_configs.platform import detect_platform
     from shell_configs.profiles import ProfileLoader, resolve_active_profile
@@ -166,7 +176,7 @@ def packages_status(profile_name: str | None) -> None:
     if missing:
         console.print(f"\n[yellow]Missing ({len(missing)}):[/yellow]")
         for pkg in missing:
-            console.print(f"  [yellow]✗[/yellow] {pkg.name}")
+            print_error(pkg.name, indent=2)
         print_hint("Run 'shell-configs packages install' to install missing packages")
     else:
         console.print("\n[green]✓[/green] All required packages are installed")
@@ -178,7 +188,13 @@ def packages_status(profile_name: str | None) -> None:
 @click.option("--profile", "profile_name", default=None, help="Profile to use")
 def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> None:
     """Uninstall managed system packages."""
-    from shell_configs.display import console, print_error, print_hint, print_info
+    from shell_configs.display import (
+        console,
+        print_error,
+        print_hint,
+        print_info,
+        print_warning,
+    )
     from shell_configs.packages import (
         get_package_manager,
         load_packages_for_profile,
@@ -270,7 +286,7 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
                 console.print(f"[green]✓[/green] {pkg.name}")
                 success_count += 1
         else:
-            console.print(f"[red]✗[/red] {pkg.name}: {message}")
+            print_error(f"{pkg.name}: {message}")
             fail_count += 1
 
         if not dry_run and i < total:
@@ -280,9 +296,8 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
         print_hint("Use without --dry-run to uninstall.")
     else:
         if fail_count > 0:
-            console.print(
-                f"\n[yellow]⚠[/yellow] {success_count} uninstalled, {fail_count} failed"
-            )
+            console.print()
+            print_warning(f"{success_count} uninstalled, {fail_count} failed")
         else:
             console.print(
                 f"\n[green]✓[/green] Package uninstall complete ({success_count} packages)"

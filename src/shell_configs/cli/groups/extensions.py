@@ -43,7 +43,9 @@ def extensions_status(shells: list[str] | None, profile_name: str | None) -> Non
 
     ide_shells = _get_extension_shells(registry, shells)
     if not ide_shells:
-        console.print("[yellow]No IDEs with extension management found[/yellow]")
+        from shell_configs.display import print_warning
+
+        print_warning("No IDEs with extension management found")
         return
 
     table = Table(show_header=True, header_style="bold")
@@ -104,7 +106,7 @@ def extensions_status(shells: list[str] | None, profile_name: str | None) -> Non
 @click.option("--profile", "profile_name", default=None, help="Profile to use")
 def extensions_diff(shells: list[str] | None, profile_name: str | None) -> None:
     """Show differences between desired and installed extensions."""
-    from shell_configs.display import console, print_info
+    from shell_configs.display import console, print_error, print_info, print_warning
     from shell_configs.extensions import ExtensionManager
     from shell_configs.profiles import ProfileLoader, resolve_active_profile
     from shell_configs.shells.registry import ShellRegistry
@@ -117,7 +119,7 @@ def extensions_diff(shells: list[str] | None, profile_name: str | None) -> None:
 
     ide_shells = _get_extension_shells(registry, shells)
     if not ide_shells:
-        console.print("[yellow]No IDEs with extension management found[/yellow]")
+        print_warning("No IDEs with extension management found")
         return
 
     found_diffs = False
@@ -151,7 +153,7 @@ def extensions_diff(shells: list[str] | None, profile_name: str | None) -> None:
         if diff.missing:
             console.print(f"  [yellow]Missing ({len(diff.missing)}):[/yellow]")
             for ext_id in sorted(diff.missing):
-                console.print(f"    [yellow]✗[/yellow] {ext_id}")
+                print_error(ext_id, indent=4)
 
         if diff.extra:
             console.print(f"  [dim]Extra ({len(diff.extra)}):[/dim]")
@@ -184,7 +186,7 @@ def extensions_install(
     profile_name: str | None,
 ) -> None:
     """Install (and optionally prune) extensions for each IDE."""
-    from shell_configs.display import console, print_hint, print_info
+    from shell_configs.display import console, print_hint, print_info, print_warning
     from shell_configs.extensions import ExtensionManager
     from shell_configs.profiles import ProfileLoader, resolve_active_profile
     from shell_configs.shells.registry import ShellRegistry
@@ -197,7 +199,7 @@ def extensions_install(
 
     ide_shells = _get_extension_shells(registry, shells)
     if not ide_shells:
-        console.print("[yellow]No IDEs with extension management found[/yellow]")
+        print_warning("No IDEs with extension management found")
         return
 
     any_activity = False
@@ -286,7 +288,7 @@ def extensions_list(shells: list[str] | None, profile_name: str | None) -> None:
     """List all extensions for each IDE with their install status."""
     from rich.table import Table
 
-    from shell_configs.display import console, print_info
+    from shell_configs.display import console, print_info, print_warning
     from shell_configs.extensions import ExtensionManager
     from shell_configs.profiles import ProfileLoader, resolve_active_profile
     from shell_configs.shells.registry import ShellRegistry
@@ -299,7 +301,7 @@ def extensions_list(shells: list[str] | None, profile_name: str | None) -> None:
 
     ide_shells = _get_extension_shells(registry, shells)
     if not ide_shells:
-        console.print("[yellow]No IDEs with extension management found[/yellow]")
+        print_warning("No IDEs with extension management found")
         return
 
     any_output = False
@@ -321,7 +323,7 @@ def extensions_list(shells: list[str] | None, profile_name: str | None) -> None:
         for ext_id in diff.matched:
             rows.append((ext_id, "[green]✓ installed[/green]"))
         for ext_id in diff.missing:
-            rows.append((ext_id, "[yellow]✗ missing[/yellow]"))
+            rows.append((ext_id, "[red]✗ missing[/red]"))
         for ext_id in diff.extra:
             rows.append((ext_id, "[dim]+ extra[/dim]"))
         for ext_id in diff.ignored:

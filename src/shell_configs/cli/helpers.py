@@ -161,7 +161,9 @@ def _print_extension_result(console: Any, result: ExtensionResult) -> None:
     elif result.success:
         console.print(f"  [green]✓[/green] {result.message}")
     else:
-        console.print(f"  [red]✗[/red] {result.extension_id}: {result.message}")
+        from shell_configs.display import print_error
+
+        print_error(f"{result.extension_id}: {result.message}", indent=2)
 
 
 def _compute_diffs_for_shells(

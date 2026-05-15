@@ -16,7 +16,7 @@ def scripts() -> None:
 @click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
 def scripts_install(dry_run: bool, yes: bool) -> None:
     """Install utility scripts to ~/.local/bin."""
-    from shell_configs.display import console, print_info, print_warning
+    from shell_configs.display import console, print_error, print_info, print_warning
     from shell_configs.script_manager import (
         InstallResult,
         ScriptManifest,
@@ -49,7 +49,7 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
     for entry in entries:
         result, message = install_script(entry, target_dir, manifest, dry_run=dry_run)
         if result == InstallResult.COLLISION:
-            console.print(f"[yellow]⚠[/yellow] {message}")
+            print_warning(message)
             collisions.append(entry.name)
         elif result == InstallResult.ALREADY_SYNCED:
             console.print(f"[dim]✓[/dim] {message}")
@@ -60,7 +60,7 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
         elif result == InstallResult.SKIPPED_PLATFORM:
             pass
         else:
-            console.print(f"[red]✗[/red] {message}")
+            print_error(message)
 
     if collisions:
         print_warning(
@@ -75,7 +75,7 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
 @click.option("--force", is_flag=True, help="Remove even user-modified scripts")
 def scripts_uninstall(dry_run: bool, yes: bool, force: bool) -> None:
     """Remove shell-configs-managed scripts from ~/.local/bin."""
-    from shell_configs.display import console, print_info
+    from shell_configs.display import console, print_error, print_info, print_warning
     from shell_configs.script_manager import (
         ScriptManifest,
         UninstallResult,
@@ -113,11 +113,11 @@ def scripts_uninstall(dry_run: bool, yes: bool, force: bool) -> None:
         elif result == UninstallResult.WOULD_REMOVE:
             console.print(f"[dim]→[/dim] {message}")
         elif result == UninstallResult.MODIFIED:
-            console.print(f"[yellow]⚠[/yellow] {message}")
+            print_warning(message)
         elif result == UninstallResult.NOT_FOUND:
             console.print(f"[dim]-[/dim] {message}")
         else:
-            console.print(f"[red]✗[/red] {message}")
+            print_error(message)
 
 
 @scripts.command(name="status")

@@ -55,7 +55,7 @@ class GhExtensionsComponent(Component):
         if not plan.has_changes:
             return
 
-        from shell_configs.display import console
+        from shell_configs.display import console, print_error
 
         console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
 
@@ -66,7 +66,7 @@ class GhExtensionsComponent(Component):
             return
 
         for ext in plan.missing:
-            console.print(f"  [red]✗[/red] {ext.repo} (not installed)")
+            print_error(f"{ext.repo} (not installed)", indent=2)
         for ext_name in sorted(plan.extra):
             console.print(f"  [dim]+[/dim] {ext_name} (not in manifest)")
 
@@ -76,7 +76,7 @@ class GhExtensionsComponent(Component):
         if not plan.missing:
             return True
 
-        from shell_configs.display import console
+        from shell_configs.display import console, print_error
         from shell_configs.gh_extensions import install_extension
 
         all_ok = True
@@ -89,7 +89,7 @@ class GhExtensionsComponent(Component):
             elif success:
                 console.print(f"[green]✓[/green] {msg}")
             else:
-                console.print(f"[red]✗[/red] {msg}")
+                print_error(msg)
                 all_ok = False
         return all_ok
 
@@ -108,7 +108,7 @@ class GhExtensionsComponent(Component):
         return self.apply(ctx, plan)
 
     def status(self, ctx: Context) -> None:
-        from shell_configs.display import console
+        from shell_configs.display import console, print_warning
 
         plan = self.plan(ctx)
 
@@ -122,9 +122,10 @@ class GhExtensionsComponent(Component):
                 parts.append(f"{len(plan.missing)} missing")
             if plan.extra:
                 parts.append(f"{len(plan.extra)} unmanaged")
-            console.print(
-                f"  [yellow]⚠[/yellow] {len(plan.desired) - len(plan.missing)}/{len(plan.desired)} extensions installed "
-                f"({', '.join(parts)})"
+            print_warning(
+                f"{len(plan.desired) - len(plan.missing)}/{len(plan.desired)} extensions installed "
+                f"({', '.join(parts)})",
+                indent=2,
             )
 
         console.print()

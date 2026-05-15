@@ -84,7 +84,7 @@ class ScriptsComponent(Component):
         return success
 
     def install(self, ctx: Context) -> bool:
-        from shell_configs.display import console
+        from shell_configs.display import console, print_error, print_warning
         from shell_configs.script_manager import (
             InstallResult,
             ScriptManifest,
@@ -107,7 +107,7 @@ class ScriptsComponent(Component):
                     entry, target_dir, manifest, dry_run=ctx.dry_run
                 )
                 if script_result == InstallResult.COLLISION:
-                    console.print(f"[yellow]⚠[/yellow] {msg}")
+                    print_warning(msg)
                 elif script_result in (InstallResult.INSTALLED, InstallResult.UPDATED):
                     console.print(f"[green]✓[/green] {msg}")
                 elif script_result == InstallResult.ALREADY_SYNCED:
@@ -120,7 +120,7 @@ class ScriptsComponent(Component):
                 elif script_result == InstallResult.SKIPPED_PLATFORM:
                     pass
                 else:
-                    console.print(f"[red]✗[/red] {msg}")
+                    print_error(msg)
 
         return True
 
@@ -140,12 +140,12 @@ class ScriptsComponent(Component):
                 f"  [green]✓[/green] {installed}/{total} scripts installed (~/.local/bin)"
             )
         else:
-            console.print(
-                f"  [yellow]⚠[/yellow] {installed}/{total} scripts installed "
-                f"({total - installed} missing)"
-            )
-            from shell_configs.display import print_hint
+            from shell_configs.display import print_hint, print_warning
 
+            print_warning(
+                f"{installed}/{total} scripts installed ({total - installed} missing)",
+                indent=2,
+            )
             print_hint("Run 'shell-configs scripts status' for details")
 
         console.print()

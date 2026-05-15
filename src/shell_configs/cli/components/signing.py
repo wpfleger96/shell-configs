@@ -27,7 +27,7 @@ class SigningComponent(Component):
         if not plan.has_changes:
             return
 
-        from shell_configs.display import console
+        from shell_configs.display import console, print_warning
 
         console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
 
@@ -38,7 +38,7 @@ class SigningComponent(Component):
             return
 
         for r in plan.failed:
-            console.print(f"  [yellow]⚠[/yellow] {r.message}")
+            print_warning(r.message, indent=2)
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
         if not isinstance(plan, SigningPlan):
@@ -57,7 +57,7 @@ class SigningComponent(Component):
 
         import click
 
-        from shell_configs.display import console
+        from shell_configs.display import console, print_error, print_warning
         from shell_configs.signing import setup_signing
 
         console.print()
@@ -69,16 +69,16 @@ class SigningComponent(Component):
         signing_results = setup_signing(auto_fix=auto_fix, interactive=False)
         for r in signing_results:
             if r.skipped:
-                console.print(f"[yellow]⚠[/yellow] {r.message}")
+                print_warning(r.message)
             elif r.success:
                 console.print(f"[green]✓[/green] {r.message}")
             else:
-                console.print(f"[red]✗[/red] {r.message}")
+                print_error(r.message)
 
         return True
 
     def status(self, ctx: Context) -> None:
-        from shell_configs.display import console
+        from shell_configs.display import console, print_warning
         from shell_configs.signing import setup_signing
 
         signing_results = setup_signing(auto_fix=False, interactive=False)
@@ -86,7 +86,7 @@ class SigningComponent(Component):
             if r.success:
                 console.print(f"  [green]✓[/green] {r.message}")
             else:
-                console.print(f"  [yellow]⚠[/yellow] {r.message}")
+                print_warning(r.message, indent=2)
 
         console.print()
 

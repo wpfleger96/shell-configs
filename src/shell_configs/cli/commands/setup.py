@@ -53,7 +53,7 @@ def setup(
         get_supported_shells,
         install_completion,
     )
-    from shell_configs.display import console, print_error, print_warning
+    from shell_configs.display import console, print_error, print_info, print_warning
 
     if not skip_packages:
         console.print("\n[bold cyan]Step 1/5: Install required packages[/bold cyan]")
@@ -113,7 +113,7 @@ def setup(
     if not tool_install_success:
         if not yes and not dry_run:
             if not click.confirm("Install shell-configs permanently?", default=True):
-                print_warning("Setup cancelled")
+                print_info("Setup cancelled")
                 sys.exit(0)
 
         success, message = install_tool(force=yes, dry_run=dry_run)
@@ -134,9 +134,8 @@ def setup(
         local_bin = os.path.expanduser("~/.local/bin")
         path_dirs = os.environ.get("PATH", "").split(os.pathsep)
         if local_bin not in path_dirs:
-            console.print(
-                f"\n[yellow]⚠[/yellow] {local_bin} is not in your PATH. "
-                "Add it to use shell-configs from anywhere:"
+            print_warning(
+                f"{local_bin} is not in your PATH. Add it to use shell-configs from anywhere:"
             )
             console.print('  export PATH="$HOME/.local/bin:$PATH"\n')
 
@@ -162,9 +161,7 @@ def setup(
         shell = detect_shell()
         if shell is None:
             supported = ", ".join(get_supported_shells())
-            console.print(
-                f"[yellow]⚠[/yellow] Could not detect shell. Supported: {supported}"
-            )
+            print_warning(f"Could not detect shell. Supported: {supported}")
             console.print("[dim]Skipping completion installation[/dim]")
         else:
             if not yes and not dry_run:
@@ -175,13 +172,13 @@ def setup(
                     if success:
                         console.print(f"[green]✓[/green] {message}")
                     else:
-                        console.print(f"[yellow]⚠[/yellow] {message}")
+                        print_warning(message)
             else:
                 success, message = install_completion(shell, dry_run=dry_run)
                 if success:
                     console.print(f"[green]✓[/green] {message}")
                 else:
-                    console.print(f"[yellow]⚠[/yellow] {message}")
+                    print_warning(message)
 
     if not skip_scripts:
         console.print("\n[bold cyan]Step 5/5: Install utility scripts[/bold cyan]")
@@ -212,7 +209,7 @@ def setup(
                 elif result == InstallResult.ALREADY_SYNCED:
                     console.print(f"[dim]✓[/dim] {message}")
                 elif result == InstallResult.COLLISION:
-                    console.print(f"[yellow]⚠[/yellow] {message}")
+                    print_warning(message)
                 elif result in (
                     InstallResult.WOULD_INSTALL,
                     InstallResult.WOULD_UPDATE,

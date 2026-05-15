@@ -132,7 +132,9 @@ def completions_status() -> None:
     if detected_shell:
         console.print(f"Detected shell: [cyan]{detected_shell}[/cyan]\n")
     else:
-        console.print("[yellow]No supported shell detected[/yellow]\n")
+        from shell_configs.display import print_warning
+
+        print_warning("No supported shell detected")
 
     table = Table(show_header=True, header_style="bold")
     table.add_column("Shell")

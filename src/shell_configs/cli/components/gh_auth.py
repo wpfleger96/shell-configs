@@ -39,7 +39,7 @@ class GhAuthComponent(Component):
         if not plan.has_changes:
             return
 
-        from shell_configs.display import console
+        from shell_configs.display import console, print_warning
 
         console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
 
@@ -50,10 +50,10 @@ class GhAuthComponent(Component):
             return
 
         if not plan.auth_ok:
-            console.print("  [yellow]⚠[/yellow] GitHub CLI is not authenticated")
+            print_warning("GitHub CLI is not authenticated", indent=2)
 
         for scope in plan.missing_scopes:
-            console.print(f"  [yellow]⚠[/yellow] {scope} (missing)")
+            print_warning(f"{scope} (missing)", indent=2)
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
         if not isinstance(plan, GhAuthPlan):
@@ -61,7 +61,7 @@ class GhAuthComponent(Component):
         if not plan.has_changes:
             return True
 
-        from shell_configs.display import console
+        from shell_configs.display import console, print_error
         from shell_configs.signing import ensure_gh_auth, ensure_gh_scopes
 
         console.print()
@@ -73,7 +73,7 @@ class GhAuthComponent(Component):
         if auth_ok:
             console.print(f"[green]✓[/green] {auth_msg}")
         else:
-            console.print(f"[red]✗[/red] {auth_msg}")
+            print_error(auth_msg)
             return False
 
         if plan.missing_scopes:
@@ -83,13 +83,13 @@ class GhAuthComponent(Component):
             if scopes_ok:
                 console.print(f"[green]✓[/green] {scopes_msg}")
             else:
-                console.print(f"[red]✗[/red] {scopes_msg}")
+                print_error(scopes_msg)
                 return False
 
         return True
 
     def status(self, ctx: Context) -> None:
-        from shell_configs.display import console
+        from shell_configs.display import console, print_warning
         from shell_configs.gh_auth import load_desired_scopes
         from shell_configs.signing import ensure_gh_auth, ensure_gh_scopes
 
@@ -97,7 +97,7 @@ class GhAuthComponent(Component):
         if auth_ok:
             console.print(f"  [green]✓[/green] {auth_msg}")
         else:
-            console.print(f"  [yellow]⚠[/yellow] {auth_msg}")
+            print_warning(auth_msg, indent=2)
 
         if auth_ok:
             desired = load_desired_scopes()
@@ -105,6 +105,6 @@ class GhAuthComponent(Component):
             if scopes_ok:
                 console.print(f"  [green]✓[/green] {scopes_msg}")
             else:
-                console.print(f"  [yellow]⚠[/yellow] {scopes_msg}")
+                print_warning(scopes_msg, indent=2)
 
         console.print()
