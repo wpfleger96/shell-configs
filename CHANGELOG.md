@@ -2,6 +2,33 @@
 
 <!-- version list -->
 
+## v0.38.0 (2026-05-15)
+
+### Bug Fixes
+
+- Add missing lint-check/format-check Justfile recipes for CI
+  ([`f2c35d1`](https://github.com/wpfleger96/shell-configs/commit/f2c35d1940727399576857d5f2201a9a9d6c5773))
+
+### Chores
+
+- Remove Dependabot config (migrated to Renovate)
+  ([#31](https://github.com/wpfleger96/shell-configs/pull/31),
+  [`3cf9b99`](https://github.com/wpfleger96/shell-configs/commit/3cf9b99a4bab19a061fdd9491b8012970bdbe7a4))
+
+### Continuous Integration
+
+- Sync shared files
+  ([`8d502db`](https://github.com/wpfleger96/shell-configs/commit/8d502db1bb73ce351bb7b6499a0711a7d7bef163))
+
+- Sync shared files
+  ([`3cff678`](https://github.com/wpfleger96/shell-configs/commit/3cff67836c6cba248e8b79c9aa89dbabe07f81e7))
+
+### Features
+
+- Add Cursor Local (Windows-side) extension management on WSL
+  ([`4b4eb72`](https://github.com/wpfleger96/shell-configs/commit/4b4eb72d9276a2a4415665b24a3732696866adc9))
+
+
 ## v0.37.1 (2026-05-14)
 
 ### Bug Fixes
