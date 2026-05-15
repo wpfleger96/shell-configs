@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.38.2 (2026-05-15)
+
+### Bug Fixes
+
+- Add go to STUB_COMMANDS in test conftest
+  ([#32](https://github.com/wpfleger96/shell-configs/pull/32),
+  [`9dbda96`](https://github.com/wpfleger96/shell-configs/commit/9dbda96d735b17dfc474e0283a7d72aa62c8b7a0))
+
+- Move pylance to vscode-only config and fix gh-infra fork installation
+  ([#32](https://github.com/wpfleger96/shell-configs/pull/32),
+  [`9dbda96`](https://github.com/wpfleger96/shell-configs/commit/9dbda96d735b17dfc474e0283a7d72aa62c8b7a0))
+
+
 ## v0.38.1 (2026-05-15)
 
 ### Bug Fixes
