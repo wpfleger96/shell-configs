@@ -32,6 +32,9 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@v4
 
+      - name: Install shfmt
+        uses: mfinelli/setup-shfmt@v4
+
       - name: Install dependencies
         run: just sync
 

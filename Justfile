@@ -34,8 +34,12 @@ format-python:
 format-shell:
     shfmt -f . | grep -v git-prompt.sh | grep -v iterm2-shell-integration | grep -v 'src/shell_configs/scripts/' | xargs shfmt -w
 
-# Composite quality checks
-check: sync type-check lint-python-check lint-shell-check format-python-check format-shell-check
+# Composite quality checks (lint-check/format-check used by CI workflow)
+lint-check: lint-python-check lint-shell-check
+
+format-check: format-python-check format-shell-check
+
+check: sync type-check lint-check format-check
     @echo "Quick quality checks passed"
 
 check-all: check test
