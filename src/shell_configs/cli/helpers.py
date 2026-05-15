@@ -393,7 +393,8 @@ def _render_diffs(diffs: list[FileDiff], console_obj: Any = None) -> None:
         console_obj.print(syntax)
 
 
-_BUFFERED_METHODS: frozenset[str] = frozenset({"apply", "uninstall"})
+# Methods that produce console output; must be listed here for per-thread buffering
+_BUFFERED_METHODS: frozenset[str] = frozenset({"apply", "uninstall", "status"})
 
 
 def run_components_parallel(
@@ -405,13 +406,18 @@ def run_components_parallel(
 ) -> dict[Any, Any]:
     """Run a component method across all components in parallel.
 
-    For ``apply`` and ``uninstall``, each component's console output is captured
-    into a per-thread buffer and replayed atomically in completion order so that
-    output from different components never interleaves.  A Rich Progress bar
-    tracks each component live.
+    Both paths use a Rich Progress bar with one spinner row per component that
+    turns green or red on completion.
+
+    For methods in ``_BUFFERED_METHODS`` (``apply``, ``uninstall``, ``status``),
+    each component's console output is captured into a per-thread buffer and
+    replayed atomically in original component order so that output from
+    different components never interleaves.  The orchestrator prints a
+    ``[bold cyan]{comp.display_name}`` header before each component's output.
 
     For ``plan`` (and any other method), no buffering is applied — the method is
-    expected to return data without printing.  A Status spinner shows progress.
+    expected to return data without printing, and output goes directly to the
+    console as it arrives.
 
     Errors are collected rather than aborting on the first failure.  After all
     futures settle, per-component errors are printed and partial results are
@@ -443,12 +449,17 @@ def run_components_parallel(
                 highlight=False,
             )
 
-    def _make_task(comp: Any, override: Console | None = None) -> Any:
+    def _make_task(
+        comp: Any,
+        override: Console | None = None,
+        plan: Any | None = None,
+    ) -> Any:
         def _run() -> Any:
             if override is not None:
                 _console_override.set(override)
-            if method == "apply":
-                plan = (plans or {})[comp]
+            else:
+                _console_override.set(None)
+            if plan is not None:
                 return getattr(comp, method)(ctx, plan)
             return getattr(comp, method)(ctx)
 
@@ -462,6 +473,7 @@ def run_components_parallel(
                 _make_task,
                 buffered_consoles,
                 buffers,
+                plans,
                 futures,
                 results,
                 errors,
@@ -490,30 +502,36 @@ def run_components_parallel(
     return results
 
 
+def _make_progress(real_console: Any) -> Any:
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+
+    return Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=real_console,
+        transient=True,
+    )
+
+
 def _run_buffered(
     pool: Any,
     components: list[Any],
     make_task: Any,
     buffered_consoles: dict[Any, Any],
     buffers: dict[Any, StringIO],
+    plans: dict[Any, Any] | None,
     futures: dict[Future[Any], Any],
     results: dict[Any, Any],
     errors: dict[Any, BaseException],
     real_console: Any,
 ) -> None:
     """Execute components with per-thread output buffering and a Progress bar."""
-    from rich.progress import Progress, SpinnerColumn, TextColumn
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=real_console,
-        transient=True,
-    ) as progress:
+    with _make_progress(real_console) as progress:
         task_ids: dict[Any, Any] = {}
         for comp in components:
             task_ids[comp] = progress.add_task(f"[cyan]{comp.label}[/cyan]", total=None)
-            future = pool.submit(make_task(comp, buffered_consoles[comp]))
+            plan = (plans or {}).get(comp)
+            future = pool.submit(make_task(comp, buffered_consoles[comp], plan))
             futures[future] = comp
 
         for future in as_completed(futures):
@@ -534,11 +552,19 @@ def _run_buffered(
                     completed=True,
                 )
 
-            buf_content = buffers[comp].getvalue()
-            if buf_content.strip():
-                real_console.print(f"\n[bold cyan]{comp.label}[/bold cyan]")
-                real_console.file.write(buf_content)
+    first = True
+    for comp in components:
+        buf_content = buffers[comp].getvalue()
+        if buf_content.strip():
+            if not first:
+                real_console.print()
+            real_console.print(f"[bold cyan]{comp.display_name}[/bold cyan]")
+            first = False
+            try:
+                real_console.file.write(buf_content.rstrip("\n") + "\n")
                 real_console.file.flush()
+            except OSError:
+                pass
 
 
 def _run_unbuffered(
@@ -551,19 +577,19 @@ def _run_unbuffered(
     errors: dict[Any, BaseException],
     real_console: Any,
 ) -> None:
-    """Execute components under a Status spinner (no output buffering)."""
+    """Execute components under a Progress bar (no output buffering)."""
     from shell_configs.cli.context import ComponentPlan
     from shell_configs.display import print_warning
 
-    with real_console.status(f"Running {method}...") as status:
+    with _make_progress(real_console) as progress:
+        task_ids: dict[Any, Any] = {}
         for comp in components:
+            task_ids[comp] = progress.add_task(f"[cyan]{comp.label}[/cyan]", total=None)
             future = pool.submit(make_task(comp))
             futures[future] = comp
 
-        completed = 0
         for future in as_completed(futures):
             comp = futures[future]
-            completed += 1
             exc = future.exception()
             if exc is not None:
                 if method == "plan":
@@ -571,6 +597,15 @@ def _run_unbuffered(
                     results[comp] = ComponentPlan(has_changes=False)
                 else:
                     errors[comp] = exc
+                progress.update(
+                    task_ids[comp],
+                    description=f"[red]{comp.label} (failed)[/red]",
+                    completed=True,
+                )
             else:
                 results[comp] = future.result()
-            status.update(f"Running {method}... ({completed}/{len(components)} done)")
+                progress.update(
+                    task_ids[comp],
+                    description=f"[green]{comp.label}[/green]",
+                    completed=True,
+                )

@@ -37,8 +37,6 @@ def setup(
 
     Run this after installing with uvx: uvx shell-configs setup
     """
-    from rich.prompt import Confirm
-
     from shell_configs.bootstrap.installer import (
         get_tool_config_dir,
         get_tool_scripts_dir,
@@ -55,7 +53,7 @@ def setup(
         get_supported_shells,
         install_completion,
     )
-    from shell_configs.display import console
+    from shell_configs.display import console, print_error, print_warning
 
     if not skip_packages:
         console.print("\n[bold cyan]Step 1/5: Install required packages[/bold cyan]")
@@ -86,11 +84,11 @@ def setup(
                     )
                     tool_install_success = True
                 else:
-                    if not yes and not Confirm.ask(
+                    if not yes and not click.confirm(
                         f"Upgrade shell-configs {update_info.current_version} → {update_info.latest_version}?",
                         default=True,
                     ):
-                        console.print("[yellow]Skipped shell-configs upgrade[/yellow]")
+                        print_warning("Skipped shell-configs upgrade")
                         tool_install_success = True
                     else:
                         success, msg, _ = perform_github_update(
@@ -102,9 +100,7 @@ def setup(
                             )
                             tool_install_success = True
                         else:
-                            console.print(
-                                f"[red]Error:[/red] Failed to upgrade shell-configs: {msg}"
-                            )
+                            print_error(f"Failed to upgrade shell-configs: {msg}")
             else:
                 console.print("[green]✓[/green] shell-configs is already up to date")
                 tool_install_success = True
@@ -116,14 +112,14 @@ def setup(
 
     if not tool_install_success:
         if not yes and not dry_run:
-            if not Confirm.ask("Install shell-configs permanently?", default=True):
-                console.print("[yellow]Setup cancelled[/yellow]")
+            if not click.confirm("Install shell-configs permanently?", default=True):
+                print_warning("Setup cancelled")
                 sys.exit(0)
 
         success, message = install_tool(force=yes, dry_run=dry_run)
 
         if not success:
-            console.print(f"[red]Error:[/red] {message}")
+            print_error(message)
             sys.exit(1)
 
         console.print(f"[green]✓[/green] {message}")
@@ -172,7 +168,7 @@ def setup(
             console.print("[dim]Skipping completion installation[/dim]")
         else:
             if not yes and not dry_run:
-                if not Confirm.ask(f"Install {shell} tab completion?", default=True):
+                if not click.confirm(f"Install {shell} tab completion?", default=True):
                     console.print("[dim]Skipping completion installation[/dim]")
                 else:
                     success, message = install_completion(shell, dry_run=dry_run)

@@ -7,6 +7,7 @@ from shell_configs.cli.context import Component, ComponentPlan, Context, Signing
 
 class SigningComponent(Component):
     label = "signing"
+    display_name = "SSH Key Lifecycle"
 
     def plan(self, ctx: Context) -> SigningPlan:
         from shell_configs.bootstrap import is_command_available
@@ -28,7 +29,7 @@ class SigningComponent(Component):
 
         from shell_configs.display import console
 
-        console.print("\n[bold cyan]SSH Key Lifecycle[/bold cyan]\n")
+        console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
 
         if not plan.gh_available:
             console.print(
@@ -54,7 +55,7 @@ class SigningComponent(Component):
         if ctx.dry_run:
             return True
 
-        from rich.prompt import Confirm
+        import click
 
         from shell_configs.display import console
         from shell_configs.signing import setup_signing
@@ -62,7 +63,7 @@ class SigningComponent(Component):
         console.print()
         console.print("[yellow]Validating SSH key lifecycle...[/yellow]")
 
-        auto_fix = ctx.yes or Confirm.ask(
+        auto_fix = ctx.yes or click.confirm(
             "Set up SSH key lifecycle (generate, auth, sign)?", default=True
         )
         signing_results = setup_signing(auto_fix=auto_fix, interactive=False)
@@ -79,8 +80,6 @@ class SigningComponent(Component):
     def status(self, ctx: Context) -> None:
         from shell_configs.display import console
         from shell_configs.signing import setup_signing
-
-        console.print("[bold cyan]SSH Key Lifecycle[/bold cyan]\n")
 
         signing_results = setup_signing(auto_fix=False, interactive=False)
         for r in signing_results:

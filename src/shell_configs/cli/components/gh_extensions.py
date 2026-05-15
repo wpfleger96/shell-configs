@@ -12,6 +12,7 @@ from shell_configs.cli.context import (
 
 class GhExtensionsComponent(Component):
     label = "gh-extensions"
+    display_name = "gh CLI Extensions"
 
     def plan(self, ctx: Context) -> GhExtensionsPlan:
         from shell_configs.bootstrap import is_command_available
@@ -56,7 +57,7 @@ class GhExtensionsComponent(Component):
 
         from shell_configs.display import console
 
-        console.print("\n[bold cyan]gh CLI Extensions[/bold cyan]\n")
+        console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
 
         if not plan.gh_available:
             console.print(
@@ -65,7 +66,7 @@ class GhExtensionsComponent(Component):
             return
 
         for ext in plan.missing:
-            console.print(f"  [yellow]✗[/yellow] {ext.repo} (not installed)")
+            console.print(f"  [red]✗[/red] {ext.repo} (not installed)")
         for ext_name in sorted(plan.extra):
             console.print(f"  [dim]+[/dim] {ext_name} (not in manifest)")
 
@@ -108,8 +109,6 @@ class GhExtensionsComponent(Component):
 
     def status(self, ctx: Context) -> None:
         from shell_configs.display import console
-
-        console.print("[bold cyan]gh CLI Extensions[/bold cyan]\n")
 
         plan = self.plan(ctx)
 

@@ -23,20 +23,18 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         shell-configs upgrade --check     # Only check for updates
         shell-configs upgrade -y          # Auto-confirm installation
     """
-    from rich.prompt import Confirm
-
     from shell_configs.bootstrap import (
         UPDATABLE_TOOLS,
         check_tool_updates,
         perform_github_update,
     )
     from shell_configs.bootstrap.installer import make_github_install_url
-    from shell_configs.display import console
+    from shell_configs.display import console, print_error, print_warning
 
     tools = [t for t in UPDATABLE_TOOLS if t.is_installed()]
 
     if not tools:
-        console.print("[yellow]⚠[/yellow] No tools are installed")
+        print_warning("No tools are installed")
         sys.exit(1)
 
     tool_updates = []
@@ -48,18 +46,14 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
                     f"[dim]{tool.display_name} current version: {current}[/dim]"
                 )
         except Exception as e:
-            console.print(
-                f"[red]Error:[/red] Could not get {tool.display_name} version: {e}"
-            )
+            print_error(f"Could not get {tool.display_name} version: {e}")
             continue
 
         with console.status(f"Checking {tool.display_name} for updates..."):
             try:
                 update_info = check_tool_updates(tool)
             except Exception as e:
-                console.print(
-                    f"[red]Error:[/red] Failed to check {tool.display_name} updates: {e}"
-                )
+                print_error(f"Failed to check {tool.display_name} updates: {e}")
                 continue
 
         if update_info and (update_info.has_update or force):
@@ -102,8 +96,8 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
             prompt = f"\nInstall {tool_updates[0][0].display_name} update?"
         else:
             prompt = f"\nInstall {len(tool_updates)} updates?"
-        if not Confirm.ask(prompt, default=True):
-            console.print("[yellow]Cancelled.[/yellow]")
+        if not click.confirm(prompt, default=True):
+            print_warning("Cancelled")
             return
 
     upgraded_tools = []
@@ -114,9 +108,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
                     make_github_install_url(tool.github_repo)
                 )
             except Exception as e:
-                console.print(
-                    f"\n[red]Error:[/red] {tool.display_name} upgrade failed: {e}"
-                )
+                print_error(f"{tool.display_name} upgrade failed: {e}")
                 continue
 
         if success:
@@ -130,9 +122,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
                     f"[green]✓[/green] {tool.display_name} is already up to date"
                 )
         else:
-            console.print(
-                f"[red]Error:[/red] {tool.display_name} upgrade failed: {msg}"
-            )
+            print_error(f"{tool.display_name} upgrade failed: {msg}")
 
     if upgraded_tools:
         console.print()

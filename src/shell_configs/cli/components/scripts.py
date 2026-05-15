@@ -7,6 +7,7 @@ from shell_configs.cli.context import Component, ComponentPlan, Context, Scripts
 
 class ScriptsComponent(Component):
     label = "scripts"
+    display_name = "Scripts"
 
     def plan(self, ctx: Context) -> ScriptsPlan:
         from shell_configs.script_manager import (
@@ -44,7 +45,7 @@ class ScriptsComponent(Component):
             ScriptStatus.COLLISION: "[yellow]exists (not ours)[/yellow]",
         }
 
-        console.print("\n[bold cyan]Scripts[/bold cyan]\n")
+        console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
         for entry, st in plan.entries:
             if st != ScriptStatus.INSTALLED:
                 label = status_labels.get(st, st.value)
@@ -130,8 +131,6 @@ class ScriptsComponent(Component):
         from shell_configs.script_manager import ScriptStatus
 
         plan = self.plan(ctx)
-
-        console.print("[bold cyan]Scripts[/bold cyan]\n")
 
         total = len(plan.entries)
         installed = sum(1 for _, st in plan.entries if st == ScriptStatus.INSTALLED)

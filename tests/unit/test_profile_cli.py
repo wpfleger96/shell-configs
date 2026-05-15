@@ -137,7 +137,7 @@ class TestProfileSwitch:
         runner = CliRunner()
         result = runner.invoke(cli, ["profile", "switch", "nonexistent"])
         assert result.exit_code == 0
-        assert "Error" in result.output
+        assert "not found" in result.output
 
     def test_switch_prints_install_reminder(
         self, profile_config_dir, mock_home, monkeypatch

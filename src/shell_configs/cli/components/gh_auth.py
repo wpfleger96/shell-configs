@@ -9,6 +9,7 @@ from shell_configs.cli.context import Component, ComponentPlan, Context, GhAuthP
 
 class GhAuthComponent(Component):
     label = "gh-auth"
+    display_name = "GitHub CLI Auth"
 
     def plan(self, ctx: Context) -> GhAuthPlan:
         from shell_configs.bootstrap import is_command_available
@@ -40,7 +41,7 @@ class GhAuthComponent(Component):
 
         from shell_configs.display import console
 
-        console.print("\n[bold cyan]GitHub CLI Auth[/bold cyan]\n")
+        console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
 
         if not plan.gh_available:
             console.print(
@@ -91,8 +92,6 @@ class GhAuthComponent(Component):
         from shell_configs.display import console
         from shell_configs.gh_auth import load_desired_scopes
         from shell_configs.signing import ensure_gh_auth, ensure_gh_scopes
-
-        console.print("[bold cyan]GitHub CLI Auth[/bold cyan]\n")
 
         auth_ok, auth_msg = ensure_gh_auth(interactive=False)
         if auth_ok:

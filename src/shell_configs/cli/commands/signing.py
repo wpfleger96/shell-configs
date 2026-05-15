@@ -22,15 +22,13 @@ import click
 )
 def signing(fix: bool, verbose: bool, yes: bool, cleanup: bool) -> None:
     """Validate and manage SSH key lifecycle with GitHub."""
-    from shell_configs.display import console
+    from shell_configs.display import console, print_error, print_warning
     from shell_configs.signing import (
         get_signing_key_info,
         setup_signing,
     )
 
     if cleanup:
-        from rich.prompt import Confirm
-
         from shell_configs.signing import (
             delete_github_key_by_fingerprint,
             discover_managed_key,
@@ -43,15 +41,15 @@ def signing(fix: bool, verbose: bool, yes: bool, cleanup: bool) -> None:
         github_fps = get_github_key_fingerprints()
         managed_key = discover_managed_key(local_keys, github_fps)
         if not managed_key:
-            console.print(
-                "[red]✗[/red] Could not determine managed SSH key. "
+            print_error(
+                "Could not determine managed SSH key. "
                 "Run 'shell-configs signing --fix' first"
             )
             sys.exit(1)
 
         stale_keys, current_fp = find_stale_github_keys(managed_key)
         if not current_fp:
-            console.print("[red]✗[/red] Could not read local SSH key fingerprint")
+            print_error("Could not read local SSH key fingerprint")
             sys.exit(1)
 
         console.print(f"[dim]Current key fingerprint: {current_fp}[/dim]\n")
@@ -60,22 +58,20 @@ def signing(fix: bool, verbose: bool, yes: bool, cleanup: bool) -> None:
             console.print("[green]✓[/green] No stale SSH keys found on GitHub")
             return
 
-        console.print(
-            f"[yellow]Found {len(stale_keys)} stale key(s) on GitHub:[/yellow]\n"
-        )
+        print_warning(f"Found {len(stale_keys)} stale key(s) on GitHub:\n")
         for key in stale_keys:
             console.print(f"  {key.title}  {key.key_type}  {key.fingerprint}")
         console.print()
 
         for key in stale_keys:
-            if yes or Confirm.ask(
+            if yes or click.confirm(
                 f"Remove '{key.title}' ({key.fingerprint})?", default=False
             ):
                 ok, msg = delete_github_key_by_fingerprint(key.fingerprint)
                 if ok:
                     console.print(f"[green]✓[/green] {msg}")
                 else:
-                    console.print(f"[red]✗[/red] {msg}")
+                    print_error(msg)
             else:
                 console.print(f"[dim]Skipped: {key.title}[/dim]")
         return
@@ -86,11 +82,11 @@ def signing(fix: bool, verbose: bool, yes: bool, cleanup: bool) -> None:
     has_failure = False
     for r in results:
         if r.skipped:
-            console.print(f"[yellow]⚠[/yellow] {r.message}")
+            print_warning(r.message)
         elif r.success:
             console.print(f"[green]✓[/green] {r.message}")
         else:
-            console.print(f"[red]✗[/red] {r.message}")
+            print_error(r.message)
             has_failure = True
 
     if verbose and not has_failure:
