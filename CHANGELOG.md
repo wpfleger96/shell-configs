@@ -2,6 +2,35 @@
 
 <!-- version list -->
 
+## v0.40.0 (2026-05-15)
+
+### Bug Fixes
+
+- Address crossfire code review findings for parallel execution and CLI output
+  ([#33](https://github.com/wpfleger96/shell-configs/pull/33),
+  [`a185313`](https://github.com/wpfleger96/shell-configs/commit/a185313b4bbed4091f1808bb27458b802cc2dd4e))
+
+- Normalize inter-section spacing in buffered output replay
+  ([#33](https://github.com/wpfleger96/shell-configs/pull/33),
+  [`a185313`](https://github.com/wpfleger96/shell-configs/commit/a185313b4bbed4091f1808bb27458b802cc2dd4e))
+
+### Features
+
+- Parallelize status command across components
+  ([#33](https://github.com/wpfleger96/shell-configs/pull/33),
+  [`a185313`](https://github.com/wpfleger96/shell-configs/commit/a185313b4bbed4091f1808bb27458b802cc2dd4e))
+
+- Parallelize status command and standardize CLI output rendering
+  ([#33](https://github.com/wpfleger96/shell-configs/pull/33),
+  [`a185313`](https://github.com/wpfleger96/shell-configs/commit/a185313b4bbed4091f1808bb27458b802cc2dd4e))
+
+### Refactoring
+
+- Standardize CLI output rendering across all commands
+  ([#33](https://github.com/wpfleger96/shell-configs/pull/33),
+  [`a185313`](https://github.com/wpfleger96/shell-configs/commit/a185313b4bbed4091f1808bb27458b802cc2dd4e))
+
+
 ## v0.39.0 (2026-05-15)
 
 ### Features
