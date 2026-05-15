@@ -1,0 +1,346 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+DRY_RUN=false
+SOURCE=""
+DEST=""
+
+detect_platform() {
+    if [[ -f /proc/version ]] && grep -qi "microsoft\|wsl" /proc/version 2>/dev/null; then
+        echo "wsl"
+    else
+        echo "macos"
+    fi
+}
+
+PLATFORM=$(detect_platform)
+
+read_device_name() {
+    local id_file="$1/Identification.json"
+    if [[ ! -f "$id_file" ]]; then
+        echo "Unknown ResMed device"
+        return
+    fi
+
+    local name="" serial=""
+    if command -v jq &>/dev/null; then
+        name=$(jq -r '.FlowGenerator.IdentificationProfiles.Product.ProductName // empty' "$id_file" 2>/dev/null)
+        serial=$(jq -r '.FlowGenerator.IdentificationProfiles.Product.SerialNumber // empty' "$id_file" 2>/dev/null)
+    else
+        name=$(grep -o '"ProductName":"[^"]*"' "$id_file" 2>/dev/null | head -1 | cut -d'"' -f4)
+        serial=$(grep -o '"SerialNumber":"[^"]*"' "$id_file" 2>/dev/null | head -1 | cut -d'"' -f4)
+    fi
+
+    if [[ -n "$name" ]]; then
+        local display_name
+        display_name=$(echo "$name" | sed 's/\([a-z]\)\([0-9]\)/\1 \2/g; s/\([0-9]\)\([A-Z]\)/\1 \2/g')
+        echo "$display_name (serial: ${serial:-unknown})"
+    else
+        echo "Unknown ResMed device"
+    fi
+}
+
+discover_sd_card() {
+    local candidates=()
+
+    if [[ "$PLATFORM" == "wsl" ]]; then
+        for drive in /mnt/[d-z]; do
+            if [[ -f "$drive/STR.edf" ]]; then
+                candidates+=("$drive")
+            fi
+        done
+    else
+        for vol in /Volumes/*; do
+            if [[ -f "$vol/STR.edf" ]]; then
+                candidates+=("$vol")
+            fi
+        done
+    fi
+
+    if [[ ${#candidates[@]} -eq 1 ]]; then
+        echo "${candidates[0]}"
+    elif [[ ${#candidates[@]} -gt 1 ]]; then
+        echo -e "${YELLOW}Multiple ResMed SD cards found:${NC}" >&2
+        for i in "${!candidates[@]}"; do
+            local device_info
+            device_info=$(read_device_name "${candidates[$i]}")
+            echo -e "  $((i + 1))) ${candidates[$i]} — ${device_info}" >&2
+        done
+        read -rp "Select SD card (1-${#candidates[@]}): " choice
+        if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#candidates[@]} )); then
+            echo "${candidates[$((choice - 1))]}"
+        else
+            echo -e "${RED}Invalid selection${NC}" >&2
+            return 1
+        fi
+    else
+        echo -e "${YELLOW}No ResMed SD card found automatically.${NC}" >&2
+        read -rp "Enter path to SD card root: " manual_path
+        if [[ -z "$manual_path" ]]; then
+            return 1
+        fi
+        echo "$manual_path"
+    fi
+}
+
+discover_dest() {
+    local candidates=()
+
+    if [[ "$PLATFORM" == "wsl" ]]; then
+        for dir in /mnt/c/Users/*/Dropbox/Medical/*Raw\ Data; do
+            if [[ -d "$dir" ]]; then
+                candidates+=("$dir")
+            fi
+        done
+    else
+        for base in "$HOME/Dropbox" "$HOME/Library/CloudStorage/Dropbox"*; do
+            for dir in "$base"/Medical/*Raw\ Data; do
+                if [[ -d "$dir" ]]; then
+                    candidates+=("$dir")
+                fi
+            done
+        done
+    fi
+
+    if [[ ${#candidates[@]} -eq 1 ]]; then
+        echo "${candidates[0]}"
+    elif [[ ${#candidates[@]} -gt 1 ]]; then
+        echo -e "${CYAN}Select backup destination:${NC}" >&2
+        for i in "${!candidates[@]}"; do
+            echo -e "  $((i + 1))) $(basename "${candidates[$i]}")" >&2
+        done
+        read -rp "Select destination (1-${#candidates[@]}): " choice
+        if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#candidates[@]} )); then
+            echo "${candidates[$((choice - 1))]}"
+        else
+            echo -e "${RED}Invalid selection${NC}" >&2
+            return 1
+        fi
+    else
+        echo -e "${YELLOW}No backup destination found automatically.${NC}" >&2
+        read -rp "Enter backup destination path: " manual_path
+        if [[ -z "$manual_path" ]]; then
+            return 1
+        fi
+        echo "$manual_path"
+    fi
+}
+
+archive_str_edf() {
+    local dest="$1"
+    local str_dest="$dest/STR.edf"
+
+    if [[ ! -f "$str_dest" ]]; then
+        return
+    fi
+
+    local backup_dir="$dest/STR_Backup"
+
+    local mtime
+    if [[ "$PLATFORM" == "wsl" ]]; then
+        mtime=$(stat -c '%Y' "$str_dest" 2>/dev/null)
+    else
+        mtime=$(stat -f '%m' "$str_dest" 2>/dev/null)
+    fi
+    local date_str
+    date_str=$(date -d "@$mtime" '+%Y-%m-%d' 2>/dev/null || date -r "$mtime" '+%Y-%m-%d' 2>/dev/null)
+
+    local archive_path="$backup_dir/STR-${date_str}.edf"
+    local n=1
+    while [[ -f "$archive_path" ]]; do
+        archive_path="$backup_dir/STR-${date_str}-${n}.edf"
+        ((n++))
+    done
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo -e "${CYAN}[DRY RUN] Would archive: STR.edf → $(basename "$archive_path")${NC}"
+    else
+        mkdir -p "$backup_dir"
+        mv "$str_dest" "$archive_path"
+        echo -e "${GREEN}✓ Archived: STR.edf → STR_Backup/$(basename "$archive_path")${NC}"
+    fi
+}
+
+sync_metadata() {
+    local source="$1"
+    local dest="$2"
+
+    echo ""
+    echo -e "${BLUE}=== Phase 1: Syncing metadata ===${NC}"
+    echo ""
+
+    archive_str_edf "$dest"
+
+    local metadata_files=("STR.edf" "Identification.json" "Identification.crc")
+    for file in "${metadata_files[@]}"; do
+        if [[ ! -f "$source/$file" ]]; then
+            echo -e "${YELLOW}⚠ Skipping: $file (not found on SD card)${NC}"
+            continue
+        fi
+
+        if [[ "$DRY_RUN" == "true" ]]; then
+            echo -e "${CYAN}[DRY RUN] Would sync: $file${NC}"
+        else
+            rsync -a "$source/$file" "$dest/$file" >/dev/null
+            echo -e "${GREEN}✓ Synced: $file${NC}"
+        fi
+    done
+
+    if [[ -d "$source/SETTINGS" ]]; then
+        if [[ "$DRY_RUN" == "true" ]]; then
+            echo -e "${CYAN}[DRY RUN] Would sync: SETTINGS/${NC}"
+        else
+            rsync -a "$source/SETTINGS/" "$dest/SETTINGS/" >/dev/null
+            echo -e "${GREEN}✓ Synced: SETTINGS/${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠ Skipping: SETTINGS/ (not found on SD card)${NC}"
+    fi
+}
+
+sync_datalog() {
+    local source="$1"
+    local dest="$2"
+
+    echo ""
+    echo -e "${BLUE}=== Phase 2: Syncing DATALOG (incremental) ===${NC}"
+    echo ""
+
+    if [[ ! -d "$source/DATALOG" ]]; then
+        echo -e "${YELLOW}⚠ No DATALOG directory on SD card${NC}"
+        return
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo -e "${CYAN}[DRY RUN] Previewing DATALOG sync:${NC}"
+        rsync --dry-run --ignore-existing -avP --stats "$source/DATALOG/" "$dest/DATALOG/" 2>&1
+    else
+        local rsync_output
+        rsync_output=$(rsync --ignore-existing -avP --stats "$source/DATALOG/" "$dest/DATALOG/" 2>&1)
+        echo "$rsync_output"
+
+        local files_transferred
+        files_transferred=$(echo "$rsync_output" | grep "Number of regular files transferred" | awk '{print $NF}')
+        echo ""
+        echo -e "${GREEN}✓ DATALOG sync complete: ${files_transferred:-0} new file(s) copied${NC}"
+    fi
+}
+
+show_help() {
+    echo -e "${BLUE}ResMed SD Card Backup${NC}"
+    echo ""
+    echo "Back up ResMed CPAP/BiPAP/APAP SD card data to a local directory."
+    echo "Auto-detects the SD card and backup destination, or accepts explicit paths."
+    echo ""
+    echo -e "${CYAN}Usage:${NC} $0 [OPTIONS]"
+    echo ""
+    echo -e "${CYAN}Options:${NC}"
+    echo -e "    ${GREEN}--source <path>${NC}    Path to SD card root (auto-detected if omitted)"
+    echo -e "    ${GREEN}--dest <path>${NC}      Path to backup destination (prompted if omitted)"
+    echo -e "    ${GREEN}--dry-run${NC}          Show what would be copied without copying"
+    echo -e "    ${GREEN}-h, --help${NC}         Show this help message"
+    echo ""
+    echo -e "${CYAN}Backup behavior:${NC}"
+    echo "    Metadata (overwrite):  STR.edf, Identification.json, Identification.crc, SETTINGS/"
+    echo "    DATALOG (incremental): Only new files are copied, existing files are never overwritten"
+    echo "    STR.edf archival:      Previous STR.edf is saved to STR_Backup/ before overwriting"
+    echo ""
+    echo -e "${CYAN}Examples:${NC}"
+    echo "    $0                                    # Auto-detect everything"
+    echo "    $0 --dry-run                          # Preview without copying"
+    echo "    $0 --source /mnt/f                    # Specify SD card path"
+    echo "    $0 --dest ~/Dropbox/Medical/BiPAP\\ Raw\\ Data  # Specify destination"
+}
+
+main() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            --source)
+                if [[ $# -lt 2 ]]; then
+                    echo -e "${RED}--source requires a path argument${NC}" >&2
+                    exit 1
+                fi
+                SOURCE="$2"
+                shift 2
+                ;;
+            --dest)
+                if [[ $# -lt 2 ]]; then
+                    echo -e "${RED}--dest requires a path argument${NC}" >&2
+                    exit 1
+                fi
+                DEST="$2"
+                shift 2
+                ;;
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}Unknown option: $1${NC}" >&2
+                echo ""
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+
+    if [[ -z "$SOURCE" ]]; then
+        SOURCE=$(discover_sd_card) || { echo -e "${RED}No SD card source provided${NC}" >&2; exit 1; }
+    fi
+
+    if [[ ! -f "$SOURCE/STR.edf" ]]; then
+        echo -e "${RED}Not a ResMed SD card: STR.edf not found at $SOURCE${NC}" >&2
+        exit 1
+    fi
+
+    local device_info
+    device_info=$(read_device_name "$SOURCE")
+
+    echo -e "${BLUE}=== ResMed SD Card Backup ===${NC}"
+    echo ""
+    echo -e "Platform:    ${CYAN}${PLATFORM}${NC}"
+    echo -e "Device:      ${CYAN}${device_info}${NC}"
+    echo -e "Source:      ${CYAN}${SOURCE}${NC}"
+
+    if [[ -z "$DEST" ]]; then
+        DEST=$(discover_dest) || { echo -e "${RED}No backup destination provided${NC}" >&2; exit 1; }
+    fi
+
+    if [[ ! -d "$DEST" ]]; then
+        echo -e "${YELLOW}Destination does not exist: $DEST${NC}"
+        read -rp "Create it? (y/N) " confirm
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            mkdir -p "$DEST"
+            echo -e "${GREEN}✓ Created: $DEST${NC}"
+        else
+            exit 1
+        fi
+    fi
+
+    echo -e "Destination: ${CYAN}${DEST}${NC}"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo ""
+        echo -e "${YELLOW}[DRY RUN MODE]${NC}"
+    fi
+
+    sync_metadata "$SOURCE" "$DEST"
+    sync_datalog "$SOURCE" "$DEST"
+
+    echo ""
+    echo -e "${BLUE}=== Backup complete ===${NC}"
+}
+
+main "$@"
