@@ -132,8 +132,6 @@ class ScriptsComponent(Component):
 
         plan = self.plan(ctx)
 
-        console.print(f"[bold cyan]{self.display_name}[/bold cyan]\n")
-
         total = len(plan.entries)
         installed = sum(1 for _, st in plan.entries if st == ScriptStatus.INSTALLED)
 

@@ -159,8 +159,6 @@ class ExtensionsComponent(Component):
         from shell_configs.display import console
         from shell_configs.extensions import ExtensionManager
 
-        console.print(f"[bold cyan]{self.display_name}[/bold cyan]\n")
-
         ext_manager = ExtensionManager()
 
         from shell_configs.cli.helpers import _get_extension_shells

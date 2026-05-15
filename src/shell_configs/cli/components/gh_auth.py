@@ -93,8 +93,6 @@ class GhAuthComponent(Component):
         from shell_configs.gh_auth import load_desired_scopes
         from shell_configs.signing import ensure_gh_auth, ensure_gh_scopes
 
-        console.print(f"[bold cyan]{self.display_name}[/bold cyan]\n")
-
         auth_ok, auth_msg = ensure_gh_auth(interactive=False)
         if auth_ok:
             console.print(f"  [green]✓[/green] {auth_msg}")

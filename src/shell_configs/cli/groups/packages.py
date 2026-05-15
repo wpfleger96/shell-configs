@@ -21,8 +21,6 @@ def packages() -> None:
 @click.option("--profile", "profile_name", default=None, help="Profile to use")
 def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None:
     """Install required system packages."""
-    from rich.prompt import Confirm
-
     from shell_configs.display import console, print_error, print_info
     from shell_configs.packages import (
         get_package_manager,
@@ -84,7 +82,7 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
         console.print(f"  {pkg.name}{desc}")
 
     if not yes and not dry_run:
-        if not Confirm.ask("\nInstall these packages?", default=True):
+        if not click.confirm("\nInstall these packages?", default=True):
             print_info("Installation cancelled")
             return
 
@@ -184,8 +182,6 @@ def packages_status(profile_name: str | None) -> None:
 @click.option("--profile", "profile_name", default=None, help="Profile to use")
 def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> None:
     """Uninstall managed system packages."""
-    from rich.prompt import Confirm
-
     from shell_configs.display import console, print_error, print_info
     from shell_configs.packages import (
         get_package_manager,
@@ -254,7 +250,7 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
         console.print(f"  {pkg.name}{desc}")
 
     if not yes and not dry_run:
-        if not Confirm.ask("\nUninstall these packages?", default=False):
+        if not click.confirm("\nUninstall these packages?", default=False):
             print_info("Uninstall cancelled")
             return
 

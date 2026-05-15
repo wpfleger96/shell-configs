@@ -163,7 +163,7 @@ class OptionalPackagesComponent(Component):
         if ctx.dry_run:
             return True
 
-        from rich.prompt import Confirm
+        import click
 
         from shell_configs.display import print_info
 
@@ -180,7 +180,7 @@ class OptionalPackagesComponent(Component):
 
         self.display_plan(plan)
 
-        if ctx.yes or Confirm.ask("Install missing packages?", default=True):
+        if ctx.yes or click.confirm("Install missing packages?", default=True):
             from shell_configs.display import console
 
             console.print()
@@ -194,8 +194,6 @@ class OptionalPackagesComponent(Component):
     def status(self, ctx: Context) -> None:
         from shell_configs.display import console
         from shell_configs.packages import get_package_manager
-
-        console.print(f"[bold cyan]{self.display_name}[/bold cyan]\n")
 
         pkg_manager = get_package_manager()
         if not pkg_manager:
@@ -231,5 +229,5 @@ class OptionalPackagesComponent(Component):
 
         console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
         for pkg in plan.missing:
-            console.print(f"  [yellow]✗[/yellow] {pkg.name} (not installed)")
+            console.print(f"  [red]✗[/red] {pkg.name} (not installed)")
         return True

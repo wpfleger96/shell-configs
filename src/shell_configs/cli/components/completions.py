@@ -18,8 +18,6 @@ class CompletionsComponent(Component):
         )
         from shell_configs.display import console
 
-        console.print(f"[bold cyan]{self.display_name}[/bold cyan]\n")
-
         detected_shell = detect_shell()
         if detected_shell:
             config_path = find_config_file(detected_shell)
@@ -29,7 +27,7 @@ class CompletionsComponent(Component):
                 )
             else:
                 console.print(
-                    f"  [yellow]⚠[/yellow] {detected_shell} completion not installed "
+                    f"  [dim]○[/dim] {detected_shell} completion not installed "
                     "(run: shell-configs completions install)"
                 )
         else:

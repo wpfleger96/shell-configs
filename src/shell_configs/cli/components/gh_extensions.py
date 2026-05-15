@@ -110,8 +110,6 @@ class GhExtensionsComponent(Component):
     def status(self, ctx: Context) -> None:
         from shell_configs.display import console
 
-        console.print(f"[bold cyan]{self.display_name}[/bold cyan]\n")
-
         plan = self.plan(ctx)
 
         if not plan.missing and not plan.extra:

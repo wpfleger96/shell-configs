@@ -108,8 +108,8 @@ class ScriptsPlan(ComponentPlan):
 
 
 class Component:
-    label: str = ""
-    display_name: str = ""
+    label: str = ""  # machine slug for progress spinners and error messages
+    display_name: str = ""  # human-readable title for section headers
 
     def plan(self, ctx: Context) -> ComponentPlan:
         """Compute what needs to change (read-only, no prompts, no writes)."""

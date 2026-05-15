@@ -16,8 +16,6 @@ def scripts() -> None:
 @click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
 def scripts_install(dry_run: bool, yes: bool) -> None:
     """Install utility scripts to ~/.local/bin."""
-    from rich.prompt import Confirm
-
     from shell_configs.display import console, print_info, print_warning
     from shell_configs.script_manager import (
         InstallResult,
@@ -43,7 +41,7 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
         for entry in entries:
             console.print(f"  {entry.name}")
         console.print()
-        if not Confirm.ask("Proceed?", default=True):
+        if not click.confirm("Proceed?", default=True):
             print_info("Cancelled")
             return
 
@@ -77,8 +75,6 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
 @click.option("--force", is_flag=True, help="Remove even user-modified scripts")
 def scripts_uninstall(dry_run: bool, yes: bool, force: bool) -> None:
     """Remove shell-configs-managed scripts from ~/.local/bin."""
-    from rich.prompt import Confirm
-
     from shell_configs.display import console, print_info
     from shell_configs.script_manager import (
         ScriptManifest,
@@ -104,7 +100,7 @@ def scripts_uninstall(dry_run: bool, yes: bool, force: bool) -> None:
         for name in names:
             console.print(f"  {name}")
         console.print()
-        if not Confirm.ask("Proceed?", default=True):
+        if not click.confirm("Proceed?", default=True):
             print_info("Cancelled")
             return
 
