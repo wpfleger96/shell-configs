@@ -16,14 +16,14 @@ class CompletionsComponent(Component):
             get_supported_shells,
             is_completion_installed,
         )
-        from shell_configs.display import console
+        from shell_configs.display import console, print_success
 
         detected_shell = detect_shell()
         if detected_shell:
             config_path = find_config_file(detected_shell)
             if config_path and is_completion_installed(config_path):
-                console.print(
-                    f"  [green]✓[/green] {detected_shell} completion installed ({config_path})"
+                print_success(
+                    f"{detected_shell} completion installed ({config_path})", indent=2
                 )
             else:
                 console.print(

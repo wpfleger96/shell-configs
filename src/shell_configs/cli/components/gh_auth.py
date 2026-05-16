@@ -61,17 +61,22 @@ class GhAuthComponent(Component):
         if not plan.has_changes:
             return True
 
-        from shell_configs.display import console, print_error
+        from shell_configs.display import (
+            console,
+            print_error,
+            print_progress,
+            print_success,
+        )
         from shell_configs.signing import ensure_gh_auth, ensure_gh_scopes
 
         console.print()
-        console.print("[yellow]Ensuring GitHub CLI auth and scopes...[/yellow]")
+        print_progress("Ensuring GitHub CLI auth and scopes...")
 
         interactive = sys.stdin.isatty()
 
         auth_ok, auth_msg = ensure_gh_auth(interactive=interactive)
         if auth_ok:
-            console.print(f"[green]✓[/green] {auth_msg}")
+            print_success(auth_msg)
         else:
             print_error(auth_msg)
             return False
@@ -81,7 +86,7 @@ class GhAuthComponent(Component):
                 scopes=plan.missing_scopes, interactive=interactive
             )
             if scopes_ok:
-                console.print(f"[green]✓[/green] {scopes_msg}")
+                print_success(scopes_msg)
             else:
                 print_error(scopes_msg)
                 return False
@@ -89,13 +94,13 @@ class GhAuthComponent(Component):
         return True
 
     def status(self, ctx: Context) -> None:
-        from shell_configs.display import console, print_warning
+        from shell_configs.display import console, print_success, print_warning
         from shell_configs.gh_auth import load_desired_scopes
         from shell_configs.signing import ensure_gh_auth, ensure_gh_scopes
 
         auth_ok, auth_msg = ensure_gh_auth(interactive=False)
         if auth_ok:
-            console.print(f"  [green]✓[/green] {auth_msg}")
+            print_success(auth_msg, indent=2)
         else:
             print_warning(auth_msg, indent=2)
 
@@ -103,7 +108,7 @@ class GhAuthComponent(Component):
             desired = load_desired_scopes()
             scopes_ok, scopes_msg = ensure_gh_scopes(scopes=desired, interactive=False)
             if scopes_ok:
-                console.print(f"  [green]✓[/green] {scopes_msg}")
+                print_success(scopes_msg, indent=2)
             else:
                 print_warning(scopes_msg, indent=2)
 

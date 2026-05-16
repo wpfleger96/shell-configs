@@ -76,7 +76,11 @@ class GhExtensionsComponent(Component):
         if not plan.missing:
             return True
 
-        from shell_configs.display import console, print_error
+        from shell_configs.display import (
+            print_error,
+            print_success,
+            print_would,
+        )
         from shell_configs.gh_extensions import install_extension
 
         all_ok = True
@@ -85,24 +89,24 @@ class GhExtensionsComponent(Component):
                 ext.repo, pin=ext.pin, dry_run=ctx.dry_run, build_path=ext.build_path
             )
             if ctx.dry_run:
-                console.print(f"[dim]→[/dim] {msg}")
+                print_would(msg)
             elif success:
-                console.print(f"[green]✓[/green] {msg}")
+                print_success(msg)
             else:
                 print_error(msg)
                 all_ok = False
         return all_ok
 
     def install(self, ctx: Context) -> bool:
-        from shell_configs.display import console
+        from shell_configs.display import console, print_done, print_progress
 
         console.print()
-        console.print("[yellow]Installing gh CLI extensions...[/yellow]")
+        print_progress("Installing gh CLI extensions...")
 
         plan = self.plan(ctx)
 
         if not plan.missing:
-            console.print("[dim]✓[/dim] All gh extensions already installed")
+            print_done("All gh extensions already installed")
             return True
 
         return self.apply(ctx, plan)
@@ -113,8 +117,11 @@ class GhExtensionsComponent(Component):
         plan = self.plan(ctx)
 
         if not plan.missing and not plan.extra:
-            console.print(
-                f"  [green]✓[/green] {len(plan.desired)}/{len(plan.desired)} extensions installed"
+            from shell_configs.display import print_success
+
+            print_success(
+                f"{len(plan.desired)}/{len(plan.desired)} extensions installed",
+                indent=2,
             )
         else:
             parts = []

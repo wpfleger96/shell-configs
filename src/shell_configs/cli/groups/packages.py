@@ -23,9 +23,11 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
     """Install required system packages."""
     from shell_configs.display import (
         console,
+        print_done,
         print_error,
         print_hint,
         print_info,
+        print_success,
     )
     from shell_configs.packages import (
         get_package_manager,
@@ -78,7 +80,8 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
             console.print(f"  [dim]{pkg.name}[/dim]")
 
     if not to_install:
-        console.print("\n[green]✓[/green] All required packages are already installed")
+        console.print()
+        print_success("All required packages are already installed")
         return
 
     console.print(f"\n[cyan]Packages to install ({len(to_install)}):[/cyan]")
@@ -101,11 +104,11 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
 
         if success:
             if "already installed" in message:
-                console.print(f"[dim]✓[/dim] {pkg.name} [dim](already installed)[/dim]")
+                print_done(f"{pkg.name} [dim](already installed)[/dim]")
             elif dry_run:
                 console.print(f"[dim]  Would install {pkg.name}[/dim]")
             else:
-                console.print(f"[green]✓[/green] {pkg.name}")
+                print_success(pkg.name)
         else:
             print_error(f"{pkg.name}: {message}")
 
@@ -115,9 +118,8 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
     if dry_run:
         print_hint("Use without --dry-run to install.")
     else:
-        console.print(
-            f"\n[green]✓[/green] Package installation complete ({total} packages)"
-        )
+        console.print()
+        print_success(f"Package installation complete ({total} packages)")
 
 
 @packages.command(name="status")
@@ -129,6 +131,7 @@ def packages_status(profile_name: str | None) -> None:
         print_error,
         print_hint,
         print_info,
+        print_success,
     )
     from shell_configs.packages import get_package_manager, load_packages_for_profile
     from shell_configs.platform import detect_platform
@@ -171,7 +174,7 @@ def packages_status(profile_name: str | None) -> None:
     if installed:
         console.print(f"[green]Installed ({len(installed)}):[/green]")
         for pkg in installed:
-            console.print(f"  [green]✓[/green] {pkg.name}")
+            print_success(pkg.name, indent=2)
 
     if missing:
         console.print(f"\n[yellow]Missing ({len(missing)}):[/yellow]")
@@ -179,7 +182,8 @@ def packages_status(profile_name: str | None) -> None:
             print_error(pkg.name, indent=2)
         print_hint("Run 'shell-configs packages install' to install missing packages")
     else:
-        console.print("\n[green]✓[/green] All required packages are installed")
+        console.print()
+        print_success("All required packages are installed")
 
 
 @packages.command(name="uninstall")
@@ -193,6 +197,7 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
         print_error,
         print_hint,
         print_info,
+        print_success,
         print_warning,
     )
     from shell_configs.packages import (
@@ -253,7 +258,8 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
             console.print(f"  [dim]{pkg.name}[/dim]")
 
     if not to_uninstall:
-        console.print("\n[green]✓[/green] No packages to uninstall")
+        console.print()
+        print_success("No packages to uninstall")
         return
 
     console.print(f"\n[cyan]Packages to uninstall ({len(to_uninstall)}):[/cyan]")
@@ -283,7 +289,7 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
             elif dry_run:
                 console.print(f"[dim]  Would uninstall {pkg.name}[/dim]")
             else:
-                console.print(f"[green]✓[/green] {pkg.name}")
+                print_success(pkg.name)
                 success_count += 1
         else:
             print_error(f"{pkg.name}: {message}")
@@ -299,6 +305,5 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
             console.print()
             print_warning(f"{success_count} uninstalled, {fail_count} failed")
         else:
-            console.print(
-                f"\n[green]✓[/green] Package uninstall complete ({success_count} packages)"
-            )
+            console.print()
+            print_success(f"Package uninstall complete ({success_count} packages)")

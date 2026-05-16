@@ -159,7 +159,9 @@ def _print_extension_result(console: Any, result: ExtensionResult) -> None:
     if result.status == ExtensionResultStatus.SKIPPED_BUILTIN:
         console.print(f"  [yellow]![/yellow] {result.extension_id}: {result.message}")
     elif result.success:
-        console.print(f"  [green]✓[/green] {result.message}")
+        from shell_configs.display import print_success
+
+        print_success(result.message, indent=2)
     else:
         from shell_configs.display import print_error
 

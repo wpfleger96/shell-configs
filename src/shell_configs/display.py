@@ -70,17 +70,52 @@ def print_hint(message: str, *, indent: int = 0) -> None:
     get_console().print(f"{' ' * indent}[yellow]💡[/yellow] {message}")
 
 
+def print_success(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}[green]✓[/green] {message}")
+
+
+def print_done(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}[dim]✓[/dim] {message}")
+
+
+def print_unchanged(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}[dim]•[/dim] {message}")
+
+
+def print_skipped(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}[dim]○[/dim] {message}")
+
+
+def print_absent(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}[yellow]○[/yellow] {message}")
+
+
+def print_update(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}[yellow]↻[/yellow] {message}")
+
+
+def print_would(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}[dim]→[/dim] {message}")
+
+
+def print_add(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}[green]+[/green] {message}")
+
+
+def print_progress(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}[yellow]{message}[/yellow]")
+
+
 def print_operation_result(result: OperationResult, message: str) -> None:
     """Print an operation result with appropriate formatting."""
-    cons = get_console()
     if result in (
         OperationResult.CREATED,
         OperationResult.UPDATED,
         OperationResult.REMOVED,
     ):
-        cons.print(f"[green]✓[/green] {message}")
+        print_success(message)
     elif result == OperationResult.ALREADY_SYNCED:
-        cons.print(f"[dim]•[/dim] {message}")
+        print_unchanged(message)
     elif result == OperationResult.NOT_FOUND:
         print_warning(message)
     elif result == OperationResult.ERROR:

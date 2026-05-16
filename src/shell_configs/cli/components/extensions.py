@@ -89,7 +89,7 @@ class ExtensionsComponent(Component):
             _print_extension_result,
             _print_ignored_builtin_extensions,
         )
-        from shell_configs.display import console
+        from shell_configs.display import console, print_done, print_progress
         from shell_configs.extensions import ExtensionManager
 
         ext_manager = ExtensionManager()
@@ -110,7 +110,7 @@ class ExtensionsComponent(Component):
             if diff.ignored:
                 if not any_ext_activity:
                     console.print()
-                    console.print("[yellow]Installing IDE extensions...[/yellow]")
+                    print_progress("Installing IDE extensions...")
                 any_ext_activity = True
                 console.print(f"  [bold cyan]{shell.display_name}[/bold cyan]")
                 printed_header = _print_ignored_builtin_extensions(
@@ -125,7 +125,7 @@ class ExtensionsComponent(Component):
 
             if not any_ext_activity:
                 console.print()
-                console.print("[yellow]Installing IDE extensions...[/yellow]")
+                print_progress("Installing IDE extensions...")
             any_ext_activity = True
 
             if not printed_header:
@@ -134,8 +134,8 @@ class ExtensionsComponent(Component):
                     f"{len(diff.missing)} missing"
                 )
             else:
-                console.print(
-                    f"  [yellow]Installing {len(diff.missing)} missing extension(s)...[/yellow]"
+                print_progress(
+                    f"Installing {len(diff.missing)} missing extension(s)...", indent=2
                 )
 
             ext_results = ext_manager.install_extensions(
@@ -146,7 +146,7 @@ class ExtensionsComponent(Component):
 
         if not any_ext_activity:
             console.print()
-            console.print("[dim]✓[/dim] All IDE extensions already in sync")
+            print_done("All IDE extensions already in sync")
 
         return True
 
@@ -183,9 +183,12 @@ class ExtensionsComponent(Component):
             )
 
             if not ext_diff.missing and not ext_diff.extra:
-                console.print(
-                    f"  [green]✓[/green] {shell.display_name}: "
-                    f"{len(ext_diff.matched)}/{len(ext_desired)} extensions synced"
+                from shell_configs.display import print_success
+
+                print_success(
+                    f"{shell.display_name}: "
+                    f"{len(ext_diff.matched)}/{len(ext_desired)} extensions synced",
+                    indent=2,
                 )
             else:
                 parts = []

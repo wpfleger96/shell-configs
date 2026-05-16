@@ -186,7 +186,13 @@ def extensions_install(
     profile_name: str | None,
 ) -> None:
     """Install (and optionally prune) extensions for each IDE."""
-    from shell_configs.display import console, print_hint, print_info, print_warning
+    from shell_configs.display import (
+        console,
+        print_hint,
+        print_info,
+        print_progress,
+        print_warning,
+    )
     from shell_configs.extensions import ExtensionManager
     from shell_configs.profiles import ProfileLoader, resolve_active_profile
     from shell_configs.shells.registry import ShellRegistry
@@ -239,12 +245,10 @@ def extensions_install(
             printed_header = True
 
         if to_install:
-            console.print(
-                f"  [yellow]Installing {len(to_install)} extension(s)...[/yellow]"
-            )
+            print_progress(f"Installing {len(to_install)} extension(s)...", indent=2)
             if not dry_run and not yes:
                 if not click.confirm("  Proceed?", default=True):
-                    print_info(f"  Skipping {shell.display_name} installs")
+                    print_info(f"Skipping {shell.display_name} installs", indent=2)
                     to_install = frozenset()
 
             if to_install:
@@ -255,12 +259,12 @@ def extensions_install(
                     _print_extension_result(console, r)
 
         if to_uninstall:
-            console.print(
-                f"  [yellow]Pruning {len(to_uninstall)} extra extension(s)...[/yellow]"
+            print_progress(
+                f"Pruning {len(to_uninstall)} extra extension(s)...", indent=2
             )
             if not dry_run and not yes:
                 if not click.confirm("  Proceed with pruning?", default=False):
-                    print_info(f"  Skipping {shell.display_name} prune")
+                    print_info(f"Skipping {shell.display_name} prune", indent=2)
                     to_uninstall = frozenset()
 
             if to_uninstall:

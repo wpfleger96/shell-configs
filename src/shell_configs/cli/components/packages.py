@@ -40,12 +40,10 @@ class RequiredPackagesComponent(Component):
         if not plan.has_changes:
             return
 
-        from shell_configs.display import console
+        from shell_configs.display import console, print_progress
 
         console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
-        console.print(
-            f"[yellow]Installing {len(plan.missing)} required package(s)...[/yellow]"
-        )
+        print_progress(f"Installing {len(plan.missing)} required package(s)...")
         for pkg in plan.missing:
             console.print(f"  {pkg.name}")
 
@@ -55,7 +53,12 @@ class RequiredPackagesComponent(Component):
         if not plan.missing:
             return True
 
-        from shell_configs.display import console, print_error, print_warning
+        from shell_configs.display import (
+            console,
+            print_error,
+            print_success,
+            print_warning,
+        )
         from shell_configs.packages import get_package_manager
 
         pkg_manager = get_package_manager()
@@ -67,7 +70,7 @@ class RequiredPackagesComponent(Component):
                 console.print(f"  Installing {pkg.name}...")
                 success, message = pkg_manager.install(pkg, dry_run=False)
                 if success:
-                    console.print(f"  [green]✓[/green] {pkg.name}")
+                    print_success(pkg.name, indent=2)
                 else:
                     print_error(f"{pkg.name}: {message}", indent=2)
             console.print()
@@ -128,7 +131,7 @@ class OptionalPackagesComponent(Component):
         if not plan.missing:
             return True
 
-        from shell_configs.display import console, print_error
+        from shell_configs.display import console, print_error, print_success
         from shell_configs.packages import get_package_manager
 
         pkg_manager = get_package_manager()
@@ -142,16 +145,15 @@ class OptionalPackagesComponent(Component):
                 success, message = pkg_manager.install(pkg, dry_run=False)
 
                 if success:
-                    console.print(f"[green]✓[/green] {pkg.name}")
+                    print_success(pkg.name)
                 else:
                     print_error(f"{pkg.name}: {message}")
 
                 if i < total:
                     console.print()
 
-            console.print(
-                f"\n[green]✓[/green] Package installation complete ({total} packages)"
-            )
+            console.print()
+            print_success(f"Package installation complete ({total} packages)")
         except Exception as e:
             print_error(f"Error installing packages: {e}")
 
@@ -203,8 +205,11 @@ class OptionalPackagesComponent(Component):
         display_name = pkg_manager.display_name
 
         if not plan.missing:
-            console.print(
-                f"  [green]✓[/green] {installed_count}/{total_count} packages installed ({display_name})"
+            from shell_configs.display import print_success
+
+            print_success(
+                f"{installed_count}/{total_count} packages installed ({display_name})",
+                indent=2,
             )
         else:
             from shell_configs.display import print_hint, print_warning

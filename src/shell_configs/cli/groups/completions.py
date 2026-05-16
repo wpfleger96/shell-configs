@@ -60,7 +60,7 @@ def completions_zsh() -> None:
 def completions_install(shell: str | None) -> None:
     """Install shell completion to config file."""
     from shell_configs.completions import detect_shell, install_completion
-    from shell_configs.display import console, print_error
+    from shell_configs.display import console, print_error, print_success
 
     if shell is None:
         shell = detect_shell()
@@ -72,7 +72,7 @@ def completions_install(shell: str | None) -> None:
     success, message = install_completion(shell, dry_run=False)
 
     if success:
-        console.print(f"[green]✓[/green] {message}")
+        print_success(message)
     else:
         print_error(message)
         sys.exit(1)
@@ -91,7 +91,7 @@ def completions_uninstall(shell: str | None) -> None:
         find_config_file,
         uninstall_completion,
     )
-    from shell_configs.display import console, print_error
+    from shell_configs.display import print_error, print_success
 
     if shell is None:
         shell = detect_shell()
@@ -107,7 +107,7 @@ def completions_uninstall(shell: str | None) -> None:
     success, message = uninstall_completion(config_path)
 
     if success:
-        console.print(f"[green]✓[/green] {message}")
+        print_success(message)
     else:
         print_error(message)
         sys.exit(1)

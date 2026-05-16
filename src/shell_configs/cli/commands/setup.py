@@ -53,7 +53,15 @@ def setup(
         get_supported_shells,
         install_completion,
     )
-    from shell_configs.display import console, print_error, print_info, print_warning
+    from shell_configs.display import (
+        console,
+        print_done,
+        print_error,
+        print_info,
+        print_success,
+        print_warning,
+        print_would,
+    )
 
     if not skip_packages:
         console.print("\n[bold cyan]Step 1/5: Install required packages[/bold cyan]")
@@ -95,14 +103,14 @@ def setup(
                             make_github_install_url(shell_configs_tool.github_repo)
                         )
                         if success:
-                            console.print(
-                                f"[green]✓[/green] Upgraded shell-configs ({update_info.current_version} → {update_info.latest_version})"
+                            print_success(
+                                f"Upgraded shell-configs ({update_info.current_version} → {update_info.latest_version})"
                             )
                             tool_install_success = True
                         else:
                             print_error(f"Failed to upgrade shell-configs: {msg}")
             else:
-                console.print("[green]✓[/green] shell-configs is already up to date")
+                print_success("shell-configs is already up to date")
                 tool_install_success = True
         except Exception as e:
             import logging
@@ -122,7 +130,7 @@ def setup(
             print_error(message)
             sys.exit(1)
 
-        console.print(f"[green]✓[/green] {message}")
+        print_success(message)
         tool_install_success = True
 
     if not tool_install_success:
@@ -170,13 +178,13 @@ def setup(
                 else:
                     success, message = install_completion(shell, dry_run=dry_run)
                     if success:
-                        console.print(f"[green]✓[/green] {message}")
+                        print_success(message)
                     else:
                         print_warning(message)
             else:
                 success, message = install_completion(shell, dry_run=dry_run)
                 if success:
-                    console.print(f"[green]✓[/green] {message}")
+                    print_success(message)
                 else:
                     print_warning(message)
 
@@ -205,16 +213,16 @@ def setup(
                     source_dir=scripts_source,
                 )
                 if result in (InstallResult.INSTALLED, InstallResult.UPDATED):
-                    console.print(f"[green]✓[/green] {message}")
+                    print_success(message)
                 elif result == InstallResult.ALREADY_SYNCED:
-                    console.print(f"[dim]✓[/dim] {message}")
+                    print_done(message)
                 elif result == InstallResult.COLLISION:
                     print_warning(message)
                 elif result in (
                     InstallResult.WOULD_INSTALL,
                     InstallResult.WOULD_UPDATE,
                 ):
-                    console.print(f"[dim]→[/dim] {message}")
+                    print_would(message)
 
     if dry_run:
         console.print("\n[dim]Dry run complete - no changes were made.[/dim]")

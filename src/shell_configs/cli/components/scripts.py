@@ -84,7 +84,15 @@ class ScriptsComponent(Component):
         return success
 
     def install(self, ctx: Context) -> bool:
-        from shell_configs.display import console, print_error, print_warning
+        from shell_configs.display import (
+            console,
+            print_done,
+            print_error,
+            print_progress,
+            print_success,
+            print_warning,
+            print_would,
+        )
         from shell_configs.script_manager import (
             InstallResult,
             ScriptManifest,
@@ -95,7 +103,7 @@ class ScriptsComponent(Component):
         )
 
         console.print()
-        console.print("[yellow]Installing utility scripts...[/yellow]")
+        print_progress("Installing utility scripts...")
         target_dir = get_default_target_dir()
         manifest = ScriptManifest(get_default_manifest_path())
         entries = discover_scripts()
@@ -109,14 +117,14 @@ class ScriptsComponent(Component):
                 if script_result == InstallResult.COLLISION:
                     print_warning(msg)
                 elif script_result in (InstallResult.INSTALLED, InstallResult.UPDATED):
-                    console.print(f"[green]✓[/green] {msg}")
+                    print_success(msg)
                 elif script_result == InstallResult.ALREADY_SYNCED:
-                    console.print(f"[dim]✓[/dim] {msg}")
+                    print_done(msg)
                 elif script_result in (
                     InstallResult.WOULD_INSTALL,
                     InstallResult.WOULD_UPDATE,
                 ):
-                    console.print(f"[dim]→[/dim] {msg}")
+                    print_would(msg)
                 elif script_result == InstallResult.SKIPPED_PLATFORM:
                     pass
                 else:
@@ -136,8 +144,10 @@ class ScriptsComponent(Component):
         if total == 0:
             console.print("  [dim]No scripts available for this platform[/dim]")
         elif installed == total:
-            console.print(
-                f"  [green]✓[/green] {installed}/{total} scripts installed (~/.local/bin)"
+            from shell_configs.display import print_success
+
+            print_success(
+                f"{installed}/{total} scripts installed (~/.local/bin)", indent=2
             )
         else:
             from shell_configs.display import print_hint, print_warning

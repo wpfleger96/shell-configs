@@ -31,9 +31,11 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
     from shell_configs.bootstrap.installer import make_github_install_url
     from shell_configs.display import (
         console,
+        print_done,
         print_error,
         print_hint,
         print_info,
+        print_success,
         print_warning,
     )
 
@@ -65,14 +67,12 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         if update_info and (update_info.has_update or force):
             tool_updates.append((tool, update_info))
         elif update_info and not update_info.has_update:
-            console.print(
-                f"[green]✓[/green] {tool.display_name} is already up to date!"
-            )
+            print_success(f"{tool.display_name} is already up to date!")
 
     console.print()
 
     if not tool_updates and not force:
-        console.print("[green]✓[/green] All tools are up to date!")
+        print_success("All tools are up to date!")
         return
 
     if not check:
@@ -120,11 +120,9 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         if success:
             if was_upgraded:
                 upgraded_tools.append(tool)
-                console.print(
-                    f"[green]✓[/green] {tool.display_name} upgraded successfully!"
-                )
+                print_success(f"{tool.display_name} upgraded successfully!")
             else:
-                console.print(f"[dim]✓[/dim] {tool.display_name} is already up to date")
+                print_done(f"{tool.display_name} is already up to date")
         else:
             print_error(f"{tool.display_name} upgrade failed: {msg}")
 

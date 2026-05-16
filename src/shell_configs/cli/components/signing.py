@@ -57,11 +57,17 @@ class SigningComponent(Component):
 
         import click
 
-        from shell_configs.display import console, print_error, print_warning
+        from shell_configs.display import (
+            console,
+            print_error,
+            print_progress,
+            print_success,
+            print_warning,
+        )
         from shell_configs.signing import setup_signing
 
         console.print()
-        console.print("[yellow]Validating SSH key lifecycle...[/yellow]")
+        print_progress("Validating SSH key lifecycle...")
 
         auto_fix = ctx.yes or click.confirm(
             "Set up SSH key lifecycle (generate, auth, sign)?", default=True
@@ -71,20 +77,20 @@ class SigningComponent(Component):
             if r.skipped:
                 print_warning(r.message)
             elif r.success:
-                console.print(f"[green]✓[/green] {r.message}")
+                print_success(r.message)
             else:
                 print_error(r.message)
 
         return True
 
     def status(self, ctx: Context) -> None:
-        from shell_configs.display import console, print_warning
+        from shell_configs.display import console, print_success, print_warning
         from shell_configs.signing import setup_signing
 
         signing_results = setup_signing(auto_fix=False, interactive=False)
         for r in signing_results:
             if r.success:
-                console.print(f"  [green]✓[/green] {r.message}")
+                print_success(r.message, indent=2)
             else:
                 print_warning(r.message, indent=2)
 

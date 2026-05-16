@@ -16,7 +16,15 @@ def scripts() -> None:
 @click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
 def scripts_install(dry_run: bool, yes: bool) -> None:
     """Install utility scripts to ~/.local/bin."""
-    from shell_configs.display import console, print_error, print_info, print_warning
+    from shell_configs.display import (
+        console,
+        print_done,
+        print_error,
+        print_info,
+        print_success,
+        print_warning,
+        print_would,
+    )
     from shell_configs.script_manager import (
         InstallResult,
         ScriptManifest,
@@ -52,11 +60,11 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
             print_warning(message)
             collisions.append(entry.name)
         elif result == InstallResult.ALREADY_SYNCED:
-            console.print(f"[dim]✓[/dim] {message}")
+            print_done(message)
         elif result in (InstallResult.INSTALLED, InstallResult.UPDATED):
-            console.print(f"[green]✓[/green] {message}")
+            print_success(message)
         elif result in (InstallResult.WOULD_INSTALL, InstallResult.WOULD_UPDATE):
-            console.print(f"[dim]→[/dim] {message}")
+            print_would(message)
         elif result == InstallResult.SKIPPED_PLATFORM:
             pass
         else:
@@ -75,7 +83,15 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
 @click.option("--force", is_flag=True, help="Remove even user-modified scripts")
 def scripts_uninstall(dry_run: bool, yes: bool, force: bool) -> None:
     """Remove shell-configs-managed scripts from ~/.local/bin."""
-    from shell_configs.display import console, print_error, print_info, print_warning
+    from shell_configs.display import (
+        console,
+        print_error,
+        print_info,
+        print_success,
+        print_unchanged,
+        print_warning,
+        print_would,
+    )
     from shell_configs.script_manager import (
         ScriptManifest,
         UninstallResult,
@@ -109,13 +125,13 @@ def scripts_uninstall(dry_run: bool, yes: bool, force: bool) -> None:
             name, target_dir, manifest, force=force, dry_run=dry_run
         )
         if result == UninstallResult.REMOVED:
-            console.print(f"[green]✓[/green] {message}")
+            print_success(message)
         elif result == UninstallResult.WOULD_REMOVE:
-            console.print(f"[dim]→[/dim] {message}")
+            print_would(message)
         elif result == UninstallResult.MODIFIED:
             print_warning(message)
         elif result == UninstallResult.NOT_FOUND:
-            console.print(f"[dim]-[/dim] {message}")
+            print_unchanged(message)
         else:
             print_error(message)
 
