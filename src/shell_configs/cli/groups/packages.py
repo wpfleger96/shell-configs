@@ -23,10 +23,13 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
     """Install required system packages."""
     from shell_configs.display import (
         console,
+        dim,
+        print_dim,
         print_done,
         print_error,
         print_hint,
         print_info,
+        print_label,
         print_success,
     )
     from shell_configs.packages import (
@@ -42,7 +45,7 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
     active_profile = resolve_active_profile(profile_name, profile_loader)
 
     platform_name = detect_platform().display_name
-    console.print(f"[dim]Platform:[/dim] {platform_name}")
+    print_label("Platform", platform_name)
 
     manager = get_package_manager()
 
@@ -51,7 +54,8 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
         print_hint("Install Homebrew: https://brew.sh (macOS) or use apt (Linux/WSL)")
         sys.exit(1)
 
-    console.print(f"[dim]Package manager:[/dim] {manager.display_name}\n")
+    print_label("Package manager", manager.display_name)
+    console.print()
 
     try:
         packages = load_packages_for_profile(active_profile)
@@ -77,7 +81,7 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
     if already_installed:
         console.print(f"[green]Already installed ({len(already_installed)}):[/green]")
         for pkg in already_installed:
-            console.print(f"  [dim]{pkg.name}[/dim]")
+            print_dim(pkg.name, indent=2)
 
     if not to_install:
         console.print()
@@ -98,15 +102,15 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
     total = len(to_install)
     for i, pkg in enumerate(to_install, start=1):
         if not dry_run:
-            console.print(f"[dim][{i}/{total}] Installing {pkg.name}...[/dim]")
+            print_dim(f"[{i}/{total}] Installing {pkg.name}...")
 
         success, message = manager.install(pkg, dry_run=dry_run)
 
         if success:
             if "already installed" in message:
-                print_done(f"{pkg.name} [dim](already installed)[/dim]")
+                print_done(f"{pkg.name} {dim('(already installed)')}")
             elif dry_run:
-                console.print(f"[dim]  Would install {pkg.name}[/dim]")
+                print_dim(f"Would install {pkg.name}", indent=2)
             else:
                 print_success(pkg.name)
         else:
@@ -131,6 +135,7 @@ def packages_status(profile_name: str | None) -> None:
         print_error,
         print_hint,
         print_info,
+        print_label,
         print_success,
     )
     from shell_configs.packages import get_package_manager, load_packages_for_profile
@@ -142,7 +147,8 @@ def packages_status(profile_name: str | None) -> None:
     active_profile = resolve_active_profile(profile_name, profile_loader)
 
     platform_name = detect_platform().display_name
-    console.print(f"[dim]Platform:[/dim] {platform_name}\n")
+    print_label("Platform", platform_name)
+    console.print()
 
     manager = get_package_manager()
 
@@ -150,7 +156,8 @@ def packages_status(profile_name: str | None) -> None:
         print_error("No package manager available")
         return
 
-    console.print(f"[dim]Package manager:[/dim] {manager.display_name}\n")
+    print_label("Package manager", manager.display_name)
+    console.print()
 
     try:
         packages = load_packages_for_profile(active_profile)
@@ -194,9 +201,11 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
     """Uninstall managed system packages."""
     from shell_configs.display import (
         console,
+        print_dim,
         print_error,
         print_hint,
         print_info,
+        print_label,
         print_success,
         print_warning,
     )
@@ -213,7 +222,7 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
     active_profile = resolve_active_profile(profile_name, profile_loader)
 
     platform_name = detect_platform().display_name
-    console.print(f"[dim]Platform:[/dim] {platform_name}")
+    print_label("Platform", platform_name)
 
     manager = get_package_manager()
 
@@ -221,7 +230,8 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
         print_error("No package manager available for this platform")
         sys.exit(1)
 
-    console.print(f"[dim]Package manager:[/dim] {manager.display_name}\n")
+    print_label("Package manager", manager.display_name)
+    console.print()
 
     try:
         packages = load_packages_for_profile(active_profile)
@@ -248,14 +258,14 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
     to_uninstall = sort_packages_for_uninstall(to_uninstall)
 
     if managed_externally:
-        console.print(f"[dim]Managed externally ({len(managed_externally)}):[/dim]")
+        print_dim(f"Managed externally ({len(managed_externally)}):")
         for pkg in managed_externally:
-            console.print(f"  [dim]{pkg.name} (not via {manager.display_name})[/dim]")
+            print_dim(f"{pkg.name} (not via {manager.display_name})", indent=2)
 
     if not_installed:
-        console.print(f"[dim]Not installed ({len(not_installed)}):[/dim]")
+        print_dim(f"Not installed ({len(not_installed)}):")
         for pkg in not_installed:
-            console.print(f"  [dim]{pkg.name}[/dim]")
+            print_dim(pkg.name, indent=2)
 
     if not to_uninstall:
         console.print()
@@ -279,15 +289,15 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
 
     for i, pkg in enumerate(to_uninstall, start=1):
         if not dry_run:
-            console.print(f"[dim][{i}/{total}] Uninstalling {pkg.name}...[/dim]")
+            print_dim(f"[{i}/{total}] Uninstalling {pkg.name}...")
 
         success, message = manager.uninstall(pkg, dry_run=dry_run)
 
         if success:
             if "not installed" in message or "skipping" in message:
-                console.print(f"[dim]  {pkg.name} ({message})[/dim]")
+                print_dim(f"{pkg.name} ({message})", indent=2)
             elif dry_run:
-                console.print(f"[dim]  Would uninstall {pkg.name}[/dim]")
+                print_dim(f"Would uninstall {pkg.name}", indent=2)
             else:
                 print_success(pkg.name)
                 success_count += 1

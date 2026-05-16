@@ -39,13 +39,14 @@ class GhAuthComponent(Component):
         if not plan.has_changes:
             return
 
-        from shell_configs.display import console, print_warning
+        from shell_configs.display import console, print_dim, print_warning
 
         console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
 
         if not plan.gh_available:
-            console.print(
-                "  [dim]gh not installed — auth validation will run after packages are installed[/dim]"
+            print_dim(
+                "gh not installed — auth validation will run after packages are installed",
+                indent=2,
             )
             return
 

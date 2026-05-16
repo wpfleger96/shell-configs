@@ -60,14 +60,14 @@ def completions_zsh() -> None:
 def completions_install(shell: str | None) -> None:
     """Install shell completion to config file."""
     from shell_configs.completions import detect_shell, install_completion
-    from shell_configs.display import console, print_error, print_success
+    from shell_configs.display import print_error, print_label, print_success
 
     if shell is None:
         shell = detect_shell()
         if shell is None:
             print_error("Could not detect shell. Please specify with --shell")
             sys.exit(1)
-        console.print(f"[dim]Detected shell:[/dim] {shell}")
+        print_label("Detected shell", shell)
 
     success, message = install_completion(shell, dry_run=False)
 
@@ -124,7 +124,14 @@ def completions_status() -> None:
         get_supported_shells,
         is_completion_installed,
     )
-    from shell_configs.display import console, print_hint
+    from shell_configs.display import (
+        ICON_ABSENT,
+        ICON_NONE,
+        ICON_SUCCESS,
+        console,
+        dim,
+        print_hint,
+    )
 
     detected_shell = detect_shell()
     console.print("[bold cyan]Shell Completions Status[/bold cyan]\n")
@@ -145,14 +152,14 @@ def completions_status() -> None:
         config_path = find_config_file(shell)
 
         if config_path is None:
-            status = "[dim]-[/dim]"
-            config_str = "[dim]No config file found[/dim]"
+            status = ICON_NONE
+            config_str = dim("No config file found")
         elif is_completion_installed(config_path):
-            status = "[green]✓[/green]"
+            status = ICON_SUCCESS
             config_str = str(config_path)
         else:
-            status = "[yellow]○[/yellow]"
-            config_str = f"{config_path} [dim](not installed)[/dim]"
+            status = ICON_ABSENT
+            config_str = f"{config_path} {dim('(not installed)')}"
 
         shell_name = f"[bold]{shell}[/bold]" if shell == detected_shell else shell
         table.add_row(shell_name, status, config_str)

@@ -85,6 +85,7 @@ def scripts_uninstall(dry_run: bool, yes: bool, force: bool) -> None:
     """Remove shell-configs-managed scripts from ~/.local/bin."""
     from shell_configs.display import (
         console,
+        print_dim,
         print_error,
         print_info,
         print_success,
@@ -104,7 +105,7 @@ def scripts_uninstall(dry_run: bool, yes: bool, force: bool) -> None:
     target_dir = get_default_target_dir()
 
     if not manifest.scripts:
-        console.print("[dim]No scripts installed by shell-configs[/dim]")
+        print_dim("No scripts installed by shell-configs")
         return
 
     names = list(manifest.scripts.keys())
@@ -141,7 +142,14 @@ def scripts_status() -> None:
     """Show installation status of managed scripts."""
     from rich.table import Table
 
-    from shell_configs.display import console
+    from shell_configs.display import (
+        ICON_ERROR,
+        ICON_NONE,
+        ICON_SUCCESS,
+        ICON_WARNING,
+        console,
+        print_dim,
+    )
     from shell_configs.script_manager import (
         ScriptManifest,
         ScriptStatus,
@@ -159,12 +167,12 @@ def scripts_status() -> None:
     table.add_column("Status")
 
     status_icons = {
-        ScriptStatus.INSTALLED: "[green]✓[/green]",
+        ScriptStatus.INSTALLED: ICON_SUCCESS,
         ScriptStatus.OUTDATED: "[yellow]↑[/yellow]",
         ScriptStatus.MODIFIED: "[yellow]✎[/yellow]",
-        ScriptStatus.MISSING: "[red]✗[/red]",
-        ScriptStatus.COLLISION: "[yellow]⚠[/yellow]",
-        ScriptStatus.SKIPPED_PLATFORM: "[dim]-[/dim]",
+        ScriptStatus.MISSING: ICON_ERROR,
+        ScriptStatus.COLLISION: ICON_WARNING,
+        ScriptStatus.SKIPPED_PLATFORM: ICON_NONE,
     }
 
     for entry in discover_scripts(include_all=True):
@@ -179,7 +187,8 @@ def scripts_status() -> None:
 
     console.print("[bold cyan]Script Status[/bold cyan]\n")
     console.print(table)
-    console.print(f"\n[dim]Target directory: {target_dir}[/dim]")
+    console.print()
+    print_dim(f"Target directory: {target_dir}")
 
 
 @scripts.command(name="list")
@@ -190,7 +199,7 @@ def scripts_list(include_all: bool) -> None:
     """List available scripts."""
     from rich.table import Table
 
-    from shell_configs.display import console
+    from shell_configs.display import console, print_dim
     from shell_configs.platform import detect_platform
     from shell_configs.script_manager import discover_scripts
 
@@ -210,6 +219,5 @@ def scripts_list(include_all: bool) -> None:
     console.print("[bold cyan]Available Scripts[/bold cyan]\n")
     console.print(table)
     if not include_all:
-        console.print(
-            f"\n[dim]Showing scripts for {current.display_name}. Use --all to see all.[/dim]"
-        )
+        console.print()
+        print_dim(f"Showing scripts for {current.display_name}. Use --all to see all.")

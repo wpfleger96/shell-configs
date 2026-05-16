@@ -30,7 +30,7 @@ def extensions_status(shells: list[str] | None, profile_name: str | None) -> Non
     """Show extension sync status for each IDE."""
     from rich.table import Table
 
-    from shell_configs.display import console
+    from shell_configs.display import ICON_SUCCESS, ICON_WARNING, console
     from shell_configs.extensions import ExtensionManager
     from shell_configs.profiles import ProfileLoader, resolve_active_profile
     from shell_configs.shells.registry import ShellRegistry
@@ -74,11 +74,11 @@ def extensions_status(shells: list[str] | None, profile_name: str | None) -> Non
             ignored_by_shell.append((shell.display_name, diff.ignored))
 
         if diff.missing or diff.extra:
-            status_str = "[yellow]⚠ out of sync[/yellow]"
+            status_str = f"{ICON_WARNING} out of sync"
         elif diff.ignored:
-            status_str = "[yellow]⚠ built-ins ignored[/yellow]"
+            status_str = f"{ICON_WARNING} built-ins ignored"
         else:
-            status_str = "[green]✓ synced[/green]"
+            status_str = f"{ICON_SUCCESS} synced"
 
         table.add_row(
             shell.display_name,
@@ -106,7 +106,14 @@ def extensions_status(shells: list[str] | None, profile_name: str | None) -> Non
 @click.option("--profile", "profile_name", default=None, help="Profile to use")
 def extensions_diff(shells: list[str] | None, profile_name: str | None) -> None:
     """Show differences between desired and installed extensions."""
-    from shell_configs.display import console, print_error, print_info, print_warning
+    from shell_configs.display import (
+        ICON_ADD,
+        console,
+        print_dim,
+        print_error,
+        print_info,
+        print_warning,
+    )
     from shell_configs.extensions import ExtensionManager
     from shell_configs.profiles import ProfileLoader, resolve_active_profile
     from shell_configs.shells.registry import ShellRegistry
@@ -156,9 +163,9 @@ def extensions_diff(shells: list[str] | None, profile_name: str | None) -> None:
                 print_error(ext_id, indent=4)
 
         if diff.extra:
-            console.print(f"  [dim]Extra ({len(diff.extra)}):[/dim]")
+            print_dim(f"Extra ({len(diff.extra)}):", indent=2)
             for ext_id in sorted(diff.extra):
-                console.print(f"    [dim]+[/dim] {ext_id}")
+                console.print(f"    {ICON_ADD} {ext_id}")
 
     if not found_diffs:
         print_info("All IDE extensions are in sync")
@@ -292,7 +299,14 @@ def extensions_list(shells: list[str] | None, profile_name: str | None) -> None:
     """List all extensions for each IDE with their install status."""
     from rich.table import Table
 
-    from shell_configs.display import console, print_info, print_warning
+    from shell_configs.display import (
+        ICON_ERROR,
+        ICON_SUCCESS,
+        console,
+        dim,
+        print_info,
+        print_warning,
+    )
     from shell_configs.extensions import ExtensionManager
     from shell_configs.profiles import ProfileLoader, resolve_active_profile
     from shell_configs.shells.registry import ShellRegistry
@@ -325,13 +339,13 @@ def extensions_list(shells: list[str] | None, profile_name: str | None) -> None:
 
         rows: list[tuple[str, str]] = []
         for ext_id in diff.matched:
-            rows.append((ext_id, "[green]✓ installed[/green]"))
+            rows.append((ext_id, f"{ICON_SUCCESS} installed"))
         for ext_id in diff.missing:
-            rows.append((ext_id, "[red]✗ missing[/red]"))
+            rows.append((ext_id, f"{ICON_ERROR} missing"))
         for ext_id in diff.extra:
-            rows.append((ext_id, "[dim]+ extra[/dim]"))
+            rows.append((ext_id, dim("+ extra")))
         for ext_id in diff.ignored:
-            rows.append((ext_id, "[dim]~ builtin[/dim]"))
+            rows.append((ext_id, dim("~ builtin")))
 
         if not rows:
             continue

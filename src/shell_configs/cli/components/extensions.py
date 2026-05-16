@@ -74,9 +74,11 @@ class ExtensionsComponent(Component):
                     print_error(ext_id, indent=6)
 
             if diff.extra:
-                console.print(f"    [dim]Unmanaged ({len(diff.extra)}):[/dim]")
+                from shell_configs.display import ICON_ADD, print_dim
+
+                print_dim(f"Unmanaged ({len(diff.extra)}):", indent=4)
                 for ext_id in sorted(diff.extra):
-                    console.print(f"      [dim]+[/dim] {ext_id}")
+                    console.print(f"      {ICON_ADD} {ext_id}")
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
         if not isinstance(plan, ExtensionsPlan):

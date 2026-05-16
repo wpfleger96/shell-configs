@@ -55,6 +55,7 @@ def setup(
     )
     from shell_configs.display import (
         console,
+        print_dim,
         print_done,
         print_error,
         print_info,
@@ -65,9 +66,8 @@ def setup(
 
     if not skip_packages:
         console.print("\n[bold cyan]Step 1/5: Install required packages[/bold cyan]")
-        console.print(
-            "[dim]Installing system packages needed by shell configurations.[/dim]\n"
-        )
+        print_dim("Installing system packages needed by shell configurations.")
+        console.print()
         from shell_configs.cli.groups.packages import packages_install
 
         ctx.invoke(packages_install, dry_run=dry_run, yes=yes)
@@ -75,9 +75,8 @@ def setup(
     console.print(
         "\n[bold cyan]Step 2/5: Install shell-configs system-wide[/bold cyan]"
     )
-    console.print(
-        "[dim]This allows you to run 'shell-configs' from any directory.[/dim]\n"
-    )
+    print_dim("This allows you to run 'shell-configs' from any directory.")
+    console.print()
 
     shell_configs_tool = get_tool_by_id("shell-configs")
     tool_install_success = False
@@ -87,8 +86,8 @@ def setup(
             update_info = check_tool_updates(shell_configs_tool, timeout=10)
             if update_info and update_info.has_update:
                 if dry_run:
-                    console.print(
-                        f"[dim]Would upgrade shell-configs {update_info.current_version} → {update_info.latest_version}[/dim]"
+                    print_dim(
+                        f"Would upgrade shell-configs {update_info.current_version} → {update_info.latest_version}"
                     )
                     tool_install_success = True
                 else:
@@ -170,11 +169,11 @@ def setup(
         if shell is None:
             supported = ", ".join(get_supported_shells())
             print_warning(f"Could not detect shell. Supported: {supported}")
-            console.print("[dim]Skipping completion installation[/dim]")
+            print_dim("Skipping completion installation")
         else:
             if not yes and not dry_run:
                 if not click.confirm(f"Install {shell} tab completion?", default=True):
-                    console.print("[dim]Skipping completion installation[/dim]")
+                    print_dim("Skipping completion installation")
                 else:
                     success, message = install_completion(shell, dry_run=dry_run)
                     if success:
@@ -190,7 +189,8 @@ def setup(
 
     if not skip_scripts:
         console.print("\n[bold cyan]Step 5/5: Install utility scripts[/bold cyan]")
-        console.print("[dim]Installing utility scripts to ~/.local/bin.[/dim]\n")
+        print_dim("Installing utility scripts to ~/.local/bin.")
+        console.print()
         scripts_source = get_tool_scripts_dir("shell-configs") if not dry_run else None
         if scripts_source and scripts_source.exists():
             from shell_configs.script_manager import (
@@ -225,7 +225,8 @@ def setup(
                     print_would(message)
 
     if dry_run:
-        console.print("\n[dim]Dry run complete - no changes were made.[/dim]")
+        console.print()
+        print_dim("Dry run complete - no changes were made.")
     else:
         console.print("\n[green bold]✓ Setup complete![/green bold]")
         console.print("You can now run shell-configs from anywhere.")

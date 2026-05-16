@@ -108,7 +108,9 @@ class ScriptsComponent(Component):
         manifest = ScriptManifest(get_default_manifest_path())
         entries = discover_scripts()
         if not entries:
-            console.print("[dim]No scripts available for this platform[/dim]")
+            from shell_configs.display import print_dim
+
+            print_dim("No scripts available for this platform")
         else:
             for entry in entries:
                 script_result, msg = install_script(
@@ -142,7 +144,9 @@ class ScriptsComponent(Component):
         installed = sum(1 for _, st in plan.entries if st == ScriptStatus.INSTALLED)
 
         if total == 0:
-            console.print("  [dim]No scripts available for this platform[/dim]")
+            from shell_configs.display import print_dim
+
+            print_dim("No scripts available for this platform", indent=2)
         elif installed == total:
             from shell_configs.display import print_success
 

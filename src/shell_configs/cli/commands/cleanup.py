@@ -20,7 +20,7 @@ def cleanup(dry_run: bool, keep: int | None, yes: bool) -> None:
     from rich.table import Table
 
     from shell_configs.bootstrap import load_auto_update_config
-    from shell_configs.display import console, print_info
+    from shell_configs.display import console, print_info, print_success
     from shell_configs.manager import ConfigManager
     from shell_configs.shells.registry import ShellRegistry
 
@@ -128,7 +128,7 @@ def cleanup(dry_run: bool, keep: int | None, yes: bool) -> None:
         )
         removed_count += len(removed)
 
-    console.print(
-        f"[green]✓[/green] Removed {removed_count} backup files "
+    print_success(
+        f"Removed {removed_count} backup files "
         f"(kept {retention} most recent per config)"
     )

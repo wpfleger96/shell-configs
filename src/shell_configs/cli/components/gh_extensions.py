@@ -55,20 +55,21 @@ class GhExtensionsComponent(Component):
         if not plan.has_changes:
             return
 
-        from shell_configs.display import console, print_error
+        from shell_configs.display import console, print_add, print_dim, print_error
 
         console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
 
         if not plan.gh_available:
-            console.print(
-                "  [dim]gh not installed — will be installed by required packages first[/dim]"
+            print_dim(
+                "gh not installed — will be installed by required packages first",
+                indent=2,
             )
             return
 
         for ext in plan.missing:
             print_error(f"{ext.repo} (not installed)", indent=2)
         for ext_name in sorted(plan.extra):
-            console.print(f"  [dim]+[/dim] {ext_name} (not in manifest)")
+            print_add(f"{ext_name} (not in manifest)", indent=2)
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
         if not isinstance(plan, GhExtensionsPlan):

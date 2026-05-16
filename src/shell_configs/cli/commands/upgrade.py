@@ -31,6 +31,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
     from shell_configs.bootstrap.installer import make_github_install_url
     from shell_configs.display import (
         console,
+        print_dim,
         print_done,
         print_error,
         print_hint,
@@ -50,9 +51,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         try:
             current = tool.get_version()
             if current:
-                console.print(
-                    f"[dim]{tool.display_name} current version: {current}[/dim]"
-                )
+                print_dim(f"{tool.display_name} current version: {current}")
         except Exception as e:
             print_error(f"Could not get {tool.display_name} version: {e}")
             continue

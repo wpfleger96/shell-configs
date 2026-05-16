@@ -22,7 +22,14 @@ import click
 )
 def signing(fix: bool, verbose: bool, yes: bool, cleanup: bool) -> None:
     """Validate and manage SSH key lifecycle with GitHub."""
-    from shell_configs.display import console, print_error, print_success, print_warning
+    from shell_configs.display import (
+        console,
+        print_dim,
+        print_error,
+        print_label,
+        print_success,
+        print_warning,
+    )
     from shell_configs.signing import (
         get_signing_key_info,
         setup_signing,
@@ -52,7 +59,8 @@ def signing(fix: bool, verbose: bool, yes: bool, cleanup: bool) -> None:
             print_error("Could not read local SSH key fingerprint")
             sys.exit(1)
 
-        console.print(f"[dim]Current key fingerprint: {current_fp}[/dim]\n")
+        print_label("Current key fingerprint", current_fp)
+        console.print()
 
         if not stale_keys:
             print_success("No stale SSH keys found on GitHub")
@@ -73,7 +81,7 @@ def signing(fix: bool, verbose: bool, yes: bool, cleanup: bool) -> None:
                 else:
                     print_error(msg)
             else:
-                console.print(f"[dim]Skipped: {key.title}[/dim]")
+                print_dim(f"Skipped: {key.title}")
         return
 
     interactive = sys.stdin.isatty() if not yes else False

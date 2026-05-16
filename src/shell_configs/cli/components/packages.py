@@ -131,7 +131,7 @@ class OptionalPackagesComponent(Component):
         if not plan.missing:
             return True
 
-        from shell_configs.display import console, print_error, print_success
+        from shell_configs.display import console, print_dim, print_error, print_success
         from shell_configs.packages import get_package_manager
 
         pkg_manager = get_package_manager()
@@ -141,7 +141,7 @@ class OptionalPackagesComponent(Component):
         try:
             total = len(plan.missing)
             for i, pkg in enumerate(plan.missing, start=1):
-                console.print(f"[dim][{i}/{total}] Installing {pkg.name}...[/dim]")
+                print_dim(f"[{i}/{total}] Installing {pkg.name}...")
                 success, message = pkg_manager.install(pkg, dry_run=False)
 
                 if success:
@@ -168,12 +168,10 @@ class OptionalPackagesComponent(Component):
         plan = self.plan(ctx)
 
         if not plan.has_changes:
-            from shell_configs.display import console
+            from shell_configs.display import console, print_done
 
             console.print()
-            console.print(
-                f"[dim]✓[/dim] All {len(plan.total)} packages already installed"
-            )
+            print_done(f"All {len(plan.total)} packages already installed")
             return True
 
         self.display_plan(plan)
@@ -190,12 +188,12 @@ class OptionalPackagesComponent(Component):
             return True
 
     def status(self, ctx: Context) -> None:
-        from shell_configs.display import console
+        from shell_configs.display import console, print_dim
         from shell_configs.packages import get_package_manager
 
         pkg_manager = get_package_manager()
         if not pkg_manager:
-            console.print("  [dim]No package manager available[/dim]")
+            print_dim("No package manager available", indent=2)
             console.print()
             return
 
