@@ -30,5 +30,5 @@ chrome() {
 }
 
 nosleep() {
-    caffeinate -disu -t "${1:-9200}"
+    caffeinate -disu -t "${1:-86400}"
 }
