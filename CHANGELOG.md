@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v0.40.1 (2026-05-16)
+
+### Bug Fixes
+
+- Raise nosleep default timeout to 24 hours
+  ([#36](https://github.com/wpfleger96/shell-configs/pull/36),
+  [`6239033`](https://github.com/wpfleger96/shell-configs/commit/6239033dc931c7bb5d73467ebda91d8579da9de0))
+
+
 ## v0.40.0 (2026-05-15)
 
 ### Bug Fixes
