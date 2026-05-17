@@ -144,11 +144,12 @@ def scripts_status() -> None:
 
     from shell_configs.display import (
         ICON_ERROR,
-        ICON_NONE,
+        ICON_SKIPPED,
         ICON_SUCCESS,
         ICON_WARNING,
         console,
         print_dim,
+        print_section,
     )
     from shell_configs.script_manager import (
         ScriptManifest,
@@ -172,7 +173,7 @@ def scripts_status() -> None:
         ScriptStatus.MODIFIED: "[yellow]✎[/yellow]",
         ScriptStatus.MISSING: ICON_ERROR,
         ScriptStatus.COLLISION: ICON_WARNING,
-        ScriptStatus.SKIPPED_PLATFORM: ICON_NONE,
+        ScriptStatus.SKIPPED_PLATFORM: ICON_SKIPPED,
     }
 
     for entry in discover_scripts(include_all=True):
@@ -185,7 +186,7 @@ def scripts_status() -> None:
             label = "other platform"
         table.add_row(entry.name, f"{icon} {label}")
 
-    console.print("[bold cyan]Script Status[/bold cyan]\n")
+    print_section("Script Status")
     console.print(table)
     console.print()
     print_dim(f"Target directory: {target_dir}")
@@ -199,7 +200,7 @@ def scripts_list(include_all: bool) -> None:
     """List available scripts."""
     from rich.table import Table
 
-    from shell_configs.display import console, print_dim
+    from shell_configs.display import console, print_dim, print_section
     from shell_configs.platform import detect_platform
     from shell_configs.script_manager import discover_scripts
 
@@ -216,7 +217,7 @@ def scripts_list(include_all: bool) -> None:
         )
         table.add_row(entry.name, platforms)
 
-    console.print("[bold cyan]Available Scripts[/bold cyan]\n")
+    print_section("Available Scripts")
     console.print(table)
     if not include_all:
         console.print()

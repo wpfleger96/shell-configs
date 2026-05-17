@@ -66,12 +66,12 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         if update_info and (update_info.has_update or force):
             tool_updates.append((tool, update_info))
         elif update_info and not update_info.has_update:
-            print_success(f"{tool.display_name} is already up to date!")
+            print_done(f"{tool.display_name} is already up to date")
 
     console.print()
 
     if not tool_updates and not force:
-        print_success("All tools are up to date!")
+        print_done("All tools are up to date")
         return
 
     if not check:

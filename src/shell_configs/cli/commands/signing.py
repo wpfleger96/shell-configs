@@ -100,8 +100,9 @@ def signing(fix: bool, verbose: bool, yes: bool, cleanup: bool) -> None:
     if verbose and not has_failure:
         info = get_signing_key_info()
         if info:
-            console.print()
-            console.print("[bold cyan]Signing Key Details[/bold cyan]")
+            from shell_configs.display import print_section
+
+            print_section("Signing Key Details")
             console.print(f"  Key type:      {info['key_type']}")
             console.print(f"  Fingerprint:   {info['fingerprint']}")
             console.print(f"  GitHub title:  {info['github_title'] or 'N/A'}")

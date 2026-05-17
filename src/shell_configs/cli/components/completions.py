@@ -16,7 +16,12 @@ class CompletionsComponent(Component):
             get_supported_shells,
             is_completion_installed,
         )
-        from shell_configs.display import console, print_success
+        from shell_configs.display import (
+            console,
+            print_dim,
+            print_skipped,
+            print_success,
+        )
 
         detected_shell = detect_shell()
         if detected_shell:
@@ -26,8 +31,6 @@ class CompletionsComponent(Component):
                     f"{detected_shell} completion installed ({config_path})", indent=2
                 )
             else:
-                from shell_configs.display import print_skipped
-
                 print_skipped(
                     f"{detected_shell} completion not installed "
                     "(run: shell-configs completions install)",
@@ -35,8 +38,6 @@ class CompletionsComponent(Component):
                 )
         else:
             supported = ", ".join(get_supported_shells())
-            from shell_configs.display import print_dim
-
             print_dim(
                 f"Shell completion not available for your shell (only {supported} supported)",
                 indent=2,

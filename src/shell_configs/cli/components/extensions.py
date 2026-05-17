@@ -49,7 +49,14 @@ class ExtensionsComponent(Component):
     def display_plan(self, plan: ComponentPlan) -> None:
         if not isinstance(plan, ExtensionsPlan):
             raise TypeError(f"expected ExtensionsPlan, got {type(plan).__name__}")
-        from shell_configs.display import console, print_error
+        from shell_configs.display import (
+            console,
+            print_add,
+            print_builtin,
+            print_dim,
+            print_error,
+            print_section,
+        )
 
         found_diffs = False
         for shell_name, diff in plan.per_shell.items():
@@ -57,7 +64,7 @@ class ExtensionsComponent(Component):
                 continue
 
             if not found_diffs:
-                console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
+                print_section(self.display_name)
             found_diffs = True
             console.print(f"\n  [bold]{shell_name}[/bold]")
 
@@ -66,7 +73,7 @@ class ExtensionsComponent(Component):
                     f"    [yellow]Ignored built-ins in config ({len(diff.ignored)}):[/yellow]"
                 )
                 for ext_id in sorted(diff.ignored):
-                    console.print(f"      [yellow]![/yellow] {ext_id}")
+                    print_builtin(ext_id, indent=6)
 
             if diff.missing:
                 console.print(f"    [yellow]Missing ({len(diff.missing)}):[/yellow]")
@@ -74,11 +81,9 @@ class ExtensionsComponent(Component):
                     print_error(ext_id, indent=6)
 
             if diff.extra:
-                from shell_configs.display import ICON_ADD, print_dim
-
                 print_dim(f"Unmanaged ({len(diff.extra)}):", indent=4)
                 for ext_id in sorted(diff.extra):
-                    console.print(f"      {ICON_ADD} {ext_id}")
+                    print_add(ext_id, indent=6)
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
         if not isinstance(plan, ExtensionsPlan):
@@ -144,7 +149,7 @@ class ExtensionsComponent(Component):
                 cli_cmd, set(diff.missing), dry_run=ctx.dry_run, invoker=invoker
             )
             for ext_r in ext_results:
-                _print_extension_result(console, ext_r)
+                _print_extension_result(ext_r)
 
         if not any_ext_activity:
             console.print()
@@ -158,13 +163,16 @@ class ExtensionsComponent(Component):
         return self.apply(ctx, p)
 
     def status(self, ctx: Context) -> None:
-        from shell_configs.display import console
+        from shell_configs.cli.helpers import _get_extension_shells
+        from shell_configs.display import (
+            console,
+            print_hint,
+            print_success,
+            print_warning,
+        )
         from shell_configs.extensions import ExtensionManager
 
         ext_manager = ExtensionManager()
-
-        from shell_configs.cli.helpers import _get_extension_shells
-
         ide_shells = _get_extension_shells(ctx.registry)
         for shell in ide_shells:
             invoker = shell.get_extension_invoker()
@@ -185,8 +193,6 @@ class ExtensionsComponent(Component):
             )
 
             if not ext_diff.missing and not ext_diff.extra:
-                from shell_configs.display import print_success
-
                 print_success(
                     f"{shell.display_name}: "
                     f"{len(ext_diff.matched)}/{len(ext_desired)} extensions synced",
@@ -198,14 +204,12 @@ class ExtensionsComponent(Component):
                     parts.append(f"{len(ext_diff.missing)} missing")
                 if ext_diff.extra:
                     parts.append(f"{len(ext_diff.extra)} unmanaged")
-                from shell_configs.display import print_hint, print_warning
-
                 print_warning(
                     f"{shell.display_name}: "
                     f"{len(ext_diff.matched)}/{len(ext_desired)} synced ({', '.join(parts)})",
                     indent=2,
                 )
-                print_hint("Run 'shell-configs extensions diff' for details")
+                print_hint("Run 'shell-configs extensions diff' for details", indent=2)
 
         console.print()
 

@@ -40,9 +40,9 @@ class RequiredPackagesComponent(Component):
         if not plan.has_changes:
             return
 
-        from shell_configs.display import console, print_progress
+        from shell_configs.display import console, print_progress, print_section
 
-        console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
+        print_section(self.display_name)
         print_progress(f"Installing {len(plan.missing)} required package(s)...")
         for pkg in plan.missing:
             console.print(f"  {pkg.name}")
@@ -118,9 +118,13 @@ class OptionalPackagesComponent(Component):
         if not plan.has_changes:
             return
 
-        from shell_configs.display import console, print_error, print_warning
+        from shell_configs.display import (
+            print_error,
+            print_section,
+            print_warning,
+        )
 
-        console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
+        print_section(self.display_name)
         print_warning(f"{len(plan.missing)}/{len(plan.total)} packages missing")
         for pkg in plan.missing:
             print_error(pkg.name, indent=2)
@@ -165,11 +169,11 @@ class OptionalPackagesComponent(Component):
 
         import click
 
+        from shell_configs.display import console, print_done, print_hint
+
         plan = self.plan(ctx)
 
         if not plan.has_changes:
-            from shell_configs.display import console, print_done
-
             console.print()
             print_done(f"All {len(plan.total)} packages already installed")
             return True
@@ -177,18 +181,20 @@ class OptionalPackagesComponent(Component):
         self.display_plan(plan)
 
         if ctx.yes or click.confirm("Install missing packages?", default=True):
-            from shell_configs.display import console
-
             console.print()
             return self.apply(ctx, plan)
         else:
-            from shell_configs.display import print_hint
-
             print_hint("Run 'shell-configs packages install' to install later.")
             return True
 
     def status(self, ctx: Context) -> None:
-        from shell_configs.display import console, print_dim
+        from shell_configs.display import (
+            console,
+            print_dim,
+            print_hint,
+            print_success,
+            print_warning,
+        )
         from shell_configs.packages import get_package_manager
 
         pkg_manager = get_package_manager()
@@ -203,31 +209,27 @@ class OptionalPackagesComponent(Component):
         display_name = pkg_manager.display_name
 
         if not plan.missing:
-            from shell_configs.display import print_success
-
             print_success(
                 f"{installed_count}/{total_count} packages installed ({display_name})",
                 indent=2,
             )
         else:
-            from shell_configs.display import print_hint, print_warning
-
             print_warning(
                 f"{installed_count}/{total_count} packages installed ({display_name})",
                 indent=2,
             )
-            print_hint("Run 'shell-configs packages status' for details")
+            print_hint("Run 'shell-configs packages status' for details", indent=2)
 
         console.print()
 
     def diff(self, ctx: Context) -> bool:
-        from shell_configs.display import console, print_error
+        from shell_configs.display import print_error, print_section
 
         plan = self.plan(ctx)
         if not plan.has_changes:
             return False
 
-        console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
+        print_section(self.display_name)
         for pkg in plan.missing:
             print_error(f"{pkg.name} (not installed)", indent=2)
         return True

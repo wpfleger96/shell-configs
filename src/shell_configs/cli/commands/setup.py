@@ -59,22 +59,21 @@ def setup(
         print_done,
         print_error,
         print_info,
+        print_section,
         print_success,
         print_warning,
         print_would,
     )
 
     if not skip_packages:
-        console.print("\n[bold cyan]Step 1/5: Install required packages[/bold cyan]")
+        print_section("Step 1/5: Install required packages")
         print_dim("Installing system packages needed by shell configurations.")
         console.print()
         from shell_configs.cli.groups.packages import packages_install
 
         ctx.invoke(packages_install, dry_run=dry_run, yes=yes)
 
-    console.print(
-        "\n[bold cyan]Step 2/5: Install shell-configs system-wide[/bold cyan]"
-    )
+    print_section("Step 2/5: Install shell-configs system-wide")
     print_dim("This allows you to run 'shell-configs' from any directory.")
     console.print()
 
@@ -109,7 +108,7 @@ def setup(
                         else:
                             print_error(f"Failed to upgrade shell-configs: {msg}")
             else:
-                print_success("shell-configs is already up to date")
+                print_done("shell-configs is already up to date")
                 tool_install_success = True
         except Exception as e:
             import logging
@@ -148,9 +147,7 @@ def setup(
 
     config_dir = get_tool_config_dir("shell-configs") if not dry_run else None
 
-    console.print(
-        "\n[bold cyan]Step 3/5: Installing shell configurations[/bold cyan]\n"
-    )
+    print_section("Step 3/5: Installing shell configurations")
 
     from shell_configs.cli.commands.install import install
 
@@ -163,7 +160,7 @@ def setup(
     )
 
     if not skip_completions:
-        console.print("\n[bold cyan]Step 4/5: Shell completion setup[/bold cyan]\n")
+        print_section("Step 4/5: Shell completion setup")
 
         shell = detect_shell()
         if shell is None:
@@ -188,7 +185,7 @@ def setup(
                     print_warning(message)
 
     if not skip_scripts:
-        console.print("\n[bold cyan]Step 5/5: Install utility scripts[/bold cyan]")
+        print_section("Step 5/5: Install utility scripts")
         print_dim("Installing utility scripts to ~/.local/bin.")
         console.print()
         scripts_source = get_tool_scripts_dir("shell-configs") if not dry_run else None
@@ -228,5 +225,6 @@ def setup(
         console.print()
         print_dim("Dry run complete - no changes were made.")
     else:
-        console.print("\n[green bold]✓ Setup complete![/green bold]")
+        console.print()
+        print_success("Setup complete!")
         console.print("You can now run shell-configs from anywhere.")

@@ -34,7 +34,7 @@ class ScriptsComponent(Component):
         if not plan.has_changes:
             return
 
-        from shell_configs.display import console
+        from shell_configs.display import console, print_section
         from shell_configs.script_manager import ScriptStatus, get_default_target_dir
 
         target_dir = get_default_target_dir()
@@ -45,7 +45,7 @@ class ScriptsComponent(Component):
             ScriptStatus.COLLISION: "[yellow]exists (not ours)[/yellow]",
         }
 
-        console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
+        print_section(self.display_name)
         for entry, st in plan.entries:
             if st != ScriptStatus.INSTALLED:
                 label = status_labels.get(st, st.value)
@@ -86,6 +86,7 @@ class ScriptsComponent(Component):
     def install(self, ctx: Context) -> bool:
         from shell_configs.display import (
             console,
+            print_dim,
             print_done,
             print_error,
             print_progress,
@@ -108,8 +109,6 @@ class ScriptsComponent(Component):
         manifest = ScriptManifest(get_default_manifest_path())
         entries = discover_scripts()
         if not entries:
-            from shell_configs.display import print_dim
-
             print_dim("No scripts available for this platform")
         else:
             for entry in entries:
@@ -135,7 +134,13 @@ class ScriptsComponent(Component):
         return True
 
     def status(self, ctx: Context) -> None:
-        from shell_configs.display import console
+        from shell_configs.display import (
+            console,
+            print_dim,
+            print_hint,
+            print_success,
+            print_warning,
+        )
         from shell_configs.script_manager import ScriptStatus
 
         plan = self.plan(ctx)
@@ -144,23 +149,17 @@ class ScriptsComponent(Component):
         installed = sum(1 for _, st in plan.entries if st == ScriptStatus.INSTALLED)
 
         if total == 0:
-            from shell_configs.display import print_dim
-
             print_dim("No scripts available for this platform", indent=2)
         elif installed == total:
-            from shell_configs.display import print_success
-
             print_success(
                 f"{installed}/{total} scripts installed (~/.local/bin)", indent=2
             )
         else:
-            from shell_configs.display import print_hint, print_warning
-
             print_warning(
                 f"{installed}/{total} scripts installed ({total - installed} missing)",
                 indent=2,
             )
-            print_hint("Run 'shell-configs scripts status' for details")
+            print_hint("Run 'shell-configs scripts status' for details", indent=2)
 
         console.print()
 

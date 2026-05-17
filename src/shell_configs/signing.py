@@ -479,6 +479,7 @@ def _resolve_key_path(
     choice: int = click.prompt(
         "Which key should shell-configs manage?",
         type=click.IntRange(1, len(local_keys)),
+        prompt_suffix=f" (1-{len(local_keys)}): ",
     )
     selected = local_keys[choice - 1]
     results.append(StepResult("discover_key", True, f"Selected SSH key: {selected}"))

@@ -27,9 +27,13 @@ class SigningComponent(Component):
         if not plan.has_changes:
             return
 
-        from shell_configs.display import console, print_dim, print_warning
+        from shell_configs.display import (
+            print_dim,
+            print_section,
+            print_warning,
+        )
 
-        console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
+        print_section(self.display_name)
 
         if not plan.gh_available:
             print_dim(

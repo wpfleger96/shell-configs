@@ -55,9 +55,14 @@ class GhExtensionsComponent(Component):
         if not plan.has_changes:
             return
 
-        from shell_configs.display import console, print_add, print_dim, print_error
+        from shell_configs.display import (
+            print_add,
+            print_dim,
+            print_error,
+            print_section,
+        )
 
-        console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
+        print_section(self.display_name)
 
         if not plan.gh_available:
             print_dim(

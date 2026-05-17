@@ -142,22 +142,26 @@ def _print_ignored_builtin_extensions(
         return header_printed
 
     if not header_printed:
-        console.print(f"\n[bold cyan]{shell_display_name}[/bold cyan]")
+        from shell_configs.display import print_section
+
+        print_section(shell_display_name)
         header_printed = True
 
+    from shell_configs.display import print_builtin
+
     ignored = ", ".join(sorted(ignored_extensions))
-    console.print(
-        f"  [yellow]! Ignoring built-in extensions from config: {ignored}[/yellow]"
-    )
+    print_builtin(f"Ignoring built-in extensions from config: {ignored}", indent=2)
     return header_printed
 
 
-def _print_extension_result(console: Any, result: ExtensionResult) -> None:
+def _print_extension_result(result: ExtensionResult) -> None:
     """Render extension install/uninstall results consistently."""
     from shell_configs.extensions import ExtensionResultStatus
 
     if result.status == ExtensionResultStatus.SKIPPED_BUILTIN:
-        console.print(f"  [yellow]![/yellow] {result.extension_id}: {result.message}")
+        from shell_configs.display import print_builtin
+
+        print_builtin(f"{result.extension_id}: {result.message}", indent=2)
     elif result.success:
         from shell_configs.display import print_success
 

@@ -126,21 +126,21 @@ def completions_status() -> None:
     )
     from shell_configs.display import (
         ICON_ABSENT,
-        ICON_NONE,
+        ICON_DASH,
         ICON_SUCCESS,
         console,
         dim,
         print_hint,
+        print_section,
+        print_warning,
     )
 
     detected_shell = detect_shell()
-    console.print("[bold cyan]Shell Completions Status[/bold cyan]\n")
+    print_section("Shell Completions Status")
 
     if detected_shell:
         console.print(f"Detected shell: [cyan]{detected_shell}[/cyan]\n")
     else:
-        from shell_configs.display import print_warning
-
         print_warning("No supported shell detected")
 
     table = Table(show_header=True, header_style="bold")
@@ -152,7 +152,7 @@ def completions_status() -> None:
         config_path = find_config_file(shell)
 
         if config_path is None:
-            status = ICON_NONE
+            status = ICON_DASH
             config_str = dim("No config file found")
         elif is_completion_installed(config_path):
             status = ICON_SUCCESS

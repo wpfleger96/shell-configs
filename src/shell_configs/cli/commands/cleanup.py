@@ -20,7 +20,7 @@ def cleanup(dry_run: bool, keep: int | None, yes: bool) -> None:
     from rich.table import Table
 
     from shell_configs.bootstrap import load_auto_update_config
-    from shell_configs.display import console, print_info, print_success
+    from shell_configs.display import console, print_info, print_section, print_success
     from shell_configs.manager import ConfigManager
     from shell_configs.shells.registry import ShellRegistry
 
@@ -31,7 +31,7 @@ def cleanup(dry_run: bool, keep: int | None, yes: bool) -> None:
     registry = ShellRegistry()
     all_shells = registry.get_all()
 
-    console.print("[bold cyan]Scanning for shell-configs backup files...[/bold cyan]\n")
+    print_section("Scanning for shell-configs backup files...")
 
     backup_by_config: dict[Path, list[Path]] = defaultdict(list)
     backup_dir_map: dict[Path, Path] = {}

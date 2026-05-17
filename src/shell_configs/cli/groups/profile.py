@@ -19,7 +19,7 @@ def profile_list() -> None:
     from rich.table import Table
 
     from shell_configs.bootstrap.config import load_auto_update_config
-    from shell_configs.display import ICON_NONE, console, print_dim
+    from shell_configs.display import ICON_DASH, console, print_dim
     from shell_configs.profiles import ProfileLoader
 
     config_reader = ConfigReader()
@@ -38,11 +38,11 @@ def profile_list() -> None:
             active_marker = " [green]*[/green]" if name == active_name else ""
             table.add_row(
                 f"{p.name}{active_marker}",
-                p.description or ICON_NONE,
-                p.extends or ICON_NONE,
+                p.description or ICON_DASH,
+                p.extends or ICON_DASH,
             )
         except Exception as e:
-            table.add_row(name, f"[red]Error: {e}[/red]", ICON_NONE)
+            table.add_row(name, f"[red]Error: {e}[/red]", ICON_DASH)
 
     console.print(table)
     print_dim("* = active profile")

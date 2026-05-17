@@ -62,10 +62,12 @@ ICON_UPDATE = "[yellow]↻[/yellow]"
 ICON_ERROR = "[red]✗[/red]"
 ICON_WARNING = "[yellow]⚠[/yellow]"
 ICON_INFO = "[blue]ℹ[/blue]"
-ICON_HINT = "[yellow]💡[/yellow]"
+ICON_HINT = "[yellow]»[/yellow]"
+ICON_PROGRESS = "[yellow]⟳[/yellow]"
 ICON_WOULD = "[dim]→[/dim]"
 ICON_ADD = "[green]+[/green]"
-ICON_NONE = "[dim]-[/dim]"
+ICON_BUILTIN = "[yellow]![/yellow]"
+ICON_DASH = "[dim]-[/dim]"
 
 
 # ─── Markup builder ──────────────────────────────────────────────────────────
@@ -110,14 +112,6 @@ def print_skipped(message: str, *, indent: int = 0) -> None:
     get_console().print(f"{' ' * indent}{ICON_SKIPPED} {message}")
 
 
-def print_absent(message: str, *, indent: int = 0) -> None:
-    get_console().print(f"{' ' * indent}{ICON_ABSENT} {message}")
-
-
-def print_update(message: str, *, indent: int = 0) -> None:
-    get_console().print(f"{' ' * indent}{ICON_UPDATE} {message}")
-
-
 def print_would(message: str, *, indent: int = 0) -> None:
     get_console().print(f"{' ' * indent}{ICON_WOULD} {message}")
 
@@ -127,7 +121,7 @@ def print_add(message: str, *, indent: int = 0) -> None:
 
 
 def print_progress(message: str, *, indent: int = 0) -> None:
-    get_console().print(f"{' ' * indent}[yellow]{message}[/yellow]")
+    get_console().print(f"{' ' * indent}{ICON_PROGRESS} {message}")
 
 
 def print_dim(message: str, *, indent: int = 0) -> None:
@@ -136,6 +130,14 @@ def print_dim(message: str, *, indent: int = 0) -> None:
 
 def print_label(key: str, value: str, *, indent: int = 0) -> None:
     get_console().print(f"{' ' * indent}{dim(key + ':')} {value}")
+
+
+def print_builtin(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}{ICON_BUILTIN} {message}")
+
+
+def print_section(title: str) -> None:
+    get_console().print(f"\n[bold cyan]{title}[/bold cyan]\n")
 
 
 # ─── Shell-configs-specific helpers ──────────────────────────────────────────
