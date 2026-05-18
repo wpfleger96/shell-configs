@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v0.41.1 (2026-05-18)
+
+### Bug Fixes
+
+- Restore custom prompt after Hermit chpwd hook clobbers PS1
+  ([`7c47ce1`](https://github.com/wpfleger96/shell-configs/commit/7c47ce12329a6d8691153102f4655c08143fd116))
+
+### Chores
+
+- **deps**: Update astral-sh/setup-uv action to v8
+  ([#38](https://github.com/wpfleger96/shell-configs/pull/38),
+  [`eb13977`](https://github.com/wpfleger96/shell-configs/commit/eb13977fc56420fb302148b4c8c258eb8428e299))
+
+- **deps**: Update python Docker tag to v3.14
+  ([#37](https://github.com/wpfleger96/shell-configs/pull/37),
+  [`ce39222`](https://github.com/wpfleger96/shell-configs/commit/ce392226295c705b8a3bcaf26d18070931d0bead))
+
+
 ## v0.41.0 (2026-05-18)
 
 ### Features
