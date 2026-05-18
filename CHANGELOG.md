@@ -2,6 +2,37 @@
 
 <!-- version list -->
 
+## v0.41.0 (2026-05-18)
+
+### Features
+
+- Add print_hint helper and dim background successes
+  ([#35](https://github.com/wpfleger96/shell-configs/pull/35),
+  [`43fbd8d`](https://github.com/wpfleger96/shell-configs/commit/43fbd8d70f516dc930e607dc9ba10b2daa943b98))
+
+### Refactoring
+
+- Complete display helper migration across all CLI modules
+  ([#35](https://github.com/wpfleger96/shell-configs/pull/35),
+  [`43fbd8d`](https://github.com/wpfleger96/shell-configs/commit/43fbd8d70f516dc930e607dc9ba10b2daa943b98))
+
+- Complete display helper migration and golden path alignment
+  ([#35](https://github.com/wpfleger96/shell-configs/pull/35),
+  [`43fbd8d`](https://github.com/wpfleger96/shell-configs/commit/43fbd8d70f516dc930e607dc9ba10b2daa943b98))
+
+- Eliminate all raw Rich markup via display helpers
+  ([#35](https://github.com/wpfleger96/shell-configs/pull/35),
+  [`43fbd8d`](https://github.com/wpfleger96/shell-configs/commit/43fbd8d70f516dc930e607dc9ba10b2daa943b98))
+
+- Expand display helpers to cover all symbol patterns
+  ([#35](https://github.com/wpfleger96/shell-configs/pull/35),
+  [`43fbd8d`](https://github.com/wpfleger96/shell-configs/commit/43fbd8d70f516dc930e607dc9ba10b2daa943b98))
+
+- Refine display API and fix review findings
+  ([#35](https://github.com/wpfleger96/shell-configs/pull/35),
+  [`43fbd8d`](https://github.com/wpfleger96/shell-configs/commit/43fbd8d70f516dc930e607dc9ba10b2daa943b98))
+
+
 ## v0.40.1 (2026-05-16)
 
 ### Bug Fixes
