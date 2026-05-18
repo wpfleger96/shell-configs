@@ -22,7 +22,14 @@ import click
 )
 def signing(fix: bool, verbose: bool, yes: bool, cleanup: bool) -> None:
     """Validate and manage SSH key lifecycle with GitHub."""
-    from shell_configs.display import console, print_error, print_warning
+    from shell_configs.display import (
+        console,
+        print_dim,
+        print_error,
+        print_label,
+        print_success,
+        print_warning,
+    )
     from shell_configs.signing import (
         get_signing_key_info,
         setup_signing,
@@ -52,10 +59,11 @@ def signing(fix: bool, verbose: bool, yes: bool, cleanup: bool) -> None:
             print_error("Could not read local SSH key fingerprint")
             sys.exit(1)
 
-        console.print(f"[dim]Current key fingerprint: {current_fp}[/dim]\n")
+        print_label("Current key fingerprint", current_fp)
+        console.print()
 
         if not stale_keys:
-            console.print("[green]✓[/green] No stale SSH keys found on GitHub")
+            print_success("No stale SSH keys found on GitHub")
             return
 
         print_warning(f"Found {len(stale_keys)} stale key(s) on GitHub:\n")
@@ -69,11 +77,11 @@ def signing(fix: bool, verbose: bool, yes: bool, cleanup: bool) -> None:
             ):
                 ok, msg = delete_github_key_by_fingerprint(key.fingerprint)
                 if ok:
-                    console.print(f"[green]✓[/green] {msg}")
+                    print_success(msg)
                 else:
                     print_error(msg)
             else:
-                console.print(f"[dim]Skipped: {key.title}[/dim]")
+                print_dim(f"Skipped: {key.title}")
         return
 
     interactive = sys.stdin.isatty() if not yes else False
@@ -84,7 +92,7 @@ def signing(fix: bool, verbose: bool, yes: bool, cleanup: bool) -> None:
         if r.skipped:
             print_warning(r.message)
         elif r.success:
-            console.print(f"[green]✓[/green] {r.message}")
+            print_success(r.message)
         else:
             print_error(r.message)
             has_failure = True
@@ -92,8 +100,9 @@ def signing(fix: bool, verbose: bool, yes: bool, cleanup: bool) -> None:
     if verbose and not has_failure:
         info = get_signing_key_info()
         if info:
-            console.print()
-            console.print("[bold cyan]Signing Key Details[/bold cyan]")
+            from shell_configs.display import print_section
+
+            print_section("Signing Key Details")
             console.print(f"  Key type:      {info['key_type']}")
             console.print(f"  Fingerprint:   {info['fingerprint']}")
             console.print(f"  GitHub title:  {info['github_title'] or 'N/A'}")

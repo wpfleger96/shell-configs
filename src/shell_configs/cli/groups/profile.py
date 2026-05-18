@@ -19,7 +19,7 @@ def profile_list() -> None:
     from rich.table import Table
 
     from shell_configs.bootstrap.config import load_auto_update_config
-    from shell_configs.display import console
+    from shell_configs.display import ICON_DASH, console, print_dim
     from shell_configs.profiles import ProfileLoader
 
     config_reader = ConfigReader()
@@ -38,14 +38,14 @@ def profile_list() -> None:
             active_marker = " [green]*[/green]" if name == active_name else ""
             table.add_row(
                 f"{p.name}{active_marker}",
-                p.description or "[dim]-[/dim]",
-                p.extends or "[dim]-[/dim]",
+                p.description or ICON_DASH,
+                p.extends or ICON_DASH,
             )
         except Exception as e:
-            table.add_row(name, f"[red]Error: {e}[/red]", "[dim]-[/dim]")
+            table.add_row(name, f"[red]Error: {e}[/red]", ICON_DASH)
 
     console.print(table)
-    console.print("\n[dim]* = active profile[/dim]")
+    print_dim("* = active profile")
 
 
 @profile.command(name="show")
@@ -90,7 +90,7 @@ def profile_show(name: str, resolved: bool) -> None:
 def profile_current() -> None:
     """Show the currently active profile."""
     from shell_configs.bootstrap.config import load_auto_update_config
-    from shell_configs.display import console, print_error
+    from shell_configs.display import console, print_dim, print_error, print_label
     from shell_configs.profiles import ProfileLoader
 
     config_reader = ConfigReader()
@@ -102,9 +102,9 @@ def profile_current() -> None:
         p = loader.load_profile(active_name)
         console.print(f"[bold]{p.name}[/bold]")
         if p.description:
-            console.print(f"[dim]{p.description}[/dim]")
+            print_dim(p.description)
         if p.extends:
-            console.print(f"[dim]Extends: {p.extends}[/dim]")
+            print_label("Extends", p.extends)
     except Exception as e:
         print_error(str(e))
 
@@ -117,7 +117,7 @@ def profile_switch(name: str) -> None:
         load_auto_update_config,
         save_auto_update_config,
     )
-    from shell_configs.display import console, print_error
+    from shell_configs.display import print_error, print_hint, print_success
     from shell_configs.profiles import ProfileLoader
 
     config_reader = ConfigReader()
@@ -136,5 +136,5 @@ def profile_switch(name: str) -> None:
             active_profile=name,
         )
     )
-    console.print(f"[green]✓[/green] Switched to profile '{name}'")
-    console.print("[dim]Run 'shell-configs install' to apply.[/dim]")
+    print_success(f"Switched to profile '{name}'")
+    print_hint("Run 'shell-configs install' to apply.")

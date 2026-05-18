@@ -53,23 +53,29 @@ def setup(
         get_supported_shells,
         install_completion,
     )
-    from shell_configs.display import console, print_error, print_warning
+    from shell_configs.display import (
+        console,
+        print_dim,
+        print_done,
+        print_error,
+        print_info,
+        print_section,
+        print_success,
+        print_warning,
+        print_would,
+    )
 
     if not skip_packages:
-        console.print("\n[bold cyan]Step 1/5: Install required packages[/bold cyan]")
-        console.print(
-            "[dim]Installing system packages needed by shell configurations.[/dim]\n"
-        )
+        print_section("Step 1/5: Install required packages")
+        print_dim("Installing system packages needed by shell configurations.")
+        console.print()
         from shell_configs.cli.groups.packages import packages_install
 
         ctx.invoke(packages_install, dry_run=dry_run, yes=yes)
 
-    console.print(
-        "\n[bold cyan]Step 2/5: Install shell-configs system-wide[/bold cyan]"
-    )
-    console.print(
-        "[dim]This allows you to run 'shell-configs' from any directory.[/dim]\n"
-    )
+    print_section("Step 2/5: Install shell-configs system-wide")
+    print_dim("This allows you to run 'shell-configs' from any directory.")
+    console.print()
 
     shell_configs_tool = get_tool_by_id("shell-configs")
     tool_install_success = False
@@ -79,8 +85,8 @@ def setup(
             update_info = check_tool_updates(shell_configs_tool, timeout=10)
             if update_info and update_info.has_update:
                 if dry_run:
-                    console.print(
-                        f"[dim]Would upgrade shell-configs {update_info.current_version} → {update_info.latest_version}[/dim]"
+                    print_dim(
+                        f"Would upgrade shell-configs {update_info.current_version} → {update_info.latest_version}"
                     )
                     tool_install_success = True
                 else:
@@ -95,14 +101,14 @@ def setup(
                             make_github_install_url(shell_configs_tool.github_repo)
                         )
                         if success:
-                            console.print(
-                                f"[green]✓[/green] Upgraded shell-configs ({update_info.current_version} → {update_info.latest_version})"
+                            print_success(
+                                f"Upgraded shell-configs ({update_info.current_version} → {update_info.latest_version})"
                             )
                             tool_install_success = True
                         else:
                             print_error(f"Failed to upgrade shell-configs: {msg}")
             else:
-                console.print("[green]✓[/green] shell-configs is already up to date")
+                print_done("shell-configs is already up to date")
                 tool_install_success = True
         except Exception as e:
             import logging
@@ -113,7 +119,7 @@ def setup(
     if not tool_install_success:
         if not yes and not dry_run:
             if not click.confirm("Install shell-configs permanently?", default=True):
-                print_warning("Setup cancelled")
+                print_info("Setup cancelled")
                 sys.exit(0)
 
         success, message = install_tool(force=yes, dry_run=dry_run)
@@ -122,7 +128,7 @@ def setup(
             print_error(message)
             sys.exit(1)
 
-        console.print(f"[green]✓[/green] {message}")
+        print_success(message)
         tool_install_success = True
 
     if not tool_install_success:
@@ -134,17 +140,14 @@ def setup(
         local_bin = os.path.expanduser("~/.local/bin")
         path_dirs = os.environ.get("PATH", "").split(os.pathsep)
         if local_bin not in path_dirs:
-            console.print(
-                f"\n[yellow]⚠[/yellow] {local_bin} is not in your PATH. "
-                "Add it to use shell-configs from anywhere:"
+            print_warning(
+                f"{local_bin} is not in your PATH. Add it to use shell-configs from anywhere:"
             )
             console.print('  export PATH="$HOME/.local/bin:$PATH"\n')
 
     config_dir = get_tool_config_dir("shell-configs") if not dry_run else None
 
-    console.print(
-        "\n[bold cyan]Step 3/5: Installing shell configurations[/bold cyan]\n"
-    )
+    print_section("Step 3/5: Installing shell configurations")
 
     from shell_configs.cli.commands.install import install
 
@@ -157,35 +160,34 @@ def setup(
     )
 
     if not skip_completions:
-        console.print("\n[bold cyan]Step 4/5: Shell completion setup[/bold cyan]\n")
+        print_section("Step 4/5: Shell completion setup")
 
         shell = detect_shell()
         if shell is None:
             supported = ", ".join(get_supported_shells())
-            console.print(
-                f"[yellow]⚠[/yellow] Could not detect shell. Supported: {supported}"
-            )
-            console.print("[dim]Skipping completion installation[/dim]")
+            print_warning(f"Could not detect shell. Supported: {supported}")
+            print_dim("Skipping completion installation")
         else:
             if not yes and not dry_run:
                 if not click.confirm(f"Install {shell} tab completion?", default=True):
-                    console.print("[dim]Skipping completion installation[/dim]")
+                    print_dim("Skipping completion installation")
                 else:
                     success, message = install_completion(shell, dry_run=dry_run)
                     if success:
-                        console.print(f"[green]✓[/green] {message}")
+                        print_success(message)
                     else:
-                        console.print(f"[yellow]⚠[/yellow] {message}")
+                        print_warning(message)
             else:
                 success, message = install_completion(shell, dry_run=dry_run)
                 if success:
-                    console.print(f"[green]✓[/green] {message}")
+                    print_success(message)
                 else:
-                    console.print(f"[yellow]⚠[/yellow] {message}")
+                    print_warning(message)
 
     if not skip_scripts:
-        console.print("\n[bold cyan]Step 5/5: Install utility scripts[/bold cyan]")
-        console.print("[dim]Installing utility scripts to ~/.local/bin.[/dim]\n")
+        print_section("Step 5/5: Install utility scripts")
+        print_dim("Installing utility scripts to ~/.local/bin.")
+        console.print()
         scripts_source = get_tool_scripts_dir("shell-configs") if not dry_run else None
         if scripts_source and scripts_source.exists():
             from shell_configs.script_manager import (
@@ -207,22 +209,22 @@ def setup(
                     dry_run=dry_run,
                     source_dir=scripts_source,
                 )
-                if result in (
-                    InstallResult.INSTALLED,
-                    InstallResult.UPDATED,
-                    InstallResult.ALREADY_SYNCED,
-                ):
-                    console.print(f"[green]✓[/green] {message}")
+                if result in (InstallResult.INSTALLED, InstallResult.UPDATED):
+                    print_success(message)
+                elif result == InstallResult.ALREADY_SYNCED:
+                    print_done(message)
                 elif result == InstallResult.COLLISION:
-                    console.print(f"[yellow]⚠[/yellow] {message}")
+                    print_warning(message)
                 elif result in (
                     InstallResult.WOULD_INSTALL,
                     InstallResult.WOULD_UPDATE,
                 ):
-                    console.print(f"[dim]→[/dim] {message}")
+                    print_would(message)
 
     if dry_run:
-        console.print("\n[dim]Dry run complete - no changes were made.[/dim]")
+        console.print()
+        print_dim("Dry run complete - no changes were made.")
     else:
-        console.print("\n[green bold]✓ Setup complete![/green bold]")
+        console.print()
+        print_success("Setup complete!")
         console.print("You can now run shell-configs from anywhere.")

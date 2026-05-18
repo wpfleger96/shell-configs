@@ -16,7 +16,7 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
     if not value or ctx.resilient_parsing:
         return
 
-    from shell_configs.display import console
+    from shell_configs.display import console, print_hint
 
     console.print(f"shell-configs, version {__version__}")
 
@@ -30,7 +30,7 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
                 console.print(
                     f"\n[cyan]Update available:[/cyan] {update_info.current_version} → {update_info.latest_version}"
                 )
-                console.print("[dim]Run 'shell-configs upgrade' to install[/dim]")
+                print_hint("Run 'shell-configs upgrade' to install")
     except Exception as e:
         logger.debug(f"Failed to check for updates in version callback: {e}")
 

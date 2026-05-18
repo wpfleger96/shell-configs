@@ -55,20 +55,26 @@ class GhExtensionsComponent(Component):
         if not plan.has_changes:
             return
 
-        from shell_configs.display import console
+        from shell_configs.display import (
+            print_add,
+            print_dim,
+            print_error,
+            print_section,
+        )
 
-        console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
+        print_section(self.display_name)
 
         if not plan.gh_available:
-            console.print(
-                "  [dim]gh not installed — will be installed by required packages first[/dim]"
+            print_dim(
+                "gh not installed — will be installed by required packages first",
+                indent=2,
             )
             return
 
         for ext in plan.missing:
-            console.print(f"  [red]✗[/red] {ext.repo} (not installed)")
+            print_error(f"{ext.repo} (not installed)", indent=2)
         for ext_name in sorted(plan.extra):
-            console.print(f"  [dim]+[/dim] {ext_name} (not in manifest)")
+            print_add(f"{ext_name} (not in manifest)", indent=2)
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
         if not isinstance(plan, GhExtensionsPlan):
@@ -76,7 +82,11 @@ class GhExtensionsComponent(Component):
         if not plan.missing:
             return True
 
-        from shell_configs.display import console
+        from shell_configs.display import (
+            print_error,
+            print_success,
+            print_would,
+        )
         from shell_configs.gh_extensions import install_extension
 
         all_ok = True
@@ -85,36 +95,39 @@ class GhExtensionsComponent(Component):
                 ext.repo, pin=ext.pin, dry_run=ctx.dry_run, build_path=ext.build_path
             )
             if ctx.dry_run:
-                console.print(f"[dim]→[/dim] {msg}")
+                print_would(msg)
             elif success:
-                console.print(f"[green]✓[/green] {msg}")
+                print_success(msg)
             else:
-                console.print(f"[red]✗[/red] {msg}")
+                print_error(msg)
                 all_ok = False
         return all_ok
 
     def install(self, ctx: Context) -> bool:
-        from shell_configs.display import console
+        from shell_configs.display import console, print_done, print_progress
 
         console.print()
-        console.print("[yellow]Installing gh CLI extensions...[/yellow]")
+        print_progress("Installing gh CLI extensions...")
 
         plan = self.plan(ctx)
 
         if not plan.missing:
-            console.print("[green]✓[/green] All gh extensions already installed")
+            print_done("All gh extensions already installed")
             return True
 
         return self.apply(ctx, plan)
 
     def status(self, ctx: Context) -> None:
-        from shell_configs.display import console
+        from shell_configs.display import console, print_warning
 
         plan = self.plan(ctx)
 
         if not plan.missing and not plan.extra:
-            console.print(
-                f"  [green]✓[/green] {len(plan.desired)}/{len(plan.desired)} extensions installed"
+            from shell_configs.display import print_success
+
+            print_success(
+                f"{len(plan.desired)}/{len(plan.desired)} extensions installed",
+                indent=2,
             )
         else:
             parts = []
@@ -122,9 +135,10 @@ class GhExtensionsComponent(Component):
                 parts.append(f"{len(plan.missing)} missing")
             if plan.extra:
                 parts.append(f"{len(plan.extra)} unmanaged")
-            console.print(
-                f"  [yellow]⚠[/yellow] {len(plan.desired) - len(plan.missing)}/{len(plan.desired)} extensions installed "
-                f"({', '.join(parts)})"
+            print_warning(
+                f"{len(plan.desired) - len(plan.missing)}/{len(plan.desired)} extensions installed "
+                f"({', '.join(parts)})",
+                indent=2,
             )
 
         console.print()

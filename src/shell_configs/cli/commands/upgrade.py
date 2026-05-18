@@ -29,7 +29,16 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         perform_github_update,
     )
     from shell_configs.bootstrap.installer import make_github_install_url
-    from shell_configs.display import console, print_error, print_warning
+    from shell_configs.display import (
+        console,
+        print_dim,
+        print_done,
+        print_error,
+        print_hint,
+        print_info,
+        print_success,
+        print_warning,
+    )
 
     tools = [t for t in UPDATABLE_TOOLS if t.is_installed()]
 
@@ -42,9 +51,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         try:
             current = tool.get_version()
             if current:
-                console.print(
-                    f"[dim]{tool.display_name} current version: {current}[/dim]"
-                )
+                print_dim(f"{tool.display_name} current version: {current}")
         except Exception as e:
             print_error(f"Could not get {tool.display_name} version: {e}")
             continue
@@ -59,14 +66,12 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         if update_info and (update_info.has_update or force):
             tool_updates.append((tool, update_info))
         elif update_info and not update_info.has_update:
-            console.print(
-                f"[green]✓[/green] {tool.display_name} is already up to date!"
-            )
+            print_done(f"{tool.display_name} is already up to date")
 
     console.print()
 
     if not tool_updates and not force:
-        console.print("[green]✓[/green] All tools are up to date!")
+        print_done("All tools are up to date")
         return
 
     if not check:
@@ -88,7 +93,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
 
     if check:
         if tool_updates:
-            console.print("\nRun [bold]shell-configs upgrade[/bold] to install")
+            print_hint("Run 'shell-configs upgrade' to install")
         return
 
     if not force and not yes:
@@ -97,7 +102,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         else:
             prompt = f"\nInstall {len(tool_updates)} updates?"
         if not click.confirm(prompt, default=True):
-            print_warning("Cancelled")
+            print_info("Cancelled")
             return
 
     upgraded_tools = []
@@ -114,13 +119,9 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         if success:
             if was_upgraded:
                 upgraded_tools.append(tool)
-                console.print(
-                    f"[green]✓[/green] {tool.display_name} upgraded successfully!"
-                )
+                print_success(f"{tool.display_name} upgraded successfully!")
             else:
-                console.print(
-                    f"[green]✓[/green] {tool.display_name} is already up to date"
-                )
+                print_done(f"{tool.display_name} is already up to date")
         else:
             print_error(f"{tool.display_name} upgrade failed: {msg}")
 

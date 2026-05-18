@@ -51,32 +51,108 @@ def get_console() -> Console:
     return _console_override.get() or _real_console
 
 
-def print_warning(message: str) -> None:
-    """Print a warning message."""
-    get_console().print(f"[yellow]⚠[/yellow] {message}")
+# ─── Icon constants ──────────────────────────────────────────────────────────
+
+ICON_SUCCESS = "[green]✓[/green]"
+ICON_DONE = "[dim]✓[/dim]"
+ICON_UNCHANGED = "[dim]•[/dim]"
+ICON_SKIPPED = "[dim]○[/dim]"
+ICON_ABSENT = "[yellow]○[/yellow]"
+ICON_UPDATE = "[yellow]↻[/yellow]"
+ICON_ERROR = "[red]✗[/red]"
+ICON_WARNING = "[yellow]⚠[/yellow]"
+ICON_INFO = "[blue]ℹ[/blue]"
+ICON_HINT = "[yellow]»[/yellow]"
+ICON_PROGRESS = "[yellow]⟳[/yellow]"
+ICON_WOULD = "[dim]→[/dim]"
+ICON_ADD = "[green]+[/green]"
+ICON_BUILTIN = "[yellow]![/yellow]"
+ICON_DASH = "[dim]-[/dim]"
 
 
-def print_error(message: str) -> None:
-    """Print an error message."""
-    get_console().print(f"[red]✗[/red] {message}")
+# ─── Markup builder ──────────────────────────────────────────────────────────
 
 
-def print_info(message: str) -> None:
-    """Print an info message."""
-    get_console().print(f"[blue]ℹ[/blue] {message}")
+def dim(text: str) -> str:
+    return f"[dim]{text}[/dim]"
+
+
+# ─── Print helpers ───────────────────────────────────────────────────────────
+
+
+def print_error(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}{ICON_ERROR} {message}")
+
+
+def print_warning(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}{ICON_WARNING} {message}")
+
+
+def print_info(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}{ICON_INFO} {message}")
+
+
+def print_hint(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}{ICON_HINT} {message}")
+
+
+def print_success(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}{ICON_SUCCESS} {message}")
+
+
+def print_done(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}{ICON_DONE} {message}")
+
+
+def print_unchanged(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}{ICON_UNCHANGED} {message}")
+
+
+def print_skipped(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}{ICON_SKIPPED} {message}")
+
+
+def print_would(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}{ICON_WOULD} {message}")
+
+
+def print_add(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}{ICON_ADD} {message}")
+
+
+def print_progress(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}{ICON_PROGRESS} {message}")
+
+
+def print_dim(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}{dim(message)}")
+
+
+def print_label(key: str, value: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}{dim(key + ':')} {value}")
+
+
+def print_builtin(message: str, *, indent: int = 0) -> None:
+    get_console().print(f"{' ' * indent}{ICON_BUILTIN} {message}")
+
+
+def print_section(title: str) -> None:
+    get_console().print(f"\n[bold cyan]{title}[/bold cyan]\n")
+
+
+# ─── Shell-configs-specific helpers ──────────────────────────────────────────
 
 
 def print_operation_result(result: OperationResult, message: str) -> None:
     """Print an operation result with appropriate formatting."""
-    cons = get_console()
     if result in (
         OperationResult.CREATED,
         OperationResult.UPDATED,
         OperationResult.REMOVED,
     ):
-        cons.print(f"[green]✓[/green] {message}")
+        print_success(message)
     elif result == OperationResult.ALREADY_SYNCED:
-        cons.print(f"[dim]•[/dim] {message}")
+        print_unchanged(message)
     elif result == OperationResult.NOT_FOUND:
         print_warning(message)
     elif result == OperationResult.ERROR:
@@ -107,10 +183,10 @@ def add_additional_file_row(table: Table, file_path: str, status: str) -> None:
 def get_status_indicator(synced: bool, exists: bool) -> str:
     """Get a status indicator string."""
     if not exists:
-        return "[red]✗ Not installed[/red]"
+        return f"{ICON_ERROR} Not installed"
     if synced:
-        return "[green]✓ Synced[/green]"
-    return "[yellow]⚠ Outdated[/yellow]"
+        return f"{ICON_SUCCESS} Synced"
+    return f"{ICON_WARNING} Outdated"
 
 
 def create_validation_table() -> Table:
@@ -126,7 +202,7 @@ def add_validation_row(
     table: Table, shell_name: str, valid: bool, message: str
 ) -> None:
     """Add a row to a validation table."""
-    status = "[green]✓[/green]" if valid else "[red]✗[/red]"
+    status = ICON_SUCCESS if valid else ICON_ERROR
     table.add_row(shell_name, status, message if message else "-")
 
 
