@@ -78,10 +78,16 @@ compdef _wt wt
 if [ -f ~/.zsh/git-prompt.sh ]; then
     source ~/.zsh/git-prompt.sh
     setopt prompt_subst
-    PROMPT='%F{251}%~%F{reset}%B%F{cyan}$(__git_ps1 " %s")%F{yellow}$(__wt_ps1)%F{reset}%b '
+    _SHELL_CONFIGS_PROMPT='%F{251}%~%F{reset}%B%F{cyan}$(__git_ps1 " %s")%F{yellow}$(__wt_ps1)%F{reset}%b '
+    PROMPT="$_SHELL_CONFIGS_PROMPT"
 fi
+
+_restore_prompt() {
+    [[ -n "${_SHELL_CONFIGS_PROMPT-}" ]] && PROMPT="$_SHELL_CONFIGS_PROMPT"
+}
 
 ### Git Prompt Performance ###
 autoload -U add-zsh-hook
 add-zsh-hook chpwd _tune_git_prompt
+add-zsh-hook precmd _restore_prompt
 add-zsh-hook precmd _reset_terminal_title
