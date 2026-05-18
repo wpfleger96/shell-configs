@@ -16,7 +16,15 @@ def scripts() -> None:
 @click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
 def scripts_install(dry_run: bool, yes: bool) -> None:
     """Install utility scripts to ~/.local/bin."""
-    from shell_configs.display import console, print_info, print_warning
+    from shell_configs.display import (
+        console,
+        print_done,
+        print_error,
+        print_info,
+        print_success,
+        print_warning,
+        print_would,
+    )
     from shell_configs.script_manager import (
         InstallResult,
         ScriptManifest,
@@ -49,18 +57,18 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
     for entry in entries:
         result, message = install_script(entry, target_dir, manifest, dry_run=dry_run)
         if result == InstallResult.COLLISION:
-            console.print(f"[yellow]⚠[/yellow] {message}")
+            print_warning(message)
             collisions.append(entry.name)
         elif result == InstallResult.ALREADY_SYNCED:
-            console.print(f"[green]✓[/green] {message}")
+            print_done(message)
         elif result in (InstallResult.INSTALLED, InstallResult.UPDATED):
-            console.print(f"[green]✓[/green] {message}")
+            print_success(message)
         elif result in (InstallResult.WOULD_INSTALL, InstallResult.WOULD_UPDATE):
-            console.print(f"[dim]→[/dim] {message}")
+            print_would(message)
         elif result == InstallResult.SKIPPED_PLATFORM:
             pass
         else:
-            console.print(f"[red]✗[/red] {message}")
+            print_error(message)
 
     if collisions:
         print_warning(
@@ -75,7 +83,16 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
 @click.option("--force", is_flag=True, help="Remove even user-modified scripts")
 def scripts_uninstall(dry_run: bool, yes: bool, force: bool) -> None:
     """Remove shell-configs-managed scripts from ~/.local/bin."""
-    from shell_configs.display import console, print_info
+    from shell_configs.display import (
+        console,
+        print_dim,
+        print_error,
+        print_info,
+        print_success,
+        print_unchanged,
+        print_warning,
+        print_would,
+    )
     from shell_configs.script_manager import (
         ScriptManifest,
         UninstallResult,
@@ -88,7 +105,7 @@ def scripts_uninstall(dry_run: bool, yes: bool, force: bool) -> None:
     target_dir = get_default_target_dir()
 
     if not manifest.scripts:
-        console.print("[dim]No scripts installed by shell-configs[/dim]")
+        print_dim("No scripts installed by shell-configs")
         return
 
     names = list(manifest.scripts.keys())
@@ -109,15 +126,15 @@ def scripts_uninstall(dry_run: bool, yes: bool, force: bool) -> None:
             name, target_dir, manifest, force=force, dry_run=dry_run
         )
         if result == UninstallResult.REMOVED:
-            console.print(f"[green]✓[/green] {message}")
+            print_success(message)
         elif result == UninstallResult.WOULD_REMOVE:
-            console.print(f"[dim]→[/dim] {message}")
+            print_would(message)
         elif result == UninstallResult.MODIFIED:
-            console.print(f"[yellow]⚠[/yellow] {message}")
+            print_warning(message)
         elif result == UninstallResult.NOT_FOUND:
-            console.print(f"[dim]-[/dim] {message}")
+            print_unchanged(message)
         else:
-            console.print(f"[red]✗[/red] {message}")
+            print_error(message)
 
 
 @scripts.command(name="status")
@@ -125,7 +142,15 @@ def scripts_status() -> None:
     """Show installation status of managed scripts."""
     from rich.table import Table
 
-    from shell_configs.display import console
+    from shell_configs.display import (
+        ICON_ERROR,
+        ICON_SKIPPED,
+        ICON_SUCCESS,
+        ICON_WARNING,
+        console,
+        print_dim,
+        print_section,
+    )
     from shell_configs.script_manager import (
         ScriptManifest,
         ScriptStatus,
@@ -143,12 +168,12 @@ def scripts_status() -> None:
     table.add_column("Status")
 
     status_icons = {
-        ScriptStatus.INSTALLED: "[green]✓[/green]",
+        ScriptStatus.INSTALLED: ICON_SUCCESS,
         ScriptStatus.OUTDATED: "[yellow]↑[/yellow]",
         ScriptStatus.MODIFIED: "[yellow]✎[/yellow]",
-        ScriptStatus.MISSING: "[red]✗[/red]",
-        ScriptStatus.COLLISION: "[yellow]⚠[/yellow]",
-        ScriptStatus.SKIPPED_PLATFORM: "[dim]-[/dim]",
+        ScriptStatus.MISSING: ICON_ERROR,
+        ScriptStatus.COLLISION: ICON_WARNING,
+        ScriptStatus.SKIPPED_PLATFORM: ICON_SKIPPED,
     }
 
     for entry in discover_scripts(include_all=True):
@@ -161,9 +186,10 @@ def scripts_status() -> None:
             label = "other platform"
         table.add_row(entry.name, f"{icon} {label}")
 
-    console.print("[bold cyan]Script Status[/bold cyan]\n")
+    print_section("Script Status")
     console.print(table)
-    console.print(f"\n[dim]Target directory: {target_dir}[/dim]")
+    console.print()
+    print_dim(f"Target directory: {target_dir}")
 
 
 @scripts.command(name="list")
@@ -174,7 +200,7 @@ def scripts_list(include_all: bool) -> None:
     """List available scripts."""
     from rich.table import Table
 
-    from shell_configs.display import console
+    from shell_configs.display import console, print_dim, print_section
     from shell_configs.platform import detect_platform
     from shell_configs.script_manager import discover_scripts
 
@@ -191,9 +217,8 @@ def scripts_list(include_all: bool) -> None:
         )
         table.add_row(entry.name, platforms)
 
-    console.print("[bold cyan]Available Scripts[/bold cyan]\n")
+    print_section("Available Scripts")
     console.print(table)
     if not include_all:
-        console.print(
-            f"\n[dim]Showing scripts for {current.display_name}. Use --all to see all.[/dim]"
-        )
+        console.print()
+        print_dim(f"Showing scripts for {current.display_name}. Use --all to see all.")

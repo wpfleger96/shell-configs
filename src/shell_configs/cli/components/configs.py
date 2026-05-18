@@ -34,6 +34,7 @@ class ConfigsComponent(Component):
         from shell_configs.bootstrap.config import save_auto_update_config
         from shell_configs.display import (
             print_diff,
+            print_hint,
             print_info,
             print_operation_result,
             print_warning,
@@ -145,7 +146,7 @@ class ConfigsComponent(Component):
                 preferences_results[pref_file.name] = result
 
         if ctx.dry_run:
-            print_info("Dry run complete. Use without --dry-run to apply changes.")
+            print_hint("Use without --dry-run to apply changes.")
 
         success_count = sum(
             1

@@ -34,7 +34,7 @@ class ScriptsComponent(Component):
         if not plan.has_changes:
             return
 
-        from shell_configs.display import console
+        from shell_configs.display import console, print_section
         from shell_configs.script_manager import ScriptStatus, get_default_target_dir
 
         target_dir = get_default_target_dir()
@@ -45,7 +45,7 @@ class ScriptsComponent(Component):
             ScriptStatus.COLLISION: "[yellow]exists (not ours)[/yellow]",
         }
 
-        console.print(f"\n[bold cyan]{self.display_name}[/bold cyan]\n")
+        print_section(self.display_name)
         for entry, st in plan.entries:
             if st != ScriptStatus.INSTALLED:
                 label = status_labels.get(st, st.value)
@@ -84,7 +84,16 @@ class ScriptsComponent(Component):
         return success
 
     def install(self, ctx: Context) -> bool:
-        from shell_configs.display import console
+        from shell_configs.display import (
+            console,
+            print_dim,
+            print_done,
+            print_error,
+            print_progress,
+            print_success,
+            print_warning,
+            print_would,
+        )
         from shell_configs.script_manager import (
             InstallResult,
             ScriptManifest,
@@ -95,39 +104,43 @@ class ScriptsComponent(Component):
         )
 
         console.print()
-        console.print("[yellow]Installing utility scripts...[/yellow]")
+        print_progress("Installing utility scripts...")
         target_dir = get_default_target_dir()
         manifest = ScriptManifest(get_default_manifest_path())
         entries = discover_scripts()
         if not entries:
-            console.print("[dim]No scripts available for this platform[/dim]")
+            print_dim("No scripts available for this platform")
         else:
             for entry in entries:
                 script_result, msg = install_script(
                     entry, target_dir, manifest, dry_run=ctx.dry_run
                 )
                 if script_result == InstallResult.COLLISION:
-                    console.print(f"[yellow]⚠[/yellow] {msg}")
-                elif script_result in (
-                    InstallResult.INSTALLED,
-                    InstallResult.UPDATED,
-                    InstallResult.ALREADY_SYNCED,
-                ):
-                    console.print(f"[green]✓[/green] {msg}")
+                    print_warning(msg)
+                elif script_result in (InstallResult.INSTALLED, InstallResult.UPDATED):
+                    print_success(msg)
+                elif script_result == InstallResult.ALREADY_SYNCED:
+                    print_done(msg)
                 elif script_result in (
                     InstallResult.WOULD_INSTALL,
                     InstallResult.WOULD_UPDATE,
                 ):
-                    console.print(f"[dim]→[/dim] {msg}")
+                    print_would(msg)
                 elif script_result == InstallResult.SKIPPED_PLATFORM:
                     pass
                 else:
-                    console.print(f"[red]✗[/red] {msg}")
+                    print_error(msg)
 
         return True
 
     def status(self, ctx: Context) -> None:
-        from shell_configs.display import console
+        from shell_configs.display import (
+            console,
+            print_dim,
+            print_hint,
+            print_success,
+            print_warning,
+        )
         from shell_configs.script_manager import ScriptStatus
 
         plan = self.plan(ctx)
@@ -136,17 +149,17 @@ class ScriptsComponent(Component):
         installed = sum(1 for _, st in plan.entries if st == ScriptStatus.INSTALLED)
 
         if total == 0:
-            console.print("  [dim]No scripts available for this platform[/dim]")
+            print_dim("No scripts available for this platform", indent=2)
         elif installed == total:
-            console.print(
-                f"  [green]✓[/green] {installed}/{total} scripts installed (~/.local/bin)"
+            print_success(
+                f"{installed}/{total} scripts installed (~/.local/bin)", indent=2
             )
         else:
-            console.print(
-                f"  [yellow]⚠[/yellow] {installed}/{total} scripts installed "
-                f"({total - installed} missing)"
+            print_warning(
+                f"{installed}/{total} scripts installed ({total - installed} missing)",
+                indent=2,
             )
-            console.print("  [dim]Run 'shell-configs scripts status' for details[/dim]")
+            print_hint("Run 'shell-configs scripts status' for details", indent=2)
 
         console.print()
 

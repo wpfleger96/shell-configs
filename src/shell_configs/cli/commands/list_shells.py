@@ -10,7 +10,13 @@ from shell_configs.config import ConfigReader
 @click.command("list-shells")
 def list_shells() -> None:
     """List all available shell configurations."""
-    from shell_configs.display import console, print_warning
+    from shell_configs.display import (
+        ICON_SKIPPED,
+        ICON_SUCCESS,
+        console,
+        print_section,
+        print_warning,
+    )
     from shell_configs.shells.registry import ShellRegistry
 
     config_reader = ConfigReader()
@@ -18,10 +24,10 @@ def list_shells() -> None:
     all_shells = registry.get_all()
     available = config_reader.get_available_shells()
 
-    console.print("[bold cyan]Available Shells:[/bold cyan]")
+    print_section("Available Shells:")
     for shell in all_shells:
         has_config = shell.name in available
-        status = "[green]✓[/green]" if has_config else "[dim]○[/dim]"
+        status = ICON_SUCCESS if has_config else ICON_SKIPPED
         console.print(f"  {status} {shell.display_name} ({shell.name})")
 
     if not available:

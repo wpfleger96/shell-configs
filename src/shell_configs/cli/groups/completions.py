@@ -21,15 +21,14 @@ def completions() -> None:
 def completions_bash() -> None:
     """Output bash completion script for manual installation."""
     from shell_configs.completions import generate_completion_script
-    from shell_configs.display import console, print_error
+    from shell_configs.display import console, print_error, print_hint
 
     try:
         script = generate_completion_script("bash")
         console.print(script)
-        console.print(
-            "\n[dim]To install: Add the above to your ~/.bashrc or run:[/dim]"
+        print_hint(
+            "Add the above to your ~/.bashrc or run: shell-configs completions install"
         )
-        console.print("[dim]  shell-configs completions install[/dim]")
     except Exception as e:
         print_error(f"Error generating completion script: {e}")
         sys.exit(1)
@@ -39,13 +38,14 @@ def completions_bash() -> None:
 def completions_zsh() -> None:
     """Output zsh completion script for manual installation."""
     from shell_configs.completions import generate_completion_script
-    from shell_configs.display import console, print_error
+    from shell_configs.display import console, print_error, print_hint
 
     try:
         script = generate_completion_script("zsh")
         console.print(script)
-        console.print("\n[dim]To install: Add the above to your ~/.zshrc or run:[/dim]")
-        console.print("[dim]  shell-configs completions install[/dim]")
+        print_hint(
+            "Add the above to your ~/.zshrc or run: shell-configs completions install"
+        )
     except Exception as e:
         print_error(f"Error generating completion script: {e}")
         sys.exit(1)
@@ -60,19 +60,19 @@ def completions_zsh() -> None:
 def completions_install(shell: str | None) -> None:
     """Install shell completion to config file."""
     from shell_configs.completions import detect_shell, install_completion
-    from shell_configs.display import console, print_error
+    from shell_configs.display import print_error, print_label, print_success
 
     if shell is None:
         shell = detect_shell()
         if shell is None:
             print_error("Could not detect shell. Please specify with --shell")
             sys.exit(1)
-        console.print(f"[dim]Detected shell:[/dim] {shell}")
+        print_label("Detected shell", shell)
 
     success, message = install_completion(shell, dry_run=False)
 
     if success:
-        console.print(f"[green]✓[/green] {message}")
+        print_success(message)
     else:
         print_error(message)
         sys.exit(1)
@@ -91,7 +91,7 @@ def completions_uninstall(shell: str | None) -> None:
         find_config_file,
         uninstall_completion,
     )
-    from shell_configs.display import console, print_error
+    from shell_configs.display import print_error, print_success
 
     if shell is None:
         shell = detect_shell()
@@ -107,7 +107,7 @@ def completions_uninstall(shell: str | None) -> None:
     success, message = uninstall_completion(config_path)
 
     if success:
-        console.print(f"[green]✓[/green] {message}")
+        print_success(message)
     else:
         print_error(message)
         sys.exit(1)
@@ -124,15 +124,24 @@ def completions_status() -> None:
         get_supported_shells,
         is_completion_installed,
     )
-    from shell_configs.display import console
+    from shell_configs.display import (
+        ICON_ABSENT,
+        ICON_DASH,
+        ICON_SUCCESS,
+        console,
+        dim,
+        print_hint,
+        print_section,
+        print_warning,
+    )
 
     detected_shell = detect_shell()
-    console.print("[bold cyan]Shell Completions Status[/bold cyan]\n")
+    print_section("Shell Completions Status")
 
     if detected_shell:
         console.print(f"Detected shell: [cyan]{detected_shell}[/cyan]\n")
     else:
-        console.print("[yellow]No supported shell detected[/yellow]\n")
+        print_warning("No supported shell detected")
 
     table = Table(show_header=True, header_style="bold")
     table.add_column("Shell")
@@ -143,17 +152,17 @@ def completions_status() -> None:
         config_path = find_config_file(shell)
 
         if config_path is None:
-            status = "[dim]-[/dim]"
-            config_str = "[dim]No config file found[/dim]"
+            status = ICON_DASH
+            config_str = dim("No config file found")
         elif is_completion_installed(config_path):
-            status = "[green]✓[/green]"
+            status = ICON_SUCCESS
             config_str = str(config_path)
         else:
-            status = "[yellow]○[/yellow]"
-            config_str = f"{config_path} [dim](not installed)[/dim]"
+            status = ICON_ABSENT
+            config_str = f"{config_path} {dim('(not installed)')}"
 
         shell_name = f"[bold]{shell}[/bold]" if shell == detected_shell else shell
         table.add_row(shell_name, status, config_str)
 
     console.print(table)
-    console.print("\n[dim]To install: shell-configs completions install[/dim]")
+    print_hint("To install: shell-configs completions install")

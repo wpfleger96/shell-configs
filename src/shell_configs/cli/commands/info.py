@@ -19,7 +19,7 @@ def info() -> None:
         check_tool_updates,
     )
     from shell_configs.bootstrap.installer import get_tool_source
-    from shell_configs.display import console
+    from shell_configs.display import console, dim, print_hint
 
     table = Table(title="shell-configs Installation Info", show_header=True)
     table.add_column("Tool", style="cyan")
@@ -33,14 +33,14 @@ def info() -> None:
         tool_name = tool.display_name
 
         if not tool.is_installed():
-            table.add_row(tool_name, "-", "-", "[dim](not installed)[/dim]")
+            table.add_row(tool_name, "-", "-", dim("(not installed)"))
             continue
 
         source = get_tool_source(tool.package_name)
-        source_display = source.name.lower() if source else "[dim]unknown[/dim]"
+        source_display = source.name.lower() if source else dim("unknown")
 
         version = tool.get_version()
-        version_display = version if version else "[dim]unknown[/dim]"
+        version_display = version if version else dim("unknown")
 
         update_display = "-"
         try:
@@ -49,11 +49,11 @@ def info() -> None:
                 update_display = f"[cyan]{update_info.latest_version} available[/cyan]"
                 has_updates = True
         except Exception:
-            update_display = "[dim](check failed)[/dim]"
+            update_display = dim("(check failed)")
 
         table.add_row(tool_name, source_display, version_display, update_display)
 
     console.print(table)
 
     if has_updates:
-        console.print("\n[dim]Run 'shell-configs upgrade' to install updates.[/dim]")
+        print_hint("Run 'shell-configs upgrade' to install updates.")

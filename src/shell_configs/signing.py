@@ -464,22 +464,22 @@ def _resolve_key_path(
         )
         return None
 
-    from rich.prompt import IntPrompt
+    import click
 
-    from shell_configs.display import console
+    from shell_configs.display import console, print_warning
 
-    console.print(
-        "\n[yellow]Multiple SSH keys found, none registered on your GitHub account:[/yellow]\n"
-    )
+    print_warning("Multiple SSH keys found, none registered on your GitHub account:")
+    console.print()
     for i, kp in enumerate(local_keys, 1):
         fp = get_key_fingerprint_from_pub(kp.with_suffix(".pub")) or "unknown"
         key_type = kp.name.split("_", 1)[1] if "_" in kp.name else "unknown"
         console.print(f"  {i}. {kp} ({key_type.upper()}, {fp})")
 
     console.print()
-    choice = IntPrompt.ask(
+    choice: int = click.prompt(
         "Which key should shell-configs manage?",
-        choices=[str(i) for i in range(1, len(local_keys) + 1)],
+        type=click.IntRange(1, len(local_keys)),
+        prompt_suffix=f" (1-{len(local_keys)}): ",
     )
     selected = local_keys[choice - 1]
     results.append(StepResult("discover_key", True, f"Selected SSH key: {selected}"))

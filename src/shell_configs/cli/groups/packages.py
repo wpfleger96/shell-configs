@@ -21,7 +21,17 @@ def packages() -> None:
 @click.option("--profile", "profile_name", default=None, help="Profile to use")
 def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None:
     """Install required system packages."""
-    from shell_configs.display import console, print_error, print_info
+    from shell_configs.display import (
+        console,
+        dim,
+        print_dim,
+        print_done,
+        print_error,
+        print_hint,
+        print_info,
+        print_label,
+        print_success,
+    )
     from shell_configs.packages import (
         get_package_manager,
         load_packages_for_profile,
@@ -35,16 +45,17 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
     active_profile = resolve_active_profile(profile_name, profile_loader)
 
     platform_name = detect_platform().display_name
-    console.print(f"[dim]Platform:[/dim] {platform_name}")
+    print_label("Platform", platform_name)
 
     manager = get_package_manager()
 
     if manager is None:
         print_error("No package manager available for this platform")
-        print_info("Install Homebrew: https://brew.sh (macOS) or use apt (Linux/WSL)")
+        print_hint("Install Homebrew: https://brew.sh (macOS) or use apt (Linux/WSL)")
         sys.exit(1)
 
-    console.print(f"[dim]Package manager:[/dim] {manager.display_name}\n")
+    print_label("Package manager", manager.display_name)
+    console.print()
 
     try:
         packages = load_packages_for_profile(active_profile)
@@ -70,10 +81,11 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
     if already_installed:
         console.print(f"[green]Already installed ({len(already_installed)}):[/green]")
         for pkg in already_installed:
-            console.print(f"  [dim]{pkg.name}[/dim]")
+            print_dim(pkg.name, indent=2)
 
     if not to_install:
-        console.print("\n[green]✓[/green] All required packages are already installed")
+        console.print()
+        print_success("All required packages are already installed")
         return
 
     console.print(f"\n[cyan]Packages to install ({len(to_install)}):[/cyan]")
@@ -90,38 +102,42 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
     total = len(to_install)
     for i, pkg in enumerate(to_install, start=1):
         if not dry_run:
-            console.print(f"[dim][{i}/{total}] Installing {pkg.name}...[/dim]")
+            print_dim(f"[{i}/{total}] Installing {pkg.name}...")
 
         success, message = manager.install(pkg, dry_run=dry_run)
 
         if success:
             if "already installed" in message:
-                console.print(
-                    f"[green]✓[/green] {pkg.name} [dim](already installed)[/dim]"
-                )
+                print_done(f"{pkg.name} {dim('(already installed)')}")
             elif dry_run:
-                console.print(f"[dim]  Would install {pkg.name}[/dim]")
+                print_dim(f"Would install {pkg.name}", indent=2)
             else:
-                console.print(f"[green]✓[/green] {pkg.name}")
+                print_success(pkg.name)
         else:
-            console.print(f"[red]✗[/red] {pkg.name}: {message}")
+            print_error(f"{pkg.name}: {message}")
 
         if not dry_run and i < total:
             console.print()
 
     if dry_run:
-        print_info("\nDry run complete. Use without --dry-run to install.")
+        print_hint("Use without --dry-run to install.")
     else:
-        console.print(
-            f"\n[green]✓[/green] Package installation complete ({total} packages)"
-        )
+        console.print()
+        print_success(f"Package installation complete ({total} packages)")
 
 
 @packages.command(name="status")
 @click.option("--profile", "profile_name", default=None, help="Profile to use")
 def packages_status(profile_name: str | None) -> None:
     """Show status of required packages."""
-    from shell_configs.display import console, print_error, print_info
+    from shell_configs.display import (
+        console,
+        print_error,
+        print_hint,
+        print_info,
+        print_label,
+        print_success,
+    )
     from shell_configs.packages import get_package_manager, load_packages_for_profile
     from shell_configs.platform import detect_platform
     from shell_configs.profiles import ProfileLoader, resolve_active_profile
@@ -131,7 +147,8 @@ def packages_status(profile_name: str | None) -> None:
     active_profile = resolve_active_profile(profile_name, profile_loader)
 
     platform_name = detect_platform().display_name
-    console.print(f"[dim]Platform:[/dim] {platform_name}\n")
+    print_label("Platform", platform_name)
+    console.print()
 
     manager = get_package_manager()
 
@@ -139,7 +156,8 @@ def packages_status(profile_name: str | None) -> None:
         print_error("No package manager available")
         return
 
-    console.print(f"[dim]Package manager:[/dim] {manager.display_name}\n")
+    print_label("Package manager", manager.display_name)
+    console.print()
 
     try:
         packages = load_packages_for_profile(active_profile)
@@ -163,17 +181,16 @@ def packages_status(profile_name: str | None) -> None:
     if installed:
         console.print(f"[green]Installed ({len(installed)}):[/green]")
         for pkg in installed:
-            console.print(f"  [green]✓[/green] {pkg.name}")
+            print_success(pkg.name, indent=2)
 
     if missing:
         console.print(f"\n[yellow]Missing ({len(missing)}):[/yellow]")
         for pkg in missing:
-            console.print(f"  [yellow]✗[/yellow] {pkg.name}")
-        console.print(
-            "\n[dim]Run 'shell-configs packages install' to install missing packages[/dim]"
-        )
+            print_error(pkg.name, indent=2)
+        print_hint("Run 'shell-configs packages install' to install missing packages")
     else:
-        console.print("\n[green]✓[/green] All required packages are installed")
+        console.print()
+        print_success("All required packages are installed")
 
 
 @packages.command(name="uninstall")
@@ -182,7 +199,16 @@ def packages_status(profile_name: str | None) -> None:
 @click.option("--profile", "profile_name", default=None, help="Profile to use")
 def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> None:
     """Uninstall managed system packages."""
-    from shell_configs.display import console, print_error, print_info
+    from shell_configs.display import (
+        console,
+        print_dim,
+        print_error,
+        print_hint,
+        print_info,
+        print_label,
+        print_success,
+        print_warning,
+    )
     from shell_configs.packages import (
         get_package_manager,
         load_packages_for_profile,
@@ -196,7 +222,7 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
     active_profile = resolve_active_profile(profile_name, profile_loader)
 
     platform_name = detect_platform().display_name
-    console.print(f"[dim]Platform:[/dim] {platform_name}")
+    print_label("Platform", platform_name)
 
     manager = get_package_manager()
 
@@ -204,7 +230,8 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
         print_error("No package manager available for this platform")
         sys.exit(1)
 
-    console.print(f"[dim]Package manager:[/dim] {manager.display_name}\n")
+    print_label("Package manager", manager.display_name)
+    console.print()
 
     try:
         packages = load_packages_for_profile(active_profile)
@@ -231,17 +258,18 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
     to_uninstall = sort_packages_for_uninstall(to_uninstall)
 
     if managed_externally:
-        console.print(f"[dim]Managed externally ({len(managed_externally)}):[/dim]")
+        print_dim(f"Managed externally ({len(managed_externally)}):")
         for pkg in managed_externally:
-            console.print(f"  [dim]{pkg.name} (not via {manager.display_name})[/dim]")
+            print_dim(f"{pkg.name} (not via {manager.display_name})", indent=2)
 
     if not_installed:
-        console.print(f"[dim]Not installed ({len(not_installed)}):[/dim]")
+        print_dim(f"Not installed ({len(not_installed)}):")
         for pkg in not_installed:
-            console.print(f"  [dim]{pkg.name}[/dim]")
+            print_dim(pkg.name, indent=2)
 
     if not to_uninstall:
-        console.print("\n[green]✓[/green] No packages to uninstall")
+        console.print()
+        print_success("No packages to uninstall")
         return
 
     console.print(f"\n[cyan]Packages to uninstall ({len(to_uninstall)}):[/cyan]")
@@ -261,33 +289,31 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
 
     for i, pkg in enumerate(to_uninstall, start=1):
         if not dry_run:
-            console.print(f"[dim][{i}/{total}] Uninstalling {pkg.name}...[/dim]")
+            print_dim(f"[{i}/{total}] Uninstalling {pkg.name}...")
 
         success, message = manager.uninstall(pkg, dry_run=dry_run)
 
         if success:
             if "not installed" in message or "skipping" in message:
-                console.print(f"[dim]  {pkg.name} ({message})[/dim]")
+                print_dim(f"{pkg.name} ({message})", indent=2)
             elif dry_run:
-                console.print(f"[dim]  Would uninstall {pkg.name}[/dim]")
+                print_dim(f"Would uninstall {pkg.name}", indent=2)
             else:
-                console.print(f"[green]✓[/green] {pkg.name}")
+                print_success(pkg.name)
                 success_count += 1
         else:
-            console.print(f"[red]✗[/red] {pkg.name}: {message}")
+            print_error(f"{pkg.name}: {message}")
             fail_count += 1
 
         if not dry_run and i < total:
             console.print()
 
     if dry_run:
-        print_info("\nDry run complete. Use without --dry-run to uninstall.")
+        print_hint("Use without --dry-run to uninstall.")
     else:
         if fail_count > 0:
-            console.print(
-                f"\n[yellow]⚠[/yellow] {success_count} uninstalled, {fail_count} failed"
-            )
+            console.print()
+            print_warning(f"{success_count} uninstalled, {fail_count} failed")
         else:
-            console.print(
-                f"\n[green]✓[/green] Package uninstall complete ({success_count} packages)"
-            )
+            console.print()
+            print_success(f"Package uninstall complete ({success_count} packages)")
