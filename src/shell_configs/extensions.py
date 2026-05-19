@@ -19,8 +19,12 @@ _EXTENSION_ID_RE = re.compile(r"^[a-z0-9_-]+\.[a-z0-9_-]+$")
 
 BUILTIN_EXTENSIONS: dict[str, set[str]] = {
     "vscode": {"github.copilot-chat"},
-    "vscode-local": {"ms-vscode-remote.remote-wsl"},
-    "cursor": {"anysphere.cursorpyright", "github.copilot-chat"},
+    "vscode-local": {"github.copilot-chat", "ms-vscode-remote.remote-wsl"},
+    "cursor": {
+        "anysphere.cursorpyright",
+        "github.copilot-chat",
+        "ms-python.vscode-pylance",
+    },
     "cursor-local": {"anysphere.remote-wsl", "anysphere.cursorpyright"},
 }
 

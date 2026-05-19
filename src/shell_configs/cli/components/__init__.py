@@ -7,6 +7,7 @@ from shell_configs.cli.components.configs import ConfigsComponent
 from shell_configs.cli.components.extensions import ExtensionsComponent
 from shell_configs.cli.components.gh_auth import GhAuthComponent
 from shell_configs.cli.components.gh_extensions import GhExtensionsComponent
+from shell_configs.cli.components.languages import LanguagesComponent
 from shell_configs.cli.components.packages import (
     OptionalPackagesComponent,
     RequiredPackagesComponent,
@@ -17,6 +18,7 @@ from shell_configs.cli.context import Component
 
 INSTALL_COMPONENTS: list[Component] = [
     RequiredPackagesComponent(),
+    LanguagesComponent(),
     ConfigsComponent(),
     OptionalPackagesComponent(),
     GhAuthComponent(),
@@ -30,6 +32,7 @@ STATUS_COMPONENTS: list[Component] = [
     ConfigsComponent(),
     CompletionsComponent(),
     OptionalPackagesComponent(),
+    LanguagesComponent(),
     ExtensionsComponent(),
     ScriptsComponent(),
     GhAuthComponent(),
