@@ -5,7 +5,7 @@ platforms = ["macos"]
 platforms = ["wsl"]
 
 [disk-cleanup]
-platforms = ["macos"]
+platforms = ["macos", "linux", "wsl"]
 
 [laptop-upgrade]
 platforms = ["macos"]

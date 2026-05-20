@@ -1,0 +1,813 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import concurrent.futures
+import os
+import shutil
+import subprocess
+import sys
+import threading
+
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# ANSI colors
+# ---------------------------------------------------------------------------
+
+_USE_COLOR = (
+    sys.stdout.isatty()
+    and not os.environ.get("NO_COLOR")
+    and "--no-color" not in sys.argv
+)
+
+if _USE_COLOR:
+    RED = "\033[0;31m"
+    GREEN = "\033[0;32m"
+    YELLOW = "\033[1;33m"
+    BLUE = "\033[0;34m"
+    CYAN = "\033[0;36m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    NC = "\033[0m"
+else:
+    RED = GREEN = YELLOW = BLUE = CYAN = BOLD = DIM = NC = ""
+
+# ---------------------------------------------------------------------------
+# Platform detection
+# ---------------------------------------------------------------------------
+
+
+def _detect_platform() -> str:
+    if sys.platform == "win32":
+        return "windows"
+    if sys.platform == "darwin":
+        return "macos"
+    if sys.platform == "linux":
+        try:
+            with open("/proc/version") as f:
+                v = f.read().lower()
+                if "microsoft" in v or "wsl" in v:
+                    return "wsl"
+        except OSError:
+            pass
+        return "linux"
+    return "linux"
+
+
+PLATFORM = _detect_platform()
+
+# ---------------------------------------------------------------------------
+# Data model
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ScanTarget:
+    path: Path
+    label: str
+    category: str  # "incremental" | "target" | "cache" | "docker"
+    tier: int  # 1=incremental/safe caches, 2=full caches, 3=Rust targets, 4=Docker
+    cleanup_cmd: list[str] | None = (
+        None  # None => shutil.rmtree; list => subprocess args
+    )
+    tool_name: str | None = None  # required tool (checked via shutil.which)
+    size_bytes: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Platform target registry
+# ---------------------------------------------------------------------------
+
+_TARGET_BUILDERS: dict[str, list[Callable[[], list[ScanTarget]]]] = {}
+
+
+def _register(*platforms: str) -> Callable:
+    def decorator(fn: Callable) -> Callable:
+        for p in platforms:
+            _TARGET_BUILDERS.setdefault(p, [])
+            _TARGET_BUILDERS[p].append(fn)
+        return fn
+
+    return decorator
+
+
+# ---------------------------------------------------------------------------
+# Size computation
+# ---------------------------------------------------------------------------
+
+
+def _du_size_bytes(path: Path) -> int:
+    """Get directory size using du -sk. Falls back to 0 on error."""
+    try:
+        result = subprocess.run(
+            ["du", "-sk", str(path)], capture_output=True, text=True, timeout=300
+        )
+        if result.returncode == 0:
+            return int(result.stdout.split()[0]) * 1024
+    except (subprocess.TimeoutExpired, ValueError, IndexError, OSError):
+        pass
+    return 0
+
+
+def _compute_sizes_parallel(targets: list[ScanTarget], max_workers: int = 8) -> None:
+    to_scan = [t for t in targets if t.path.exists() and t.category != "docker"]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {pool.submit(_du_size_bytes, t.path): t for t in to_scan}
+        for future in concurrent.futures.as_completed(futures):
+            target = futures[future]
+            try:
+                target.size_bytes = future.result()
+            except Exception:
+                target.size_bytes = 0
+
+
+def _docker_raw_size(path: Path) -> int:
+    try:
+        st = os.stat(path)
+        if hasattr(st, "st_blocks"):
+            # st_blocks reports 512-byte blocks actually allocated (sparse-file aware)
+            return st.st_blocks * 512
+        return st.st_size
+    except OSError:
+        return 0
+
+
+# ---------------------------------------------------------------------------
+# Dev tree scanner
+# ---------------------------------------------------------------------------
+
+
+def _scan_dev_tree(
+    dev_dir: Path, max_depth: int = 6
+) -> tuple[list[ScanTarget], list[ScanTarget]]:
+    targets: list[ScanTarget] = []
+    incrementals: list[ScanTarget] = []
+    _SKIP_NAMES = frozenset({".git", "node_modules", "__pycache__"})
+
+    stack: list[tuple[Path, int]] = [(dev_dir, 0)]
+    while stack:
+        current, depth = stack.pop()
+        if depth > max_depth:
+            continue
+        try:
+            entries = list(os.scandir(current))
+        except (PermissionError, OSError):
+            continue
+
+        if current.name == "target":
+            child_names = {e.name for e in entries if e.is_dir(follow_symlinks=False)}
+            if "debug" in child_names or "release" in child_names:
+                targets.append(
+                    ScanTarget(
+                        path=current,
+                        label=str(current),
+                        category="target",
+                        tier=3,
+                    )
+                )
+                for variant in ("debug", "release"):
+                    inc = current / variant / "incremental"
+                    if not inc.is_symlink() and inc.is_dir():
+                        incrementals.append(
+                            ScanTarget(
+                                path=inc,
+                                label=str(inc),
+                                category="incremental",
+                                tier=1,
+                            )
+                        )
+                continue  # prune — don't descend into target/
+
+        for entry in entries:
+            if not entry.is_dir(follow_symlinks=False):
+                continue
+            if entry.name in _SKIP_NAMES:
+                continue
+            stack.append((Path(entry.path), depth + 1))
+
+    return targets, incrementals
+
+
+# ---------------------------------------------------------------------------
+# Target builder functions
+# ---------------------------------------------------------------------------
+
+
+@_register("macos", "linux", "wsl", "windows")
+def _shared_caches() -> list[ScanTarget]:
+    home = Path.home()
+    return [
+        ScanTarget(
+            path=home / ".gradle" / "caches",
+            label=str(home / ".gradle" / "caches"),
+            category="cache",
+            tier=2,
+        ),
+        ScanTarget(
+            path=home / ".npm" / "_cacache",
+            label=str(home / ".npm" / "_cacache"),
+            category="cache",
+            tier=1,
+            cleanup_cmd=["npm", "cache", "clean", "--force"],
+            tool_name="npm",
+        ),
+        ScanTarget(
+            path=home / ".cache" / "uv",
+            label=str(home / ".cache" / "uv"),
+            category="cache",
+            tier=1,
+            cleanup_cmd=["uv", "cache", "clean"],
+            tool_name="uv",
+        ),
+        ScanTarget(
+            path=home / ".cargo" / "registry" / "cache",
+            label=str(home / ".cargo" / "registry" / "cache"),
+            category="cache",
+            tier=2,
+        ),
+        ScanTarget(
+            path=home / ".cache" / "pip",
+            label=str(home / ".cache" / "pip"),
+            category="cache",
+            tier=1,
+        ),
+        ScanTarget(
+            path=home / ".m2" / "repository",
+            label=str(home / ".m2" / "repository"),
+            category="cache",
+            tier=2,
+        ),
+    ]
+
+
+@_register("macos")
+def _macos_caches() -> list[ScanTarget]:
+    home = Path.home()
+    targets: list[ScanTarget] = [
+        ScanTarget(
+            path=home / "Library" / "Caches" / "Homebrew",
+            label=str(home / "Library" / "Caches" / "Homebrew"),
+            category="cache",
+            tier=1,
+            cleanup_cmd=["brew", "cleanup"],
+            tool_name="brew",
+        ),
+        ScanTarget(
+            path=home / "Library" / "Caches" / "hermit",
+            label=str(home / "Library" / "Caches" / "hermit"),
+            category="cache",
+            tier=2,
+        ),
+        ScanTarget(
+            path=home / "Library" / "Developer" / "Xcode" / "DerivedData",
+            label=str(home / "Library" / "Developer" / "Xcode" / "DerivedData"),
+            category="cache",
+            tier=2,
+        ),
+        ScanTarget(
+            path=home / "Library" / "Caches" / "CocoaPods",
+            label=str(home / "Library" / "Caches" / "CocoaPods"),
+            category="cache",
+            tier=2,
+        ),
+    ]
+
+    docker_raw = (
+        home
+        / "Library"
+        / "Containers"
+        / "com.docker.docker"
+        / "Data"
+        / "vms"
+        / "0"
+        / "data"
+        / "Docker.raw"
+    )
+    if docker_raw.exists():
+        t = ScanTarget(
+            path=docker_raw,
+            label=str(docker_raw),
+            category="docker",
+            tier=4,
+            # Docker.raw is a VM disk image (file, not dir) — not directly deletable.
+            # Reclaimed via docker system prune. Report-only: cleanup_cmd marks it
+            # as tool-managed so _run_fix won't attempt shutil.rmtree on a file.
+            cleanup_cmd=["docker", "system", "prune", "-af"],
+            tool_name="docker",
+        )
+        t.size_bytes = _docker_raw_size(docker_raw)
+        targets.append(t)
+
+    return targets
+
+
+@_register("linux")
+def _linux_caches() -> list[ScanTarget]:
+    home = Path.home()
+    return [
+        ScanTarget(
+            path=Path("/var/cache/apt"),
+            label="/var/cache/apt",
+            category="cache",
+            tier=2,
+            cleanup_cmd=["sudo", "apt-get", "clean"],
+            tool_name="apt-get",
+        ),
+        ScanTarget(
+            path=home / ".cache" / "JetBrains",
+            label=str(home / ".cache" / "JetBrains"),
+            category="cache",
+            tier=2,
+        ),
+    ]
+
+
+@_register("wsl")
+def _wsl_caches() -> list[ScanTarget]:
+    targets: list[ScanTarget] = []
+
+    # Resolve Windows LOCALAPPDATA via cmd.exe + wslpath
+    try:
+        proc = subprocess.run(
+            ["cmd.exe", "/c", "echo %LOCALAPPDATA%"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if proc.returncode == 0:
+            win_path = proc.stdout.strip()
+            wsl_proc = subprocess.run(
+                ["wslpath", "-u", win_path],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if wsl_proc.returncode == 0:
+                local_app_data = Path(wsl_proc.stdout.strip())
+                targets.extend(
+                    [
+                        ScanTarget(
+                            path=local_app_data / "Temp",
+                            label=str(local_app_data / "Temp"),
+                            category="cache",
+                            tier=1,
+                        ),
+                        ScanTarget(
+                            path=local_app_data / "npm-cache",
+                            label=str(local_app_data / "npm-cache"),
+                            category="cache",
+                            tier=1,
+                        ),
+                    ]
+                )
+    except (subprocess.TimeoutExpired, OSError):
+        pass  # WSL path resolution failure is non-fatal
+
+    return targets
+
+
+@_register("windows")
+def _windows_caches() -> list[ScanTarget]:
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    home = Path.home()
+    targets: list[ScanTarget] = []
+
+    if local_app_data:
+        lad = Path(local_app_data)
+        targets.extend(
+            [
+                ScanTarget(
+                    path=lad / "Temp",
+                    label=str(lad / "Temp"),
+                    category="cache",
+                    tier=1,
+                ),
+                ScanTarget(
+                    path=lad / "npm-cache",
+                    label=str(lad / "npm-cache"),
+                    category="cache",
+                    tier=1,
+                ),
+            ]
+        )
+
+    targets.append(
+        ScanTarget(
+            path=home / ".nuget" / "packages",
+            label=str(home / ".nuget" / "packages"),
+            category="cache",
+            tier=2,
+        )
+    )
+
+    return targets
+
+
+@_register("macos", "linux", "wsl", "windows")
+def _docker_targets() -> list[ScanTarget]:
+    if not shutil.which("docker"):
+        return []
+    try:
+        result = subprocess.run(
+            ["docker", "info"],
+            capture_output=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            return []
+    except (subprocess.TimeoutExpired, OSError):
+        return []
+
+    # Sentinel target — no path, handled specially in report and fix
+    return [
+        ScanTarget(
+            path=Path("/dev/null"),  # placeholder; category="docker" skips du
+            label="docker system",
+            category="docker",
+            tier=4,
+            cleanup_cmd=["docker", "system", "prune", "-af"],
+            tool_name="docker",
+        )
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Output formatting
+# ---------------------------------------------------------------------------
+
+
+def _human_size(nbytes: int) -> str:
+    if nbytes >= 1024**3:
+        return f"{nbytes / 1024**3:.1f}G"
+    elif nbytes >= 1024**2:
+        return f"{nbytes / 1024**2:.0f}M"
+    elif nbytes >= 1024:
+        return f"{nbytes / 1024:.0f}K"
+    return f"{nbytes}B"
+
+
+def _color_size(nbytes: int) -> str:
+    text = _human_size(nbytes)
+    if nbytes >= 10 * 1024**3:
+        return f"{RED}{text}{NC}"
+    elif nbytes >= 1024**3:
+        return f"{YELLOW}{text}{NC}"
+    return text
+
+
+def _short_path(p: Path) -> str:
+    home = str(Path.home())
+    s = str(p)
+    return s.replace(home, "~", 1) if s.startswith(home) else s
+
+
+def _term_width() -> int:
+    try:
+        return os.get_terminal_size().columns
+    except (ValueError, OSError):
+        return 100
+
+
+def _format_rows(items: list[ScanTarget], term_width: int) -> list[str]:
+    SIZE_COL = 8
+    INDENT = 2
+    max_path_width = term_width - INDENT - SIZE_COL
+    rows = []
+    for t in items:
+        path_str = _short_path(t.path)
+        if len(path_str) > max_path_width:
+            path_str = "…" + path_str[-(max_path_width - 1) :]
+        plain_size = _human_size(t.size_bytes)
+        padding = term_width - INDENT - len(path_str) - len(plain_size)
+        rows.append(f"  {path_str}{' ' * max(1, padding)}{_color_size(t.size_bytes)}")
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# Spinner
+# ---------------------------------------------------------------------------
+
+
+@contextmanager
+def _spinner(message: str) -> Generator[None, None, None]:
+    if not sys.stderr.isatty():
+        sys.stderr.write(f"{message}\n")
+        yield
+        return
+    stop = threading.Event()
+
+    def spin() -> None:
+        chars = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+        i = 0
+        while not stop.is_set():
+            sys.stderr.write(f"\r{chars[i % len(chars)]} {message}")
+            sys.stderr.flush()
+            stop.wait(0.1)
+            i += 1
+        sys.stderr.write(f"\r{' ' * (len(message) + 3)}\r")
+        sys.stderr.flush()
+
+    t = threading.Thread(target=spin, daemon=True)
+    t.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        t.join()
+
+
+# ---------------------------------------------------------------------------
+# Scan
+# ---------------------------------------------------------------------------
+
+
+def _scan(dev_dir: Path, workers: int) -> list[ScanTarget]:
+    all_targets: list[ScanTarget] = []
+
+    with _spinner("Scanning development directories..."):
+        rust_targets, incrementals = _scan_dev_tree(dev_dir)
+        all_targets.extend(rust_targets)
+        all_targets.extend(incrementals)
+
+    for fn in _TARGET_BUILDERS.get(PLATFORM, []):
+        all_targets.extend(fn())
+    # WSL inherits all Linux cache locations on top of its own
+    if PLATFORM == "wsl":
+        for fn in _TARGET_BUILDERS.get("linux", []):
+            all_targets.extend(fn())
+
+    with _spinner("Computing sizes..."):
+        _compute_sizes_parallel(all_targets, max_workers=workers)
+
+    return all_targets
+
+
+# ---------------------------------------------------------------------------
+# Report
+# ---------------------------------------------------------------------------
+
+
+_MIN_DISPLAY_BYTES = 1024 * 1024  # 1 MB
+
+
+def _print_section(
+    title: str,
+    description: str,
+    items: list[ScanTarget],
+    term_width: int,
+) -> int:
+    print(f"{BLUE}{title}{NC} {DIM}({description}){NC}:")
+    shown = [
+        t
+        for t in sorted(items, key=lambda t: t.size_bytes, reverse=True)
+        if t.size_bytes >= _MIN_DISPLAY_BYTES
+    ]
+    if shown:
+        for line in _format_rows(shown, term_width):
+            print(line)
+    else:
+        print(f"  {DIM}(none found){NC}")
+    subtotal = sum(t.size_bytes for t in items)
+    print(f"  {BOLD}Subtotal: {_human_size(subtotal)}{NC}")
+    print()
+    return subtotal
+
+
+def _print_report(targets: list[ScanTarget]) -> None:
+    print(f"{BOLD}Disk Usage Report{NC}")
+    print("=================")
+
+    root = "C:\\" if sys.platform == "win32" else "/"
+    usage = shutil.disk_usage(root)
+    free = usage.free
+    total = usage.total
+    pct_used = int((total - free) * 100 / total) if total else 0
+    print(
+        f"Disk: {BOLD}{_human_size(free)}{NC} free {DIM}/ {_human_size(total)} total ({pct_used}% used){NC}"
+    )
+    print()
+
+    incrementals = [t for t in targets if t.category == "incremental"]
+    rust_targets = [t for t in targets if t.category == "target"]
+    caches = [t for t in targets if t.category == "cache"]
+    docker_targets = [t for t in targets if t.category == "docker"]
+
+    tw = _term_width()
+    total_inc = _print_section(
+        "Rust incremental caches",
+        "safe to clear, first rebuild slightly slower",
+        incrementals,
+        tw,
+    )
+    _print_section(
+        "Rust target dirs",
+        "full — clearing requires full rebuild",
+        rust_targets,
+        tw,
+    )
+    total_cache = _print_section(
+        "Package caches",
+        "safe to clear, re-downloaded on demand",
+        caches,
+        tw,
+    )
+
+    # --- Docker ---
+    docker_files = [t for t in docker_targets if t.label != "docker system"]
+    docker_daemon = [t for t in docker_targets if t.label == "docker system"]
+    if docker_files or docker_daemon:
+        print(f"{BLUE}Docker{NC}:")
+        if docker_files:
+            for line in _format_rows(docker_files, tw):
+                print(line)
+        if docker_daemon:
+            print(
+                f"  {DIM}docker daemon running — run {NC}{CYAN}docker system prune{NC}{DIM} to reclaim{NC}"
+            )
+        print()
+
+    total_reclaimable = total_inc + total_cache
+    print(
+        f"{GREEN}{BOLD}Total reclaimable (incremental + caches): {_human_size(total_reclaimable)}{NC}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Fix
+# ---------------------------------------------------------------------------
+
+
+_TIER_LABELS = {
+    1: "Tier 1: Incremental caches and safe package caches",
+    2: "Tier 2: Full package caches",
+    3: "Tier 3: Rust target directories (requires full rebuild to restore)",
+    4: "Tier 4: Docker",
+}
+
+
+def _confirm(prompt: str) -> bool:
+    print(f"{YELLOW}{prompt}{NC}")
+    try:
+        reply = input("Continue? (y/N) ").strip().lower()
+    except EOFError:
+        return False
+    return reply in ("y", "yes")
+
+
+def _run_fix(targets: list[ScanTarget], skip_confirm: bool) -> None:
+    root = "C:\\" if sys.platform == "win32" else "/"
+    before_free = shutil.disk_usage(root).free
+
+    print()
+    print(f"{BOLD}=== Cleanup ==={NC}")
+    print()
+
+    for tier in (1, 2, 3, 4):
+        tier_targets = [
+            t
+            for t in targets
+            if t.tier == tier and t.size_bytes > 0 and t.label != "docker system"
+        ]
+        docker_prune = [
+            t for t in targets if t.tier == tier and t.label == "docker system"
+        ]
+
+        if not tier_targets and not docker_prune:
+            continue
+
+        tier_total = sum(t.size_bytes for t in tier_targets)
+        label = _TIER_LABELS.get(tier, f"Tier {tier}")
+        print(f"{CYAN}{label} (~{_human_size(tier_total)}){NC}")
+
+        if not skip_confirm and not _confirm(f"Clean tier {tier}?"):
+            print(f"  {YELLOW}Skipped{NC}")
+            print()
+            continue
+
+        for t in tier_targets:
+            display = _short_path(t.path)
+            if t.cleanup_cmd is not None:
+                if t.tool_name and not shutil.which(t.tool_name):
+                    print(f"  {YELLOW}Skipping {display} ({t.tool_name} not found){NC}")
+                    continue
+                print(
+                    f"  Running {' '.join(t.cleanup_cmd)} ({display}, {_human_size(t.size_bytes)})..."
+                )
+                try:
+                    subprocess.run(t.cleanup_cmd, check=False, timeout=600)
+                except subprocess.TimeoutExpired:
+                    print(f"  {YELLOW}Warning: {t.cleanup_cmd[0]} timed out{NC}")
+            else:
+                print(f"  Removing {display} ({_human_size(t.size_bytes)})...")
+                shutil.rmtree(t.path, onerror=lambda *a: None)
+
+        if docker_prune:
+            print("  Running docker system prune -af ...")
+            try:
+                subprocess.run(
+                    ["docker", "system", "prune", "-af"], check=False, timeout=600
+                )
+            except subprocess.TimeoutExpired:
+                print(f"  {YELLOW}Warning: docker system prune timed out{NC}")
+            print("  Running docker builder prune -af ...")
+            try:
+                subprocess.run(
+                    ["docker", "builder", "prune", "-af"], check=False, timeout=600
+                )
+            except subprocess.TimeoutExpired:
+                print(f"  {YELLOW}Warning: docker builder prune timed out{NC}")
+
+        print(f"  {GREEN}Done{NC}")
+        print()
+
+    after_free = shutil.disk_usage(root).free
+    freed = after_free - before_free
+
+    print(f"{BOLD}Cleanup complete{NC}")
+    print("================")
+    if freed > 0:
+        print(f"Freed: {GREEN}{_human_size(freed)}{NC}")
+    else:
+        print("Freed: 0 (space may be reclaimed asynchronously by APFS)")
+
+    total = shutil.disk_usage(root).total
+    before_pct = int((total - before_free) * 100 / total) if total else 0
+    after_pct = int((total - after_free) * 100 / total) if total else 0
+    print(
+        f"Before: {_human_size(before_free)} free / {_human_size(total)} total ({before_pct}% used)"
+    )
+    print(
+        f"After:  {_human_size(after_free)} free / {_human_size(total)} total ({after_pct}% used)"
+    )
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        prog="disk-cleanup",
+        description="Cross-platform disk usage reporter and cleaner",
+    )
+    parser.add_argument(
+        "command",
+        nargs="?",
+        default="check",
+        choices=["check", "fix"],
+        help="check (default) or fix",
+    )
+    parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Skip confirmation prompts",
+    )
+    parser.add_argument(
+        "--dev-dir",
+        type=Path,
+        default=Path(
+            os.environ.get("DISK_CLEANUP_DEV_DIR", str(Path.home() / "Development"))
+        ),
+        help="Development directory to scan",
+    )
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable colored output",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=8,
+        help="Parallel thread count for size computation",
+    )
+    args = parser.parse_args()
+
+    if args.no_color:
+        global RED, GREEN, YELLOW, BLUE, CYAN, BOLD, DIM, NC
+        RED = GREEN = YELLOW = BLUE = CYAN = BOLD = DIM = NC = ""
+
+    dev_dir = args.dev_dir.resolve()
+    home = Path.home().resolve()
+    if dev_dir == home or dev_dir == Path("/"):
+        parser.error("--dev-dir must not be home or root itself")
+    if not str(dev_dir).startswith(str(home) + os.sep):
+        parser.error(f"--dev-dir must be under $HOME, got: {dev_dir}")
+
+    targets = _scan(dev_dir, args.workers)
+
+    if args.command == "check":
+        _print_report(targets)
+    else:
+        _print_report(targets)
+        _run_fix(targets, skip_confirm=args.yes)
+
+
+if __name__ == "__main__":
+    main()

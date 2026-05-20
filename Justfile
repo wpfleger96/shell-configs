@@ -34,6 +34,11 @@ format-python:
 format-shell:
     shfmt -f . | grep -v git-prompt.sh | grep -v iterm2-shell-integration | grep -v 'src/shell_configs/scripts/' | xargs shfmt -w
 
+lint-disk-cleanup:
+    uvx ruff check src/shell_configs/scripts/system/disk-cleanup
+    uvx ruff format src/shell_configs/scripts/system/disk-cleanup --check
+    python3 -m py_compile src/shell_configs/scripts/system/disk-cleanup
+
 # Composite quality checks (lint-check/format-check used by CI workflow)
 lint-check: lint-python-check lint-shell-check
 
