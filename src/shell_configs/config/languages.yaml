@@ -1,0 +1,33 @@
+languages:
+  - name: go
+    command: go
+    description: "Go programming language"
+    macos:
+      method: brew
+      package: go
+    linux:
+      method: apt
+      package: golang
+
+  - name: rust
+    command: rustup
+    description: "Rust toolchain (via rustup)"
+    install_cmd: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+    check_path: "~/.cargo/bin/rustup"
+
+  - name: node
+    command: node
+    description: "Node.js (via nvm)"
+    install_cmd: "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash"
+    check_path: "~/.nvm/nvm.sh"
+
+  - name: ruby
+    command: ruby
+    description: "Ruby (via rvm)"
+    install_cmd: "curl -sSL https://rvm.io/mpapis.asc | gpg --import - 2>/dev/null; curl -sSL https://rvm.io/pkuczynski.asc | gpg --import - 2>/dev/null; curl -sSL https://get.rvm.io | bash -s stable"
+    check_path: "~/.rvm/scripts/rvm"
+
+  - name: python
+    command: uv
+    description: "Python (via uv) — bootstrap prerequisite, status-only"
+    status_only: true

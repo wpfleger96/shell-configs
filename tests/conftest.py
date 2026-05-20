@@ -15,12 +15,18 @@ PASSTHROUGH_COMMANDS = {"bash", "git", "zsh"}
 STUB_COMMANDS = {
     "brew",
     "code",
+    "curl",
     "cursor",
     "defaults",
     "gh",
     "go",
+    "node",
+    "ruby",
+    "rustup",
     "ssh",
     "ssh-add",
+    "sudo",
+    "uv",
 }
 
 

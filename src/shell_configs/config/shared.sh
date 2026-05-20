@@ -786,6 +786,10 @@ bundlessl() {
     RUBYOPT="-r $SHELL_CONFIGS_DIR/lib/ssl_fix.rb" bundle "$@"
 }
 
+# Load rvm shell functions so `rvm use` works (PATH-only setup at top of file
+# adds the rvm binary but doesn't enable the shell integration)
+[ -s "$HOME/.rvm/scripts/rvm" ] && source "$HOME/.rvm/scripts/rvm"
+
 ### Docker ###
 alias docker_cleanup="docker builder prune -af && docker system prune -af"
 

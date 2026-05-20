@@ -70,18 +70,22 @@ def install(
 
     from shell_configs.cli.components.gh_auth import GhAuthComponent
     from shell_configs.cli.components.gh_extensions import GhExtensionsComponent
+    from shell_configs.cli.components.languages import LanguagesComponent
     from shell_configs.cli.components.packages import RequiredPackagesComponent
     from shell_configs.cli.components.signing import SigningComponent
 
-    # RequiredPackages installs tooling (e.g. gh) that later components depend on
+    # RequiredPackages and Languages install infrastructure that later components depend on
     gh_auth_comp = None
     signing_comp = None
     gh_ext_comp = None
     required_pkg = None
+    languages_comp = None
     parallel_comps = []
     for comp in INSTALL_COMPONENTS:
         if isinstance(comp, RequiredPackagesComponent):
             required_pkg = comp
+        elif isinstance(comp, LanguagesComponent):
+            languages_comp = comp
         elif isinstance(comp, GhAuthComponent):
             gh_auth_comp = comp
         elif isinstance(comp, SigningComponent):
@@ -93,6 +97,9 @@ def install(
 
     if required_pkg and plans[required_pkg].has_changes:
         required_pkg.apply(ctx, plans[required_pkg])
+
+    if languages_comp and plans[languages_comp].has_changes:
+        languages_comp.apply(ctx, plans[languages_comp])
 
     parallel_plans = {c: plans[c] for c in parallel_comps if plans[c].has_changes}
     if parallel_plans:

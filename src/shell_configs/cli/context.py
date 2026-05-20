@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from shell_configs.config import ConfigReader
     from shell_configs.extensions import ExtensionDiff
     from shell_configs.gh_extensions import GhExtension
+    from shell_configs.languages import Language
     from shell_configs.packages.packages import Package
     from shell_configs.profiles.profile import Profile
     from shell_configs.script_manager import DiscoveredScript, ScriptStatus
@@ -100,6 +101,13 @@ class GhExtensionsPlan(ComponentPlan):
 @dataclass
 class ScriptsPlan(ComponentPlan):
     entries: list[tuple[DiscoveredScript, ScriptStatus]] = field(default_factory=list)
+
+
+@dataclass
+class LanguagesPlan(ComponentPlan):
+    all_languages: list[Language] = field(default_factory=list)
+    missing: list[Language] = field(default_factory=list)
+    status_only: list[Language] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
