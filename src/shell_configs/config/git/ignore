@@ -32,6 +32,9 @@ node_modules/
 # Claude Code /dev-docs slash command
 PLAN__*.md
 
+# Claude Code /research slash command
+research-report_*.md
+
 # Claude Code local settings
 .claude/settings.local.json
 
