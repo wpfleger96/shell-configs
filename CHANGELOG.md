@@ -2,6 +2,27 @@
 
 <!-- version list -->
 
+## v0.42.1 (2026-05-20)
+
+### Bug Fixes
+
+- Format test_disk_cleanup.py ([#41](https://github.com/wpfleger96/shell-configs/pull/41),
+  [`a89f78f`](https://github.com/wpfleger96/shell-configs/commit/a89f78fbc76377fb6b4bf88bde3da4529a2a1acf))
+
+### Chores
+
+- Add uv.lock for reproducible installs ([#41](https://github.com/wpfleger96/shell-configs/pull/41),
+  [`a89f78f`](https://github.com/wpfleger96/shell-configs/commit/a89f78fbc76377fb6b4bf88bde3da4529a2a1acf))
+
+- **git**: Ignore Claude Code research report artifacts
+  ([`6294224`](https://github.com/wpfleger96/shell-configs/commit/62942244c12f9a5d7192c4075472c5def3b51f2e))
+
+### Refactoring
+
+- Rewrite disk-cleanup as cross-platform Python script
+  ([`ce64d98`](https://github.com/wpfleger96/shell-configs/commit/ce64d9840f696fde5ec6e0146e577e8881aa7b82))
+
+
 ## v0.42.0 (2026-05-20)
 
 ### Bug Fixes
