@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v0.42.0 (2026-05-20)
+
+### Bug Fixes
+
+- Import rvm GPG keys before install instead of skipping verification
+  ([#40](https://github.com/wpfleger96/shell-configs/pull/40),
+  [`6e1a1e1`](https://github.com/wpfleger96/shell-configs/commit/6e1a1e1b8b14f0972774f26fabe14e9467dab308))
+
+- Skip rvm GPG verification during install
+  ([#40](https://github.com/wpfleger96/shell-configs/pull/40),
+  [`6e1a1e1`](https://github.com/wpfleger96/shell-configs/commit/6e1a1e1b8b14f0972774f26fabe14e9467dab308))
+
+### Features
+
+- Add LanguagesComponent and fix IDE extension false positives
+  ([#40](https://github.com/wpfleger96/shell-configs/pull/40),
+  [`6e1a1e1`](https://github.com/wpfleger96/shell-configs/commit/6e1a1e1b8b14f0972774f26fabe14e9467dab308))
+
+
 ## v0.41.1 (2026-05-18)
 
 ### Bug Fixes
