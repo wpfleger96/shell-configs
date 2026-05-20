@@ -188,18 +188,22 @@ class TestShortPath:
 @pytest.mark.unit
 class TestTermWidth:
     def test_returns_terminal_columns(self, monkeypatch):
-        monkeypatch.setattr(os, "get_terminal_size", lambda *a: os.terminal_size((120, 40)))
+        monkeypatch.setattr(
+            os, "get_terminal_size", lambda *a: os.terminal_size((120, 40))
+        )
         assert mod._term_width() == 120
 
     def test_falls_back_to_100_on_os_error(self, monkeypatch):
         def _raise(*args, **kwargs):
             raise OSError("not a terminal")
+
         monkeypatch.setattr(os, "get_terminal_size", _raise)
         assert mod._term_width() == 100
 
     def test_falls_back_to_100_on_value_error(self, monkeypatch):
         def _raise(*args, **kwargs):
             raise ValueError("bad fd")
+
         monkeypatch.setattr(os, "get_terminal_size", _raise)
         assert mod._term_width() == 100
 
@@ -294,6 +298,7 @@ class TestFormatRows:
         rows = mod._format_rows(targets, term_width=80)
         # Strip ANSI codes to measure actual visual width
         import re
+
         ansi_pattern = re.compile(r"\033\[[0-9;]*m")
         stripped = [ansi_pattern.sub("", r) for r in rows]
         # Both rows should be same length (right-aligned to term_width)
