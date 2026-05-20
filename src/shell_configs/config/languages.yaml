@@ -24,7 +24,7 @@ languages:
   - name: ruby
     command: ruby
     description: "Ruby (via rvm)"
-    install_cmd: "curl -sSL https://get.rvm.io | bash -s stable"
+    install_cmd: "curl -sSL https://get.rvm.io | bash -s stable --no-verify-downloads"
     check_path: "~/.rvm/scripts/rvm"
 
   - name: python
