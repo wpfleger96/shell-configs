@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.43.0 (2026-05-21)
+
+### Bug Fixes
+
+- **tests**: Format _collect_scan_results signature for ruff
+  ([`f927db8`](https://github.com/wpfleger96/shell-configs/commit/f927db860f98ed2dc25a47fe493ec96143fa92ba))
+
+### Features
+
+- **disk-cleanup**: Add Rich output, interactive mode, size cache, and parallel scan
+  ([`fcb9f93`](https://github.com/wpfleger96/shell-configs/commit/fcb9f93e26daecd663cec31a54d943992a61ac95))
+
+
 ## v0.42.1 (2026-05-20)
 
 ### Bug Fixes
