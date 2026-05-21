@@ -40,7 +40,9 @@ def _load_module() -> types.ModuleType:
 mod = _load_module()
 
 
-def _collect_scan_results(dev_dir: Path, **kwargs: object) -> tuple[list[Any], list[Any]]:
+def _collect_scan_results(
+    dev_dir: Path, **kwargs: object
+) -> tuple[list[Any], list[Any]]:
     all_targets = list(mod._scan_dev_tree(dev_dir, **kwargs))
     rust_targets = [t for t in all_targets if t.category == "target"]
     incrementals = [t for t in all_targets if t.category == "incremental"]
