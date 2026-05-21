@@ -12,6 +12,7 @@ import types
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -37,6 +38,14 @@ def _load_module() -> types.ModuleType:
 
 
 mod = _load_module()
+
+
+def _collect_scan_results(dev_dir: Path, **kwargs: object) -> tuple[list[Any], list[Any]]:
+    all_targets = list(mod._scan_dev_tree(dev_dir, **kwargs))
+    rust_targets = [t for t in all_targets if t.category == "target"]
+    incrementals = [t for t in all_targets if t.category == "incremental"]
+    return rust_targets, incrementals
+
 
 # Capture the real subprocess.run before autouse fixtures replace it
 _real_subprocess_run = subprocess.run
@@ -181,34 +190,6 @@ class TestShortPath:
 
 
 # ---------------------------------------------------------------------------
-# Terminal width
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestTermWidth:
-    def test_returns_terminal_columns(self, monkeypatch):
-        monkeypatch.setattr(
-            os, "get_terminal_size", lambda *a: os.terminal_size((120, 40))
-        )
-        assert mod._term_width() == 120
-
-    def test_falls_back_to_100_on_os_error(self, monkeypatch):
-        def _raise(*args, **kwargs):
-            raise OSError("not a terminal")
-
-        monkeypatch.setattr(os, "get_terminal_size", _raise)
-        assert mod._term_width() == 100
-
-    def test_falls_back_to_100_on_value_error(self, monkeypatch):
-        def _raise(*args, **kwargs):
-            raise ValueError("bad fd")
-
-        monkeypatch.setattr(os, "get_terminal_size", _raise)
-        assert mod._term_width() == 100
-
-
-# ---------------------------------------------------------------------------
 # Row formatting
 # ---------------------------------------------------------------------------
 
@@ -296,11 +277,11 @@ class TestFormatRows:
             ),
         ]
         rows = mod._format_rows(targets, term_width=80)
-        # Strip ANSI codes to measure actual visual width
+        # Strip Rich markup tags to measure actual visual width
         import re
 
-        ansi_pattern = re.compile(r"\033\[[0-9;]*m")
-        stripped = [ansi_pattern.sub("", r) for r in rows]
+        markup_pattern = re.compile(r"\[/?[a-z ]+\]")
+        stripped = [markup_pattern.sub("", r) for r in rows]
         # Both rows should be same length (right-aligned to term_width)
         assert len(stripped[0]) == len(stripped[1])
 
@@ -381,7 +362,7 @@ class TestScanDevTree:
         project = tmp_path / "myproject"
         (project / "target" / "debug").mkdir(parents=True)
 
-        rust_targets, incrementals = mod._scan_dev_tree(tmp_path)
+        rust_targets, incrementals = _collect_scan_results(tmp_path)
 
         target_paths = [t.path for t in rust_targets]
         assert project / "target" in target_paths
@@ -390,7 +371,7 @@ class TestScanDevTree:
         project = tmp_path / "myproject"
         (project / "target" / "release").mkdir(parents=True)
 
-        rust_targets, _ = mod._scan_dev_tree(tmp_path)
+        rust_targets, _ = _collect_scan_results(tmp_path)
 
         assert any(t.path == project / "target" for t in rust_targets)
 
@@ -398,7 +379,7 @@ class TestScanDevTree:
         project = tmp_path / "myproject"
         (project / "target" / "debug" / "incremental").mkdir(parents=True)
 
-        _, incrementals = mod._scan_dev_tree(tmp_path)
+        _, incrementals = _collect_scan_results(tmp_path)
 
         incremental_paths = [t.path for t in incrementals]
         assert project / "target" / "debug" / "incremental" in incremental_paths
@@ -407,7 +388,7 @@ class TestScanDevTree:
         project = tmp_path / "myproject"
         (project / "target" / "debug").mkdir(parents=True)
 
-        _, incrementals = mod._scan_dev_tree(tmp_path)
+        _, incrementals = _collect_scan_results(tmp_path)
 
         assert incrementals == []
 
@@ -417,7 +398,7 @@ class TestScanDevTree:
         nested = project / "target" / "nested_project" / "target" / "debug"
         nested.mkdir(parents=True)
 
-        rust_targets, _ = mod._scan_dev_tree(tmp_path)
+        rust_targets, _ = _collect_scan_results(tmp_path)
 
         target_paths = [t.path for t in rust_targets]
         assert project / "target" in target_paths
@@ -429,7 +410,7 @@ class TestScanDevTree:
         project_under_git = git_dir / "nested" / "target" / "debug"
         project_under_git.mkdir(parents=True)
 
-        rust_targets, _ = mod._scan_dev_tree(tmp_path)
+        rust_targets, _ = _collect_scan_results(tmp_path)
 
         target_paths = [t.path for t in rust_targets]
         assert all(".git" not in str(p) for p in target_paths)
@@ -438,7 +419,7 @@ class TestScanDevTree:
         worktrees_dir = tmp_path / ".worktrees" / "feature-branch"
         (worktrees_dir / "myproject" / "target" / "debug").mkdir(parents=True)
 
-        rust_targets, _ = mod._scan_dev_tree(tmp_path)
+        rust_targets, _ = _collect_scan_results(tmp_path)
 
         target_paths = [t.path for t in rust_targets]
         assert any(".worktrees" in str(p) for p in target_paths)
@@ -452,7 +433,7 @@ class TestScanDevTree:
         link = dev_dir / "symlinked_project"
         os.symlink(outside, link)
 
-        rust_targets, _ = mod._scan_dev_tree(dev_dir)
+        rust_targets, _ = _collect_scan_results(dev_dir)
 
         assert rust_targets == []
 
@@ -472,7 +453,7 @@ class TestScanDevTree:
         import unittest.mock as mock
 
         with mock.patch("os.scandir", side_effect=_patched_scandir):
-            rust_targets, _ = mod._scan_dev_tree(tmp_path)
+            rust_targets, _ = _collect_scan_results(tmp_path)
 
         assert any(t.path == project / "target" for t in rust_targets)
 
@@ -480,7 +461,7 @@ class TestScanDevTree:
         project = tmp_path / "myproject"
         (project / "target" / "debug").mkdir(parents=True)
 
-        rust_targets, _ = mod._scan_dev_tree(tmp_path)
+        rust_targets, _ = _collect_scan_results(tmp_path)
 
         assert all(t.category == "target" for t in rust_targets)
 
@@ -488,7 +469,7 @@ class TestScanDevTree:
         project = tmp_path / "myproject"
         (project / "target" / "debug" / "incremental").mkdir(parents=True)
 
-        _, incrementals = mod._scan_dev_tree(tmp_path)
+        _, incrementals = _collect_scan_results(tmp_path)
 
         assert all(t.category == "incremental" for t in incrementals)
 
@@ -496,7 +477,7 @@ class TestScanDevTree:
         project = tmp_path / "myproject"
         (project / "target" / "debug").mkdir(parents=True)
 
-        rust_targets, _ = mod._scan_dev_tree(tmp_path)
+        rust_targets, _ = _collect_scan_results(tmp_path)
 
         assert all(t.tier == 3 for t in rust_targets)
 
@@ -504,12 +485,12 @@ class TestScanDevTree:
         project = tmp_path / "myproject"
         (project / "target" / "debug" / "incremental").mkdir(parents=True)
 
-        _, incrementals = mod._scan_dev_tree(tmp_path)
+        _, incrementals = _collect_scan_results(tmp_path)
 
         assert all(t.tier == 1 for t in incrementals)
 
     def test_empty_dev_dir_returns_no_targets(self, tmp_path):
-        rust_targets, incrementals = mod._scan_dev_tree(tmp_path)
+        rust_targets, incrementals = _collect_scan_results(tmp_path)
 
         assert rust_targets == []
         assert incrementals == []
@@ -520,7 +501,7 @@ class TestScanDevTree:
             deep = deep / "sub"
         (deep / "target" / "debug").mkdir(parents=True)
 
-        rust_targets, _ = mod._scan_dev_tree(tmp_path, max_depth=3)
+        rust_targets, _ = _collect_scan_results(tmp_path, max_depth=3)
 
         assert rust_targets == []
 
@@ -543,16 +524,16 @@ class TestDuSizeBytes:
 
         assert size >= 0
 
-    def test_returns_zero_for_nonexistent_path(self, tmp_path, monkeypatch):
+    def test_returns_none_for_nonexistent_path(self, tmp_path, monkeypatch):
         nonexistent = tmp_path / "does_not_exist"
 
         monkeypatch.setattr(mod.subprocess, "run", _real_subprocess_run)
 
         size = mod._du_size_bytes(nonexistent)
 
-        assert size == 0
+        assert size is None
 
-    def test_returns_zero_on_subprocess_error(self, monkeypatch):
+    def test_returns_none_on_subprocess_error(self, monkeypatch):
         def _failing_run(cmd, *args, **kwargs):
             raise OSError("du not found")
 
@@ -560,9 +541,9 @@ class TestDuSizeBytes:
 
         size = mod._du_size_bytes(Path("/some/path"))
 
-        assert size == 0
+        assert size is None
 
-    def test_returns_zero_on_timeout(self, monkeypatch):
+    def test_returns_none_on_timeout(self, monkeypatch):
         def _timeout_run(cmd, *args, **kwargs):
             raise mod.subprocess.TimeoutExpired(cmd, 300)
 
@@ -570,7 +551,7 @@ class TestDuSizeBytes:
 
         size = mod._du_size_bytes(Path("/some/path"))
 
-        assert size == 0
+        assert size is None
 
 
 # ---------------------------------------------------------------------------
@@ -943,3 +924,389 @@ class TestRunFix:
         mod._run_fix([target], skip_confirm=True)
 
         assert called_cmds == []
+
+    def test_run_fix_invalidates_cache(self, tmp_path, monkeypatch):
+        import collections
+        import time as time_mod
+
+        DiskUsage = collections.namedtuple("DiskUsage", ["total", "used", "free"])
+        monkeypatch.setattr(
+            shutil,
+            "disk_usage",
+            lambda p: DiskUsage(100 * 1024**3, 50 * 1024**3, 50 * 1024**3),
+        )
+
+        cache_file = tmp_path / "cache.json"
+        cache = mod.SizeCache(cache_file, ttl=60)
+        target_dir = tmp_path / "incremental"
+        target_dir.mkdir()
+        key = str(target_dir.resolve())
+        cache.update({key: (1024 * 1024, time_mod.time())})
+
+        target = mod.ScanTarget(
+            path=target_dir,
+            label=str(target_dir),
+            category="incremental",
+            tier=1,
+            size_bytes=2 * 1024**2,
+        )
+
+        mod._run_fix([target], skip_confirm=True, cache=cache)
+
+        assert cache.get(target_dir) is None
+
+
+# ---------------------------------------------------------------------------
+# Default workers constant
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestDefaultWorkers:
+    def test_default_workers_is_positive(self):
+        assert mod._DEFAULT_WORKERS >= 1
+
+    def test_default_workers_capped_at_16(self):
+        assert mod._DEFAULT_WORKERS <= 16
+
+    def test_default_workers_matches_formula(self):
+        expected = min(os.cpu_count() or 4, 16)
+        assert mod._DEFAULT_WORKERS == expected
+
+
+# ---------------------------------------------------------------------------
+# _run_fix_selected — interactive mode cleanup
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestRunFixSelected:
+    def test_removes_selected_directory(self, tmp_path, monkeypatch, capsys):
+        import collections
+
+        DiskUsage = collections.namedtuple("DiskUsage", ["total", "used", "free"])
+        monkeypatch.setattr(
+            shutil,
+            "disk_usage",
+            lambda path: DiskUsage(100 * 1024**3, 50 * 1024**3, 50 * 1024**3),
+        )
+
+        cache_dir = tmp_path / "incremental"
+        cache_dir.mkdir()
+        (cache_dir / "artifact.o").write_bytes(b"x" * 100)
+
+        target = mod.ScanTarget(
+            path=cache_dir,
+            label=str(cache_dir),
+            category="incremental",
+            tier=1,
+            size_bytes=2 * 1024**2,
+        )
+
+        mod._run_fix_selected([target])
+
+        assert not cache_dir.exists()
+
+    def test_runs_cleanup_cmd_for_selected(self, tmp_path, monkeypatch, capsys):
+        import collections
+
+        DiskUsage = collections.namedtuple("DiskUsage", ["total", "used", "free"])
+        monkeypatch.setattr(
+            shutil,
+            "disk_usage",
+            lambda path: DiskUsage(100 * 1024**3, 50 * 1024**3, 50 * 1024**3),
+        )
+
+        called_cmds = []
+
+        def _mock_run(cmd, *args, **kwargs):
+            called_cmds.append(cmd)
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="", stderr=""
+            )
+
+        monkeypatch.setattr(subprocess, "run", _mock_run)
+        monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}")
+
+        cache_dir = tmp_path / "npm_cache"
+        cache_dir.mkdir()
+
+        target = mod.ScanTarget(
+            path=cache_dir,
+            label=str(cache_dir),
+            category="cache",
+            tier=1,
+            cleanup_cmd=["npm", "cache", "clean", "--force"],
+            tool_name="npm",
+            size_bytes=10 * 1024**2,
+        )
+
+        mod._run_fix_selected([target])
+
+        assert ["npm", "cache", "clean", "--force"] in called_cmds
+
+    def test_skips_tool_when_not_found(self, tmp_path, monkeypatch, capsys):
+        import collections
+
+        DiskUsage = collections.namedtuple("DiskUsage", ["total", "used", "free"])
+        monkeypatch.setattr(
+            shutil,
+            "disk_usage",
+            lambda path: DiskUsage(100 * 1024**3, 50 * 1024**3, 50 * 1024**3),
+        )
+
+        called_cmds = []
+
+        def _mock_run(cmd, *args, **kwargs):
+            called_cmds.append(cmd)
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="", stderr=""
+            )
+
+        monkeypatch.setattr(subprocess, "run", _mock_run)
+        monkeypatch.setattr(shutil, "which", lambda name: None)
+
+        cache_dir = tmp_path / "npm_cache"
+        cache_dir.mkdir()
+
+        target = mod.ScanTarget(
+            path=cache_dir,
+            label=str(cache_dir),
+            category="cache",
+            tier=1,
+            cleanup_cmd=["npm", "cache", "clean", "--force"],
+            tool_name="npm",
+            size_bytes=10 * 1024**2,
+        )
+
+        mod._run_fix_selected([target])
+
+        assert called_cmds == []
+
+    def test_handles_empty_list(self, monkeypatch, capsys):
+        import collections
+
+        DiskUsage = collections.namedtuple("DiskUsage", ["total", "used", "free"])
+        monkeypatch.setattr(
+            shutil,
+            "disk_usage",
+            lambda path: DiskUsage(100 * 1024**3, 50 * 1024**3, 50 * 1024**3),
+        )
+
+        # Should complete without errors
+        mod._run_fix_selected([])
+
+        captured = capsys.readouterr()
+        assert "Cleanup complete" in captured.out
+
+    def test_run_fix_selected_invalidates_cache(self, tmp_path, monkeypatch):
+        import collections
+        import time as time_mod
+
+        DiskUsage = collections.namedtuple("DiskUsage", ["total", "used", "free"])
+        monkeypatch.setattr(
+            shutil,
+            "disk_usage",
+            lambda p: DiskUsage(100 * 1024**3, 50 * 1024**3, 50 * 1024**3),
+        )
+
+        cache_file = tmp_path / "cache.json"
+        cache = mod.SizeCache(cache_file, ttl=60)
+        target_dir = tmp_path / "to_clean"
+        target_dir.mkdir()
+        key = str(target_dir.resolve())
+        cache.update({key: (512 * 1024, time_mod.time())})
+
+        target = mod.ScanTarget(
+            path=target_dir,
+            label=str(target_dir),
+            category="cache",
+            tier=1,
+            size_bytes=512 * 1024,
+        )
+
+        mod._run_fix_selected([target], cache=cache)
+
+        assert cache.get(target_dir) is None
+
+
+# ---------------------------------------------------------------------------
+# SizeCache — persistent du result cache
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestSizeCache:
+    def test_get_returns_cached_size_within_ttl(self, tmp_path):
+        cache_file = tmp_path / "cache" / "sizes.json"
+        cache = mod.SizeCache(cache_file, ttl=60)
+        target = tmp_path / "some" / "project"
+        key = str(target.resolve())
+        cache.update({key: (98765, __import__("time").time())})
+
+        assert cache.get(target) == 98765
+
+    def test_get_returns_none_after_ttl_expiry(self, tmp_path, monkeypatch):
+        import time
+
+        cache_file = tmp_path / "cache" / "sizes.json"
+        target = tmp_path / "some" / "project"
+        key = str(target.resolve())
+        now = time.time()
+
+        # Write the entry to disk via a first cache instance (real time).
+        cache_writer = mod.SizeCache(cache_file, ttl=1)
+        cache_writer.update({key: (42000, now)})
+
+        # Patch time BEFORE constructing the second cache so that _load() sees the
+        # advanced clock and prunes the expired entry on load.
+        monkeypatch.setattr(time, "time", lambda: now + 2)
+
+        cache = mod.SizeCache(cache_file, ttl=1)
+        assert cache.get(target) is None
+
+    def test_get_returns_none_for_unknown_path(self, tmp_path):
+        cache_file = tmp_path / "cache" / "sizes.json"
+        cache = mod.SizeCache(cache_file, ttl=60)
+
+        assert cache.get(tmp_path / "no" / "such" / "path") is None
+
+    def test_load_silently_discards_corrupt_json(self, tmp_path):
+        cache_file = tmp_path / "cache" / "sizes.json"
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        cache_file.write_text("this is not valid json {{{{")
+
+        # Should not raise
+        cache = mod.SizeCache(cache_file, ttl=60)
+
+        assert cache.get(tmp_path / "anything") is None
+
+    def test_load_silently_discards_valid_json_non_dict(self, tmp_path):
+        cache_file = tmp_path / "cache" / "sizes.json"
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        cache_file.write_text("[1, 2, 3]")
+        cache = mod.SizeCache(cache_file, ttl=60)
+        assert cache.get(tmp_path / "anything") is None
+
+    def test_get_returns_zero_for_cached_empty_dir(self, tmp_path):
+        import time as time_mod
+
+        cache_file = tmp_path / "cache" / "sizes.json"
+        cache = mod.SizeCache(cache_file, ttl=60)
+        key = str((tmp_path / "empty").resolve())
+        cache.update({key: (0, time_mod.time())})
+        assert cache.get(tmp_path / "empty") == 0
+
+    def test_save_silently_discards_oserror(self, tmp_path):
+        # /dev/null is a file; /dev/null/impossible is an unwritable path
+        cache_file = Path("/dev/null/impossible/sizes.json")
+        cache = mod.SizeCache(cache_file, ttl=60)
+
+        # Should not raise even though the path is unwritable
+        cache.update({str(tmp_path): (1234, __import__("time").time())})
+
+    def test_invalidate_removes_exact_path(self, tmp_path):
+        cache_file = tmp_path / "cache" / "sizes.json"
+        cache = mod.SizeCache(cache_file, ttl=60)
+        target = Path("/a/b/c")
+        cache.update({str(target): (5000, __import__("time").time())})
+
+        cache.invalidate([target])
+
+        assert cache.get(target) is None
+
+    def test_invalidate_removes_child_when_parent_cleaned(self, tmp_path):
+        cache_file = tmp_path / "cache" / "sizes.json"
+        cache = mod.SizeCache(cache_file, ttl=60)
+        child = Path("/a/b/c/target/debug/incremental")
+        cache.update({str(child): (9999, __import__("time").time())})
+
+        cache.invalidate([Path("/a/b/c/target")])
+
+        assert cache.get(child) is None
+
+    def test_invalidate_removes_parent_when_child_cleaned(self, tmp_path):
+        cache_file = tmp_path / "cache" / "sizes.json"
+        cache = mod.SizeCache(cache_file, ttl=60)
+        parent = Path("/a/b/c/target")
+        cache.update({str(parent): (8888, __import__("time").time())})
+
+        cache.invalidate([Path("/a/b/c/target/debug/incremental")])
+
+        assert cache.get(parent) is None
+
+    def test_update_persists_to_disk(self, tmp_path):
+        import time
+
+        cache_file = tmp_path / "cache" / "sizes.json"
+        target = tmp_path / "my" / "project"
+        key = str(target.resolve())
+
+        cache1 = mod.SizeCache(cache_file, ttl=60)
+        cache1.update({key: (77777, time.time())})
+
+        # A fresh SizeCache pointed at the same file should load the persisted entry
+        cache2 = mod.SizeCache(cache_file, ttl=60)
+        assert cache2.get(target) == 77777
+
+
+# ---------------------------------------------------------------------------
+# _du_size_bytes — updated return-None behavior
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestDuSizeBytesNone:
+    def test_du_returns_none_on_nonexistent_path(self, monkeypatch):
+        monkeypatch.setattr(mod.subprocess, "run", _real_subprocess_run)
+
+        result = mod._du_size_bytes(Path("/nonexistent/path/xyz"))
+
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _interactive_select — early-exit path (no InquirerPy required)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestInteractiveSelect:
+    def test_returns_empty_list_when_no_targets_have_size(self, monkeypatch, capsys):
+        # _interactive_select imports InquirerPy at the top of the function, so we
+        # stub out the module before calling to avoid a hard dependency in tests.
+        import types
+
+        fake_inquirerpy = types.ModuleType("InquirerPy")
+        fake_inquirerpy.inquirer = None  # type: ignore[attr-defined]
+        fake_control = types.ModuleType("InquirerPy.base.control")
+        fake_control.Choice = object  # type: ignore[attr-defined]
+        fake_separator = types.ModuleType("InquirerPy.separator")
+        fake_separator.Separator = object  # type: ignore[attr-defined]
+
+        monkeypatch.setitem(sys.modules, "InquirerPy", fake_inquirerpy)
+        monkeypatch.setitem(sys.modules, "InquirerPy.base.control", fake_control)
+        monkeypatch.setitem(sys.modules, "InquirerPy.separator", fake_separator)
+
+        # All targets have size_bytes=0 — choices list stays empty and the function
+        # returns [] before ever calling inquirer.checkbox.
+        targets = [
+            mod.ScanTarget(
+                path=Path("/some/incremental"),
+                label="/some/incremental",
+                category="incremental",
+                tier=1,
+                size_bytes=0,
+            ),
+            mod.ScanTarget(
+                path=Path("/some/cache"),
+                label="/some/cache",
+                category="cache",
+                tier=2,
+                size_bytes=0,
+            ),
+        ]
+
+        result = mod._interactive_select(targets)
+
+        assert result == []

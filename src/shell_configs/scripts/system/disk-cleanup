@@ -1,40 +1,26 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["rich", "InquirerPy"]
+# ///
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
+import json
 import os
 import shutil
 import subprocess
 import sys
-import threading
+import tempfile
+import time
 
 from collections.abc import Callable, Generator
-from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# ANSI colors
-# ---------------------------------------------------------------------------
+from rich.console import Console
 
-_USE_COLOR = (
-    sys.stdout.isatty()
-    and not os.environ.get("NO_COLOR")
-    and "--no-color" not in sys.argv
-)
-
-if _USE_COLOR:
-    RED = "\033[0;31m"
-    GREEN = "\033[0;32m"
-    YELLOW = "\033[1;33m"
-    BLUE = "\033[0;34m"
-    CYAN = "\033[0;36m"
-    BOLD = "\033[1m"
-    DIM = "\033[2m"
-    NC = "\033[0m"
-else:
-    RED = GREEN = YELLOW = BLUE = CYAN = BOLD = DIM = NC = ""
+console = Console()
 
 # ---------------------------------------------------------------------------
 # Platform detection
@@ -100,8 +86,7 @@ def _register(*platforms: str) -> Callable:
 # ---------------------------------------------------------------------------
 
 
-def _du_size_bytes(path: Path) -> int:
-    """Get directory size using du -sk. Falls back to 0 on error."""
+def _du_size_bytes(path: Path) -> int | None:
     try:
         result = subprocess.run(
             ["du", "-sk", str(path)], capture_output=True, text=True, timeout=300
@@ -110,19 +95,7 @@ def _du_size_bytes(path: Path) -> int:
             return int(result.stdout.split()[0]) * 1024
     except (subprocess.TimeoutExpired, ValueError, IndexError, OSError):
         pass
-    return 0
-
-
-def _compute_sizes_parallel(targets: list[ScanTarget], max_workers: int = 8) -> None:
-    to_scan = [t for t in targets if t.path.exists() and t.category != "docker"]
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {pool.submit(_du_size_bytes, t.path): t for t in to_scan}
-        for future in concurrent.futures.as_completed(futures):
-            target = futures[future]
-            try:
-                target.size_bytes = future.result()
-            except Exception:
-                target.size_bytes = 0
+    return None
 
 
 def _docker_raw_size(path: Path) -> int:
@@ -137,15 +110,96 @@ def _docker_raw_size(path: Path) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Size cache
+# ---------------------------------------------------------------------------
+
+
+class SizeCache:
+    def __init__(self, path: Path, ttl: float):
+        self._path = path
+        self._ttl = ttl
+        self._data: dict[
+            str, tuple[int, float]
+        ] = {}  # str(path) -> (size_bytes, timestamp)
+        self._load()
+
+    def _load(self) -> None:
+        # Read JSON file, prune expired entries only (NOT existence checks — that's done by _submit_du).
+        # Silently discard any parse/IO error (self._data stays empty = fresh scan).
+        try:
+            raw = json.loads(self._path.read_text())
+            now = time.time()
+            self._data = {
+                k: (v["size_bytes"], v["ts"])
+                for k, v in raw.items()
+                if isinstance(v, dict)
+                and isinstance(v.get("size_bytes"), int)
+                and now - v.get("ts", 0) <= self._ttl
+            }
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, AttributeError):
+            self._data = {}
+
+    def get(self, path: Path) -> int | None:
+        entry = self._data.get(str(path.resolve()))
+        if entry is None:
+            return None
+        return entry[0]
+
+    def update(self, entries: dict[str, tuple[int, float]]) -> None:
+        self._data.update(entries)
+        self._save()
+
+    def invalidate(self, paths: list[Path]) -> None:
+        resolved = [p.resolve() for p in paths]
+        to_remove: list[str] = []
+        for key in self._data:
+            key_path = Path(key)
+            for p in resolved:
+                if (
+                    key_path == p
+                    or key_path.is_relative_to(p)
+                    or p.is_relative_to(key_path)
+                ):
+                    to_remove.append(key)
+                    break
+        for key in to_remove:
+            del self._data[key]
+        if to_remove:
+            self._save()
+
+    def _save(self) -> None:
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            data = {k: {"size_bytes": v[0], "ts": v[1]} for k, v in self._data.items()}
+            fd = tempfile.NamedTemporaryFile(
+                mode="w",
+                dir=self._path.parent,
+                suffix=".tmp",
+                delete=False,
+            )
+            try:
+                json.dump(data, fd)
+                fd.close()
+                os.replace(fd.name, self._path)
+            except BaseException:
+                fd.close()
+                try:
+                    os.unlink(fd.name)
+                except OSError:
+                    pass
+                raise
+        except OSError:
+            pass
+
+
+# ---------------------------------------------------------------------------
 # Dev tree scanner
 # ---------------------------------------------------------------------------
 
 
 def _scan_dev_tree(
     dev_dir: Path, max_depth: int = 6
-) -> tuple[list[ScanTarget], list[ScanTarget]]:
-    targets: list[ScanTarget] = []
-    incrementals: list[ScanTarget] = []
+) -> Generator[ScanTarget, None, None]:
     _SKIP_NAMES = frozenset({".git", "node_modules", "__pycache__"})
 
     stack: list[tuple[Path, int]] = [(dev_dir, 0)]
@@ -161,24 +215,20 @@ def _scan_dev_tree(
         if current.name == "target":
             child_names = {e.name for e in entries if e.is_dir(follow_symlinks=False)}
             if "debug" in child_names or "release" in child_names:
-                targets.append(
-                    ScanTarget(
-                        path=current,
-                        label=str(current),
-                        category="target",
-                        tier=3,
-                    )
+                yield ScanTarget(
+                    path=current,
+                    label=str(current),
+                    category="target",
+                    tier=3,
                 )
                 for variant in ("debug", "release"):
                     inc = current / variant / "incremental"
                     if not inc.is_symlink() and inc.is_dir():
-                        incrementals.append(
-                            ScanTarget(
-                                path=inc,
-                                label=str(inc),
-                                category="incremental",
-                                tier=1,
-                            )
+                        yield ScanTarget(
+                            path=inc,
+                            label=str(inc),
+                            category="incremental",
+                            tier=1,
                         )
                 continue  # prune — don't descend into target/
 
@@ -188,8 +238,6 @@ def _scan_dev_tree(
             if entry.name in _SKIP_NAMES:
                 continue
             stack.append((Path(entry.path), depth + 1))
-
-    return targets, incrementals
 
 
 # ---------------------------------------------------------------------------
@@ -453,9 +501,9 @@ def _human_size(nbytes: int) -> str:
 def _color_size(nbytes: int) -> str:
     text = _human_size(nbytes)
     if nbytes >= 10 * 1024**3:
-        return f"{RED}{text}{NC}"
+        return f"[red]{text}[/red]"
     elif nbytes >= 1024**3:
-        return f"{YELLOW}{text}{NC}"
+        return f"[yellow]{text}[/yellow]"
     return text
 
 
@@ -463,13 +511,6 @@ def _short_path(p: Path) -> str:
     home = str(Path.home())
     s = str(p)
     return s.replace(home, "~", 1) if s.startswith(home) else s
-
-
-def _term_width() -> int:
-    try:
-        return os.get_terminal_size().columns
-    except (ValueError, OSError):
-        return 100
 
 
 def _format_rows(items: list[ScanTarget], term_width: int) -> list[str]:
@@ -488,60 +529,120 @@ def _format_rows(items: list[ScanTarget], term_width: int) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Spinner
-# ---------------------------------------------------------------------------
-
-
-@contextmanager
-def _spinner(message: str) -> Generator[None, None, None]:
-    if not sys.stderr.isatty():
-        sys.stderr.write(f"{message}\n")
-        yield
-        return
-    stop = threading.Event()
-
-    def spin() -> None:
-        chars = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
-        i = 0
-        while not stop.is_set():
-            sys.stderr.write(f"\r{chars[i % len(chars)]} {message}")
-            sys.stderr.flush()
-            stop.wait(0.1)
-            i += 1
-        sys.stderr.write(f"\r{' ' * (len(message) + 3)}\r")
-        sys.stderr.flush()
-
-    t = threading.Thread(target=spin, daemon=True)
-    t.start()
-    try:
-        yield
-    finally:
-        stop.set()
-        t.join()
-
-
-# ---------------------------------------------------------------------------
 # Scan
 # ---------------------------------------------------------------------------
 
 
-def _scan(dev_dir: Path, workers: int) -> list[ScanTarget]:
+def _scan(
+    dev_dir: Path, workers: int, cache: SizeCache | None = None
+) -> list[ScanTarget]:
+    from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+
     all_targets: list[ScanTarget] = []
+    du_futures: dict[Future[int | None], ScanTarget] = {}
+    cache_hits = 0
 
-    with _spinner("Scanning development directories..."):
-        rust_targets, incrementals = _scan_dev_tree(dev_dir)
-        all_targets.extend(rust_targets)
-        all_targets.extend(incrementals)
+    def _submit_du(target: ScanTarget, pool: ThreadPoolExecutor) -> None:
+        all_targets.append(target)
+        if target.path.exists() and target.category != "docker":
+            if cache is not None:
+                cached = cache.get(target.path)
+                if cached is not None:
+                    target.size_bytes = cached
+                    nonlocal cache_hits
+                    cache_hits += 1
+                    return
+            du_futures[pool.submit(_du_size_bytes, target.path)] = target
 
-    for fn in _TARGET_BUILDERS.get(PLATFORM, []):
-        all_targets.extend(fn())
-    # WSL inherits all Linux cache locations on top of its own
-    if PLATFORM == "wsl":
-        for fn in _TARGET_BUILDERS.get("linux", []):
-            all_targets.extend(fn())
+    def _run_builders() -> list[ScanTarget]:
+        """Run all platform target builders. Runs in a background thread."""
+        result: list[ScanTarget] = []
+        for fn in _TARGET_BUILDERS.get(PLATFORM, []):
+            result.extend(fn())
+        # WSL inherits all Linux cache locations on top of its own
+        if PLATFORM == "wsl":
+            for fn in _TARGET_BUILDERS.get("linux", []):
+                result.extend(fn())
+        return result
 
-    with _spinner("Computing sizes..."):
-        _compute_sizes_parallel(all_targets, max_workers=workers)
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+        transient=True,
+    )
+
+    with progress:
+        scan_task = progress.add_task(
+            "[cyan]Scanning development directories...", total=None
+        )
+        builders_task = progress.add_task(
+            "[cyan]Resolving platform caches...", total=None
+        )
+        sizes_task = progress.add_task("[cyan]Computing sizes...", total=None)
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            # Submit builders to run concurrently with the dev-tree walk
+            builders_future = pool.submit(_run_builders)
+
+            # Walk dev tree on main thread, submit du futures as targets are found
+            for target in _scan_dev_tree(dev_dir):
+                _submit_du(target, pool)
+
+            progress.update(
+                scan_task, description="[green]Scanning development directories"
+            )
+
+            # Collect builder results, submit their du futures
+            builder_targets = builders_future.result()
+            for target in builder_targets:
+                _submit_du(target, pool)
+
+            progress.update(
+                builders_task, description="[green]Resolving platform caches"
+            )
+
+            # Update sizes task with total count now that all futures are submitted
+            total_du = len(du_futures)
+            total_sizes = cache_hits + total_du
+            completed_du = 0
+            if cache_hits > 0:
+                progress.update(
+                    sizes_task,
+                    description=f"[cyan]Computing sizes ({cache_hits}/{total_sizes}, {cache_hits} cached)...",
+                )
+            else:
+                progress.update(
+                    sizes_task,
+                    description=f"[cyan]Computing sizes (0/{total_sizes})...",
+                )
+
+            # Collect du results as they complete
+            cache_updates: dict[str, tuple[int, float]] = {}
+            now = time.time()
+            for future in as_completed(du_futures):
+                target = du_futures[future]
+                try:
+                    result = future.result()
+                except Exception:
+                    result = None
+                if result is not None:
+                    target.size_bytes = result
+                    cache_updates[str(target.path.resolve())] = (result, now)
+                else:
+                    target.size_bytes = 0
+                completed_du += 1
+                progress.update(
+                    sizes_task,
+                    description=f"[cyan]Computing sizes ({completed_du + cache_hits}/{total_sizes}{f', {cache_hits} cached' if cache_hits else ''})...",
+                )
+
+            if cache is not None and cache_updates:
+                cache.update(cache_updates)
+
+            progress.update(sizes_task, description="[green]Computing sizes")
 
     return all_targets
 
@@ -560,7 +661,7 @@ def _print_section(
     items: list[ScanTarget],
     term_width: int,
 ) -> int:
-    print(f"{BLUE}{title}{NC} {DIM}({description}){NC}:")
+    console.print(f"[blue]{title}[/blue] [dim]({description})[/dim]:")
     shown = [
         t
         for t in sorted(items, key=lambda t: t.size_bytes, reverse=True)
@@ -568,35 +669,35 @@ def _print_section(
     ]
     if shown:
         for line in _format_rows(shown, term_width):
-            print(line)
+            console.print(line)
     else:
-        print(f"  {DIM}(none found){NC}")
+        console.print("  [dim](none found)[/dim]")
     subtotal = sum(t.size_bytes for t in items)
-    print(f"  {BOLD}Subtotal: {_human_size(subtotal)}{NC}")
-    print()
+    console.print(f"  [bold]Subtotal: {_human_size(subtotal)}[/bold]")
+    console.print()
     return subtotal
 
 
 def _print_report(targets: list[ScanTarget]) -> None:
-    print(f"{BOLD}Disk Usage Report{NC}")
-    print("=================")
+    console.print("[bold]Disk Usage Report[/bold]")
+    console.print("=================")
 
     root = "C:\\" if sys.platform == "win32" else "/"
     usage = shutil.disk_usage(root)
     free = usage.free
     total = usage.total
     pct_used = int((total - free) * 100 / total) if total else 0
-    print(
-        f"Disk: {BOLD}{_human_size(free)}{NC} free {DIM}/ {_human_size(total)} total ({pct_used}% used){NC}"
+    console.print(
+        f"Disk: [bold]{_human_size(free)}[/bold] free [dim]/ {_human_size(total)} total ({pct_used}% used)[/dim]"
     )
-    print()
+    console.print()
 
     incrementals = [t for t in targets if t.category == "incremental"]
     rust_targets = [t for t in targets if t.category == "target"]
     caches = [t for t in targets if t.category == "cache"]
     docker_targets = [t for t in targets if t.category == "docker"]
 
-    tw = _term_width()
+    tw = console.width
     total_inc = _print_section(
         "Rust incremental caches",
         "safe to clear, first rebuild slightly slower",
@@ -620,19 +721,19 @@ def _print_report(targets: list[ScanTarget]) -> None:
     docker_files = [t for t in docker_targets if t.label != "docker system"]
     docker_daemon = [t for t in docker_targets if t.label == "docker system"]
     if docker_files or docker_daemon:
-        print(f"{BLUE}Docker{NC}:")
+        console.print("[blue]Docker[/blue]:")
         if docker_files:
             for line in _format_rows(docker_files, tw):
-                print(line)
+                console.print(line)
         if docker_daemon:
-            print(
-                f"  {DIM}docker daemon running — run {NC}{CYAN}docker system prune{NC}{DIM} to reclaim{NC}"
+            console.print(
+                "  [dim]docker daemon running — run [/dim][cyan]docker system prune[/cyan][dim] to reclaim[/dim]"
             )
-        print()
+        console.print()
 
     total_reclaimable = total_inc + total_cache
-    print(
-        f"{GREEN}{BOLD}Total reclaimable (incremental + caches): {_human_size(total_reclaimable)}{NC}"
+    console.print(
+        f"[green bold]Total reclaimable (incremental + caches): {_human_size(total_reclaimable)}[/green bold]"
     )
 
 
@@ -650,7 +751,7 @@ _TIER_LABELS = {
 
 
 def _confirm(prompt: str) -> bool:
-    print(f"{YELLOW}{prompt}{NC}")
+    console.print(f"[yellow]{prompt}[/yellow]")
     try:
         reply = input("Continue? (y/N) ").strip().lower()
     except EOFError:
@@ -658,96 +759,278 @@ def _confirm(prompt: str) -> bool:
     return reply in ("y", "yes")
 
 
-def _run_fix(targets: list[ScanTarget], skip_confirm: bool) -> None:
+def _execute_cleanup(targets: list[ScanTarget]) -> list[Path]:
+    attempted: list[Path] = []
+    docker_prune = [t for t in targets if t.label == "docker system"]
+    regular = [t for t in targets if t.label != "docker system"]
+
+    for t in regular:
+        display = _short_path(t.path)
+        if t.cleanup_cmd is not None:
+            if t.tool_name and not shutil.which(t.tool_name):
+                console.print(
+                    f"  [yellow]Skipping {display} ({t.tool_name} not found)[/yellow]"
+                )
+                continue
+            console.print(
+                f"  Running {' '.join(t.cleanup_cmd)} ({display}, {_human_size(t.size_bytes)})..."
+            )
+            try:
+                subprocess.run(t.cleanup_cmd, check=False, timeout=600)
+            except subprocess.TimeoutExpired:
+                console.print(
+                    f"  [yellow]Warning: {t.cleanup_cmd[0]} timed out[/yellow]"
+                )
+            attempted.append(t.path)
+        else:
+            console.print(f"  Removing {display} ({_human_size(t.size_bytes)})...")
+            shutil.rmtree(t.path, onerror=lambda *a: None)
+            attempted.append(t.path)
+
+    if docker_prune:
+        console.print("  Running docker system prune -af ...")
+        try:
+            subprocess.run(
+                ["docker", "system", "prune", "-af"], check=False, timeout=600
+            )
+        except subprocess.TimeoutExpired:
+            console.print("  [yellow]Warning: docker system prune timed out[/yellow]")
+        console.print("  Running docker builder prune -af ...")
+        try:
+            subprocess.run(
+                ["docker", "builder", "prune", "-af"], check=False, timeout=600
+            )
+        except subprocess.TimeoutExpired:
+            console.print("  [yellow]Warning: docker builder prune timed out[/yellow]")
+
+    return attempted
+
+
+def _print_cleanup_summary(before_free: int, after_free: int) -> None:
+    root = "C:\\" if sys.platform == "win32" else "/"
+    freed = after_free - before_free
+
+    console.print("[bold]Cleanup complete[/bold]")
+    console.print("================")
+    if freed > 0:
+        console.print(f"Freed: [green]{_human_size(freed)}[/green]")
+    else:
+        console.print("Freed: 0 (space may be reclaimed asynchronously by APFS)")
+
+    total = shutil.disk_usage(root).total
+    before_pct = int((total - before_free) * 100 / total) if total else 0
+    after_pct = int((total - after_free) * 100 / total) if total else 0
+    console.print(
+        f"Before: {_human_size(before_free)} free / {_human_size(total)} total ({before_pct}% used)"
+    )
+    console.print(
+        f"After:  {_human_size(after_free)} free / {_human_size(total)} total ({after_pct}% used)"
+    )
+
+
+def _run_fix(
+    targets: list[ScanTarget], skip_confirm: bool, cache: SizeCache | None = None
+) -> None:
     root = "C:\\" if sys.platform == "win32" else "/"
     before_free = shutil.disk_usage(root).free
+    all_attempted: list[Path] = []
 
-    print()
-    print(f"{BOLD}=== Cleanup ==={NC}")
-    print()
+    console.print()
+    console.print("[bold]=== Cleanup ===[/bold]")
+    console.print()
 
     for tier in (1, 2, 3, 4):
         tier_targets = [
             t
             for t in targets
-            if t.tier == tier and t.size_bytes > 0 and t.label != "docker system"
-        ]
-        docker_prune = [
-            t for t in targets if t.tier == tier and t.label == "docker system"
+            if t.tier == tier and (t.size_bytes > 0 or t.label == "docker system")
         ]
 
-        if not tier_targets and not docker_prune:
+        if not tier_targets:
             continue
 
-        tier_total = sum(t.size_bytes for t in tier_targets)
+        tier_total = sum(
+            t.size_bytes for t in tier_targets if t.label != "docker system"
+        )
         label = _TIER_LABELS.get(tier, f"Tier {tier}")
-        print(f"{CYAN}{label} (~{_human_size(tier_total)}){NC}")
+        console.print(f"[cyan]{label} (~{_human_size(tier_total)})[/cyan]")
 
         if not skip_confirm and not _confirm(f"Clean tier {tier}?"):
-            print(f"  {YELLOW}Skipped{NC}")
-            print()
+            console.print("  [yellow]Skipped[/yellow]")
+            console.print()
             continue
 
-        for t in tier_targets:
-            display = _short_path(t.path)
-            if t.cleanup_cmd is not None:
-                if t.tool_name and not shutil.which(t.tool_name):
-                    print(f"  {YELLOW}Skipping {display} ({t.tool_name} not found){NC}")
-                    continue
-                print(
-                    f"  Running {' '.join(t.cleanup_cmd)} ({display}, {_human_size(t.size_bytes)})..."
-                )
-                try:
-                    subprocess.run(t.cleanup_cmd, check=False, timeout=600)
-                except subprocess.TimeoutExpired:
-                    print(f"  {YELLOW}Warning: {t.cleanup_cmd[0]} timed out{NC}")
-            else:
-                print(f"  Removing {display} ({_human_size(t.size_bytes)})...")
-                shutil.rmtree(t.path, onerror=lambda *a: None)
+        all_attempted.extend(_execute_cleanup(tier_targets))
+        console.print("  [green]Done[/green]")
+        console.print()
 
-        if docker_prune:
-            print("  Running docker system prune -af ...")
-            try:
-                subprocess.run(
-                    ["docker", "system", "prune", "-af"], check=False, timeout=600
-                )
-            except subprocess.TimeoutExpired:
-                print(f"  {YELLOW}Warning: docker system prune timed out{NC}")
-            print("  Running docker builder prune -af ...")
-            try:
-                subprocess.run(
-                    ["docker", "builder", "prune", "-af"], check=False, timeout=600
-                )
-            except subprocess.TimeoutExpired:
-                print(f"  {YELLOW}Warning: docker builder prune timed out{NC}")
-
-        print(f"  {GREEN}Done{NC}")
-        print()
+    if cache is not None and all_attempted:
+        cache.invalidate(all_attempted)
 
     after_free = shutil.disk_usage(root).free
-    freed = after_free - before_free
+    _print_cleanup_summary(before_free, after_free)
 
-    print(f"{BOLD}Cleanup complete{NC}")
-    print("================")
-    if freed > 0:
-        print(f"Freed: {GREEN}{_human_size(freed)}{NC}")
-    else:
-        print("Freed: 0 (space may be reclaimed asynchronously by APFS)")
 
-    total = shutil.disk_usage(root).total
-    before_pct = int((total - before_free) * 100 / total) if total else 0
-    after_pct = int((total - after_free) * 100 / total) if total else 0
-    print(
-        f"Before: {_human_size(before_free)} free / {_human_size(total)} total ({before_pct}% used)"
-    )
-    print(
-        f"After:  {_human_size(after_free)} free / {_human_size(total)} total ({after_pct}% used)"
-    )
+# ---------------------------------------------------------------------------
+# Interactive mode
+# ---------------------------------------------------------------------------
+
+
+_SELECT_ALL = "__select_all__"
+_SELECT_ALL_INCREMENTAL = "__select_all_incremental__"
+_SELECT_ALL_CACHE = "__select_all_cache__"
+_SELECT_ALL_TARGET = "__select_all_target__"
+_SELECT_ALL_DOCKER = "__select_all_docker__"
+
+
+def _interactive_select(targets: list[ScanTarget]) -> list[ScanTarget]:
+    from InquirerPy import inquirer
+    from InquirerPy.base.control import Choice
+    from InquirerPy.separator import Separator
+
+    incrementals = [
+        t for t in targets if t.category == "incremental" and t.size_bytes > 0
+    ]
+    caches = [t for t in targets if t.category == "cache" and t.size_bytes > 0]
+    rust_targets = [t for t in targets if t.category == "target" and t.size_bytes > 0]
+    docker_targets = [t for t in targets if t.category == "docker" and t.size_bytes > 0]
+
+    all_with_size = [t for t in targets if t.size_bytes > 0]
+    if not all_with_size:
+        console.print("[dim]No targets with size > 0 found.[/dim]")
+        return []
+
+    choices: list = []
+
+    grand_total = _human_size(sum(t.size_bytes for t in all_with_size))
+    choices.append(Choice(value=_SELECT_ALL, name=f"Select all ({grand_total})"))
+    choices.append(Separator())
+
+    section_map = {
+        _SELECT_ALL_INCREMENTAL: incrementals,
+        _SELECT_ALL_CACHE: caches,
+        _SELECT_ALL_TARGET: rust_targets,
+        _SELECT_ALL_DOCKER: docker_targets,
+    }
+
+    if incrementals:
+        total = _human_size(sum(t.size_bytes for t in incrementals))
+        choices.append(Separator(f"── Rust incremental caches ({total}) ──"))
+        choices.append(
+            Choice(
+                value=_SELECT_ALL_INCREMENTAL,
+                name=f"Select all Rust incremental caches ({total})",
+            )
+        )
+        for t in sorted(incrementals, key=lambda t: t.size_bytes, reverse=True):
+            choices.append(
+                Choice(
+                    value=t,
+                    name=f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})",
+                )
+            )
+
+    if caches:
+        total = _human_size(sum(t.size_bytes for t in caches))
+        choices.append(Separator(f"── Package caches ({total}) ──"))
+        choices.append(
+            Choice(
+                value=_SELECT_ALL_CACHE,
+                name=f"Select all Package caches ({total})",
+            )
+        )
+        for t in sorted(caches, key=lambda t: t.size_bytes, reverse=True):
+            choices.append(
+                Choice(
+                    value=t,
+                    name=f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})",
+                )
+            )
+
+    if rust_targets:
+        total = _human_size(sum(t.size_bytes for t in rust_targets))
+        choices.append(Separator(f"── Rust target dirs ({total}) ──"))
+        choices.append(
+            Choice(
+                value=_SELECT_ALL_TARGET,
+                name=f"Select all Rust target dirs ({total})",
+            )
+        )
+        for t in sorted(rust_targets, key=lambda t: t.size_bytes, reverse=True):
+            choices.append(
+                Choice(
+                    value=t,
+                    name=f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})",
+                )
+            )
+
+    if docker_targets:
+        total = _human_size(sum(t.size_bytes for t in docker_targets))
+        choices.append(Separator(f"── Docker ({total}) ──"))
+        choices.append(
+            Choice(
+                value=_SELECT_ALL_DOCKER,
+                name=f"Select all Docker ({total})",
+            )
+        )
+        for t in docker_targets:
+            name = (
+                "  Docker system prune"
+                if t.label == "docker system"
+                else f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})"
+            )
+            choices.append(Choice(value=t, name=name))
+
+    selected_raw = inquirer.checkbox(
+        message="Select items to clean (space to toggle, enter to confirm):",
+        choices=choices,
+    ).execute()
+
+    if _SELECT_ALL in selected_raw:
+        return all_with_size
+
+    result: list[ScanTarget] = []
+    for item in selected_raw:
+        group = section_map.get(item)
+        if group is not None:
+            result.extend(group)
+        elif isinstance(item, ScanTarget):
+            result.append(item)
+
+    seen: set[int] = set()
+    deduped: list[ScanTarget] = []
+    for t in result:
+        if id(t) not in seen:
+            seen.add(id(t))
+            deduped.append(t)
+    return deduped
+
+
+def _run_fix_selected(
+    targets: list[ScanTarget], cache: SizeCache | None = None
+) -> None:
+    root = "C:\\" if sys.platform == "win32" else "/"
+    before_free = shutil.disk_usage(root).free
+
+    console.print()
+    console.print("[bold]=== Cleanup ===[/bold]")
+    console.print()
+
+    attempted = _execute_cleanup(targets)
+
+    if cache is not None and attempted:
+        cache.invalidate(attempted)
+
+    console.print()
+    after_free = shutil.disk_usage(root).free
+    _print_cleanup_summary(before_free, after_free)
 
 
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
+_DEFAULT_WORKERS = min(os.cpu_count() or 4, 16)
 
 
 def main() -> None:
@@ -759,8 +1042,8 @@ def main() -> None:
         "command",
         nargs="?",
         default="check",
-        choices=["check", "fix"],
-        help="check (default) or fix",
+        choices=["check", "fix", "interactive"],
+        help="check (default), fix (all tiers), or interactive (select items to clean)",
     )
     parser.add_argument(
         "-y",
@@ -768,13 +1051,14 @@ def main() -> None:
         action="store_true",
         help="Skip confirmation prompts",
     )
+    default_dev_dir = Path(
+        os.environ.get("DISK_CLEANUP_DEV_DIR", str(Path.home() / "Development"))
+    )
     parser.add_argument(
         "--dev-dir",
         type=Path,
-        default=Path(
-            os.environ.get("DISK_CLEANUP_DEV_DIR", str(Path.home() / "Development"))
-        ),
-        help="Development directory to scan",
+        default=default_dev_dir,
+        help=f"Development directory to scan (default: $DISK_CLEANUP_DEV_DIR or ~/Development, currently: {_short_path(default_dev_dir)})",
     )
     parser.add_argument(
         "--no-color",
@@ -784,14 +1068,28 @@ def main() -> None:
     parser.add_argument(
         "--workers",
         type=int,
-        default=8,
-        help="Parallel thread count for size computation",
+        default=_DEFAULT_WORKERS,
+        help=f"Parallel thread count for size computation (default: {_DEFAULT_WORKERS}, based on CPU count, capped at 16)",
+    )
+    parser.add_argument(
+        "--cache-ttl",
+        type=float,
+        default=300.0,
+        help="Cache TTL for du results in seconds (default: 300, 0 to disable)",
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Bypass size cache and force fresh du scan",
     )
     args = parser.parse_args()
 
+    if args.command == "interactive" and args.yes:
+        parser.error("--yes cannot be used with interactive mode")
+
     if args.no_color:
-        global RED, GREEN, YELLOW, BLUE, CYAN, BOLD, DIM, NC
-        RED = GREEN = YELLOW = BLUE = CYAN = BOLD = DIM = NC = ""
+        global console
+        console = Console(no_color=True)
 
     dev_dir = args.dev_dir.resolve()
     home = Path.home().resolve()
@@ -800,13 +1098,26 @@ def main() -> None:
     if not str(dev_dir).startswith(str(home) + os.sep):
         parser.error(f"--dev-dir must be under $HOME, got: {dev_dir}")
 
-    targets = _scan(dev_dir, args.workers)
+    cache_dir = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
+    cache_path = cache_dir / "disk-cleanup" / "sizes.json"
+    cache = (
+        None
+        if (args.no_cache or args.cache_ttl == 0)
+        else SizeCache(cache_path, args.cache_ttl)
+    )
+
+    targets = _scan(dev_dir, args.workers, cache=cache)
 
     if args.command == "check":
         _print_report(targets)
-    else:
+    elif args.command == "fix":
         _print_report(targets)
-        _run_fix(targets, skip_confirm=args.yes)
+        _run_fix(targets, skip_confirm=args.yes, cache=cache)
+    elif args.command == "interactive":
+        _print_report(targets)
+        selected = _interactive_select(targets)
+        if selected:
+            _run_fix_selected(selected, cache=cache)
 
 
 if __name__ == "__main__":
