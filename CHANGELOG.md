@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.44.1 (2026-05-23)
+
+### Bug Fixes
+
+- Cursor WSL extension detection and Go installation from go.dev
+  ([`ecae271`](https://github.com/wpfleger96/shell-configs/commit/ecae271ce35b93852b0e13865cbb7614fb24d071))
+
+### Chores
+
+- Sync Justfile
+  ([`a9e21fb`](https://github.com/wpfleger96/shell-configs/commit/a9e21fb5245e9dcc0af3e96ed8a06e9cf8e458d0))
+
+
 ## v0.44.0 (2026-05-23)
 
 ### Continuous Integration
