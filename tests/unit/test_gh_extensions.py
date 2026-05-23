@@ -285,6 +285,50 @@ class TestInstallFromSource:
         assert "Built and installed" in msg
         mock_remove.assert_called_once_with("infra")
 
+    def test_clone_with_pin(self, tmp_path: Path) -> None:
+        clone_ok = MagicMock(returncode=0, stdout="", stderr="")
+        build_ok = MagicMock(returncode=0, stdout="", stderr="")
+
+        def fake_move(src: str, dst: str) -> None:
+            Path(dst).parent.mkdir(parents=True, exist_ok=True)
+            Path(dst).touch()
+
+        with (
+            patch(
+                "shell_configs.gh_extensions._get_extensions_dir",
+                return_value=tmp_path / "extensions",
+            ),
+            patch(
+                "shell_configs.gh_extensions.shutil.which", return_value="/usr/bin/go"
+            ),
+            patch(
+                "shell_configs.gh_extensions.tempfile.mkdtemp",
+                side_effect=[str(tmp_path / "clone"), str(tmp_path / "staged")],
+            ),
+            patch(
+                "shell_configs.gh_extensions.subprocess.run",
+                side_effect=[clone_ok, build_ok],
+            ) as mock_run,
+            patch("shell_configs.gh_extensions._remove_extension"),
+            patch("shell_configs.gh_extensions.shutil.move", side_effect=fake_move),
+            patch("shell_configs.gh_extensions.shutil.rmtree"),
+        ):
+            success, msg = install_from_source(
+                "wpfleger96/gh-infra", "./cmd/gh-infra/", pin="dev"
+            )
+        assert success is True
+        clone_call = mock_run.call_args_list[0]
+        assert clone_call[0][0] == [
+            "git",
+            "clone",
+            "--depth",
+            "1",
+            "-b",
+            "dev",
+            "https://github.com/wpfleger96/gh-infra.git",
+            str(tmp_path / "clone"),
+        ]
+
 
 @pytest.mark.unit
 class TestInstallExtension:
@@ -407,7 +451,7 @@ class TestInstallExtension:
                 "wpfleger96/gh-infra", build_path="./cmd/gh-infra/"
             )
         mock_source.assert_called_once_with(
-            "wpfleger96/gh-infra", "./cmd/gh-infra/", dry_run=False
+            "wpfleger96/gh-infra", "./cmd/gh-infra/", pin=None, dry_run=False
         )
         assert success is True
 
@@ -420,7 +464,20 @@ class TestInstallExtension:
                 "wpfleger96/gh-infra", build_path="./cmd/gh-infra/", dry_run=True
             )
         mock_source.assert_called_once_with(
-            "wpfleger96/gh-infra", "./cmd/gh-infra/", dry_run=True
+            "wpfleger96/gh-infra", "./cmd/gh-infra/", pin=None, dry_run=True
+        )
+        assert success is True
+
+    def test_install_extension_with_pin_and_build_path(self) -> None:
+        with patch(
+            "shell_configs.gh_extensions.install_from_source",
+            return_value=(True, "Built and installed wpfleger96/gh-infra from source"),
+        ) as mock_source:
+            success, msg = install_extension(
+                "wpfleger96/gh-infra", pin="dev", build_path="./cmd/gh-infra/"
+            )
+        mock_source.assert_called_once_with(
+            "wpfleger96/gh-infra", "./cmd/gh-infra/", pin="dev", dry_run=False
         )
         assert success is True
 
@@ -636,5 +693,5 @@ class TestGhExtensionsComponent:
             result = component.install(self._make_ctx())
         assert result is True
         mock_source.assert_called_once_with(
-            "wpfleger96/gh-infra", "./cmd/gh-infra/", dry_run=False
+            "wpfleger96/gh-infra", "./cmd/gh-infra/", pin=None, dry_run=False
         )

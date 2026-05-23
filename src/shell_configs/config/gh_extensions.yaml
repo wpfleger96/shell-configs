@@ -1,3 +1,4 @@
 extensions:
   - repo: wpfleger96/gh-infra
+    pin: dev
     build_path: ./cmd/gh-infra/

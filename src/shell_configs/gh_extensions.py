@@ -129,7 +129,7 @@ _BUILD_PATH_RE = re.compile(r"^\.(/[a-zA-Z0-9_.-]+)+/?$")
 
 
 def install_from_source(
-    name: str, build_path: str, dry_run: bool = False
+    name: str, build_path: str, pin: str | None = None, dry_run: bool = False
 ) -> tuple[bool, str]:
     """Build and install a gh CLI extension from source using Go."""
     if not _BUILD_PATH_RE.match(build_path):
@@ -147,15 +147,12 @@ def install_from_source(
 
     clone_dir = tempfile.mkdtemp(prefix="gh-ext-build-")
     try:
+        clone_cmd = ["git", "clone", "--depth", "1"]
+        if pin:
+            clone_cmd += ["-b", pin]
+        clone_cmd += [f"https://github.com/{name}.git", clone_dir]
         clone_result = subprocess.run(
-            [
-                "git",
-                "clone",
-                "--depth",
-                "1",
-                f"https://github.com/{name}.git",
-                clone_dir,
-            ],
+            clone_cmd,
             capture_output=True,
             text=True,
             timeout=120,
@@ -205,7 +202,7 @@ def install_extension(
     cmd_name = command_name(name)
 
     if build_path is not None:
-        return install_from_source(name, build_path, dry_run=dry_run)
+        return install_from_source(name, build_path, pin=pin, dry_run=dry_run)
 
     if dry_run:
         return True, f"Would install {name}"
