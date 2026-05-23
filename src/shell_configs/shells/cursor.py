@@ -46,6 +46,7 @@ class CursorShell(Shell):
             remote_cli = self._find_cursor_remote_cli()
             if remote_cli:
                 return str(remote_cli)
+            return None
         return "cursor"
 
     def _find_cursor_remote_cli(self) -> Path | None:

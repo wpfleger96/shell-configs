@@ -39,6 +39,11 @@ class LanguagesComponent(Component):
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
         if not isinstance(plan, LanguagesPlan):
             raise TypeError(f"expected LanguagesPlan, got {type(plan).__name__}")
+
+        from shell_configs.languages import ensure_language_paths
+
+        ensure_language_paths(plan.all_languages)
+
         if not plan.has_changes:
             return True
 

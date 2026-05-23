@@ -160,11 +160,11 @@ class TestIsLanguageInstalled:
         (cargo_bin / "rustup").touch()
         assert is_language_installed(lang)
 
-    def test_check_path_missing_falls_back_to_which(self, monkeypatch):
+    def test_check_path_missing_ignores_which(self, monkeypatch):
         monkeypatch.setattr(Path, "home", staticmethod(lambda: Path("/nonexistent")))
         with patch("shell_configs.languages.shutil.which", return_value="/usr/bin/go"):
             lang = _make_lang(command="go", check_path="~/.go/bin/go")
-            assert is_language_installed(lang)
+            assert not is_language_installed(lang)
 
     def test_neither_check_path_nor_which(self, monkeypatch):
         monkeypatch.setattr(Path, "home", staticmethod(lambda: Path("/nonexistent")))

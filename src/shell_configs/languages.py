@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 
@@ -91,8 +92,7 @@ def load_languages(manifest_path: Path | None = None) -> list[Language]:
 def is_language_installed(lang: Language) -> bool:
     """Return True if the language runtime is present on this machine."""
     if lang.check_path:
-        if Path(lang.check_path.replace("~", str(Path.home()))).exists():
-            return True
+        return Path(lang.check_path.replace("~", str(Path.home()))).exists()
     return shutil.which(lang.command) is not None
 
 
@@ -116,6 +116,19 @@ def get_language_version(lang: Language) -> str | None:
     return None
 
 
+def ensure_language_paths(languages: list[Language]) -> None:
+    """Add check_path directories of installed languages to the current process PATH."""
+    path = os.environ.get("PATH", "")
+    for lang in languages:
+        if lang.check_path:
+            resolved = Path(lang.check_path.replace("~", str(Path.home())))
+            if resolved.exists():
+                bin_dir = str(resolved.parent)
+                if bin_dir not in path:
+                    path = bin_dir + os.pathsep + path
+    os.environ["PATH"] = path
+
+
 def install_language(lang: Language, dry_run: bool = False) -> tuple[bool, str]:
     """Install a language runtime. Returns (success, message)."""
     if lang.status_only:
@@ -124,17 +137,16 @@ def install_language(lang: Language, dry_run: bool = False) -> tuple[bool, str]:
     if is_language_installed(lang):
         return True, f"{lang.name} is already installed"
 
+    ok, msg = False, f"No install method configured for {lang.name} on this platform"
+
     if is_platform(Platform.MACOS) and lang.macos:
-        return _install_via_config(lang.name, lang.macos, dry_run)
+        ok, msg = _install_via_config(lang.name, lang.macos, dry_run)
+    elif (is_platform(Platform.WSL) or is_platform(Platform.LINUX)) and lang.linux:
+        ok, msg = _install_via_config(lang.name, lang.linux, dry_run)
+    elif lang.install_cmd:
+        ok, msg = _install_via_script(lang.name, lang.install_cmd, dry_run)
 
-    if is_platform(Platform.WSL) or is_platform(Platform.LINUX):
-        if lang.linux:
-            return _install_via_config(lang.name, lang.linux, dry_run)
-
-    if lang.install_cmd:
-        return _install_via_script(lang.name, lang.install_cmd, dry_run)
-
-    return False, f"No install method configured for {lang.name} on this platform"
+    return ok, msg
 
 
 def _install_via_config(

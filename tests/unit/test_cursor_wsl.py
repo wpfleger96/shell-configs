@@ -88,7 +88,7 @@ class TestCursorWSLRemoteCli:
         result = shell.get_extension_cli()
         assert result == str(cli)
 
-    def test_falls_back_to_cursor_when_no_server(self, monkeypatch, tmp_path):
+    def test_returns_none_when_no_server_on_wsl(self, monkeypatch, tmp_path):
         monkeypatch.setattr(
             "shell_configs.shells.cursor.is_platform",
             lambda p: p == Platform.WSL,
@@ -96,7 +96,7 @@ class TestCursorWSLRemoteCli:
         monkeypatch.setattr("shell_configs.shells.cursor.Path.home", lambda: tmp_path)
         shell = CursorShell()
         result = shell.get_extension_cli()
-        assert result == "cursor"
+        assert result is None
 
     def test_selects_newest_hash_dir(self, monkeypatch, tmp_path):
         monkeypatch.setattr(

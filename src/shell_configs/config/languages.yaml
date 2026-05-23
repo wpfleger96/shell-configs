@@ -5,9 +5,12 @@ languages:
     macos:
       method: brew
       package: go
-    linux:
-      method: apt
-      package: golang
+    install_cmd: >-
+      sudo rm -rf /usr/local/go &&
+      ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') &&
+      VER=$(curl -sL 'https://go.dev/VERSION?m=text' | head -1) &&
+      curl -sL "https://go.dev/dl/${VER}.linux-${ARCH}.tar.gz" | sudo tar -C /usr/local -xz
+    check_path: "/usr/local/go/bin/go"
 
   - name: rust
     command: rustup
