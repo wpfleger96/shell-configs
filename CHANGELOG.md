@@ -2,6 +2,23 @@
 
 <!-- version list -->
 
+## v0.44.0 (2026-05-23)
+
+### Continuous Integration
+
+- Sync release workflow
+  ([`e843898`](https://github.com/wpfleger96/shell-configs/commit/e8438980d90421076d00d3ee6b4362c05659acbd))
+
+- Sync shared files
+  ([`88a5118`](https://github.com/wpfleger96/shell-configs/commit/88a511829e1ede57b0a39d0510fe62af49c7a077))
+
+### Features
+
+- **gh-extensions**: Wire pin to source builds for branch targeting
+  ([#42](https://github.com/wpfleger96/shell-configs/pull/42),
+  [`297fbb7`](https://github.com/wpfleger96/shell-configs/commit/297fbb78fafe6f2ce33d2aaf0a32277bf1bc3bd7))
+
+
 ## v0.43.0 (2026-05-21)
 
 ### Bug Fixes
