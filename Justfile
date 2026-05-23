@@ -34,11 +34,6 @@ format-python:
 format-shell:
     shfmt -f . | grep -v git-prompt.sh | grep -v iterm2-shell-integration | grep -v 'src/shell_configs/scripts/' | xargs shfmt -w
 
-lint-disk-cleanup:
-    uvx ruff check src/shell_configs/scripts/system/disk-cleanup
-    uvx ruff format src/shell_configs/scripts/system/disk-cleanup --check
-    python3 -m py_compile src/shell_configs/scripts/system/disk-cleanup
-
 # Composite quality checks (lint-check/format-check used by CI workflow)
 lint-check: lint-python-check lint-shell-check
 
@@ -63,25 +58,17 @@ test-unit:
 test-integration:
     uv run pytest -m integration
 
-test-cli:
-    uv run pytest -m cli
+# Build & Package
+build: sync
+    uv build
 
-test-cov:
-    uv run pytest --cov=src --cov-report=term-missing
+clean-build:
+    rm -rf dist/ build/ src/*.egg-info
 
-test-nocov:
-    uv run pytest -o addopts='-v'
-
-# CLI Testing (development helpers)
-cli-install:
-    uv run shell-configs install --dry-run
-
-cli-status:
-    uv run shell-configs status
-
-cli-validate:
-    uv run shell-configs validate
+rebuild: clean-build build
 
 # CI workflow (matches CI steps)
 ci: sync type-check lint-python-check lint-shell-check format-python-check format-shell-check test
     @echo "CI checks passed"
+
+import? 'local.just'
