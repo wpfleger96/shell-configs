@@ -67,38 +67,6 @@ class TestLoadAgents:
         assert agents[0].name == "claude-code"
         assert agents[0].command == "claude"
 
-    def test_cask_flag_parsed(self, tmp_path):
-        manifest = tmp_path / "agents.yaml"
-        manifest.write_text(
-            "agents:\n"
-            "  - name: claude-code\n"
-            "    command: claude\n"
-            "    description: Claude Code\n"
-            "    macos:\n"
-            "      method: brew\n"
-            "      package: claude-code\n"
-            "      cask: true\n"
-        )
-        agents = load_agents(manifest)
-        assert agents[0].macos is not None
-        assert agents[0].macos.cask is True
-
-    def test_tap_field_parsed(self, tmp_path):
-        manifest = tmp_path / "agents.yaml"
-        manifest.write_text(
-            "agents:\n"
-            "  - name: amp\n"
-            "    command: amp\n"
-            "    description: Amp\n"
-            "    macos:\n"
-            "      method: brew\n"
-            "      package: ampcode/tap/ampcode\n"
-            "      tap: ampcode/tap\n"
-        )
-        agents = load_agents(manifest)
-        assert agents[0].macos is not None
-        assert agents[0].macos.tap == "ampcode/tap"
-
     def test_npm_method_parsed(self, tmp_path):
         manifest = tmp_path / "agents.yaml"
         manifest.write_text(
@@ -198,62 +166,6 @@ class TestInstallAgent:
         assert ok
         assert "already installed" in msg
 
-    def test_brew_cask_on_macos(self, monkeypatch):
-        monkeypatch.setattr(
-            "shell_configs.agents.is_platform",
-            lambda p: p.value == "macos",
-        )
-        agent = _make_agent(
-            macos=AgentInstallConfig(method="brew", package="claude-code", cask=True),
-        )
-        with (
-            patch("shell_configs.agents.is_agent_installed", return_value=False),
-            patch(
-                "shell_configs.agents.shutil.which",
-                return_value="/usr/local/bin/brew",
-            ),
-            patch("subprocess.run") as mock_run,
-        ):
-            mock_run.return_value = subprocess.CompletedProcess(
-                args=[], returncode=0, stdout="", stderr=""
-            )
-            ok, msg = install_agent(agent)
-        assert ok
-        called_cmd = mock_run.call_args[0][0]
-        assert called_cmd == ["brew", "install", "--cask", "claude-code"]
-
-    def test_brew_tap_on_macos(self, monkeypatch):
-        monkeypatch.setattr(
-            "shell_configs.agents.is_platform",
-            lambda p: p.value == "macos",
-        )
-        agent = _make_agent(
-            name="amp",
-            command="amp",
-            macos=AgentInstallConfig(
-                method="brew", package="ampcode/tap/ampcode", tap="ampcode/tap"
-            ),
-        )
-        with (
-            patch("shell_configs.agents.is_agent_installed", return_value=False),
-            patch(
-                "shell_configs.agents.shutil.which",
-                return_value="/usr/local/bin/brew",
-            ),
-            patch("subprocess.run") as mock_run,
-        ):
-            mock_run.return_value = subprocess.CompletedProcess(
-                args=[], returncode=0, stdout="", stderr=""
-            )
-            ok, msg = install_agent(agent)
-        assert ok
-        # First call is tap, second is install
-        assert mock_run.call_count == 2
-        tap_cmd = mock_run.call_args_list[0][0][0]
-        assert tap_cmd == ["brew", "tap", "ampcode/tap"]
-        install_cmd = mock_run.call_args_list[1][0][0]
-        assert install_cmd == ["brew", "install", "ampcode/tap/ampcode"]
-
     def test_npm_method(self, monkeypatch):
         monkeypatch.setattr(
             "shell_configs.agents.is_platform",
@@ -299,25 +211,55 @@ class TestInstallAgent:
         assert ok
         assert mock_run.call_args[1].get("shell") is True
 
-    def test_dry_run_brew(self, monkeypatch):
+    def test_script_install_failure(self, monkeypatch):
         monkeypatch.setattr(
             "shell_configs.agents.is_platform",
-            lambda p: p.value == "macos",
+            lambda p: False,
+        )
+        agent = _make_agent(install_cmd="curl -fsSL https://example.com | bash")
+        with (
+            patch("shell_configs.agents.is_agent_installed", return_value=False),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=1, stdout="", stderr="connection refused"
+            )
+            ok, msg = install_agent(agent)
+        assert not ok
+        assert "connection refused" in msg
+
+    def test_script_install_timeout(self, monkeypatch):
+        monkeypatch.setattr(
+            "shell_configs.agents.is_platform",
+            lambda p: False,
+        )
+        agent = _make_agent(install_cmd="curl -fsSL https://example.com | bash")
+        with (
+            patch("shell_configs.agents.is_agent_installed", return_value=False),
+            patch("subprocess.run", side_effect=subprocess.TimeoutExpired("cmd", 300)),
+        ):
+            ok, msg = install_agent(agent)
+        assert not ok
+        assert "timed out" in msg
+
+    def test_linux_uses_install_cmd(self, monkeypatch):
+        monkeypatch.setattr(
+            "shell_configs.agents.is_platform",
+            lambda p: p.value == "wsl",
         )
         agent = _make_agent(
-            macos=AgentInstallConfig(method="brew", package="claude-code", cask=True)
+            install_cmd="curl -fsSL https://claude.ai/install.sh | bash"
         )
         with (
             patch("shell_configs.agents.is_agent_installed", return_value=False),
-            patch(
-                "shell_configs.agents.shutil.which",
-                return_value="/usr/local/bin/brew",
-            ),
+            patch("subprocess.run") as mock_run,
         ):
-            ok, msg = install_agent(agent, dry_run=True)
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="", stderr=""
+            )
+            ok, msg = install_agent(agent)
         assert ok
-        assert "Would" in msg
-        assert "--cask" in msg
+        assert mock_run.call_args[1].get("shell") is True
 
     def test_dry_run_npm(self, monkeypatch):
         monkeypatch.setattr(
@@ -351,7 +293,7 @@ class TestInstallAgent:
         assert not ok
         assert "No install method" in msg
 
-    def test_npm_unavailable_returns_error(self, monkeypatch):
+    def test_npm_unavailable_returns_clear_message(self, monkeypatch):
         monkeypatch.setattr(
             "shell_configs.agents.is_platform",
             lambda p: p.value == "macos",
@@ -368,6 +310,7 @@ class TestInstallAgent:
             ok, msg = install_agent(agent)
         assert not ok
         assert "npm is not available" in msg
+        assert "Node.js" in msg
 
 
 # ---------------------------------------------------------------------------
@@ -397,6 +340,23 @@ class TestGetAgentVersion:
     def test_returns_none_when_command_not_found(self):
         with patch("shell_configs.agents.shutil.which", return_value=None):
             assert get_agent_version(_make_agent()) is None
+
+    def test_version_flag_fallback(self):
+        with (
+            patch("shell_configs.agents.shutil.which", return_value="/usr/bin/goose"),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.side_effect = [
+                subprocess.CompletedProcess(
+                    args=[], returncode=1, stdout="", stderr="unknown flag"
+                ),
+                subprocess.CompletedProcess(
+                    args=[], returncode=0, stdout="goose 1.2.3", stderr=""
+                ),
+            ]
+            version = get_agent_version(_make_agent(name="goose", command="goose"))
+        assert version == "goose 1.2.3"
+        assert mock_run.call_count == 2
 
 
 # ---------------------------------------------------------------------------

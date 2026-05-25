@@ -2,18 +2,11 @@ agents:
   - name: claude-code
     command: claude
     description: "Claude Code — Anthropic AI coding agent"
-    macos:
-      method: brew
-      package: claude-code
-      cask: true
     install_cmd: "curl -fsSL https://claude.ai/install.sh | bash"
 
   - name: goose
     command: goose
     description: "Goose — Block AI coding agent"
-    macos:
-      method: brew
-      package: block-goose-cli
     install_cmd: "curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash"
 
   - name: gemini-cli
@@ -29,17 +22,9 @@ agents:
   - name: codex
     command: codex
     description: "Codex CLI — OpenAI coding agent"
-    macos:
-      method: brew
-      package: codex
-      cask: true
     install_cmd: "curl -fsSL https://chatgpt.com/codex/install.sh | sh"
 
   - name: amp
     command: amp
     description: "Amp — Ampcode AI coding agent"
-    macos:
-      method: brew
-      package: ampcode/tap/ampcode
-      tap: ampcode/tap
     install_cmd: "curl -fsSL https://ampcode.com/install.sh | bash"

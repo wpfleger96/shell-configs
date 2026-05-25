@@ -1,4 +1,4 @@
-"""AI coding agent management (Claude Code, Codex, Gemini, Goose, etc.)."""
+"""AI coding agent management (Claude Code, Codex, Gemini, Goose, Amp)."""
 
 from __future__ import annotations
 
@@ -17,10 +17,8 @@ from shell_configs.platform import Platform, is_platform
 
 @dataclass(frozen=True)
 class AgentInstallConfig:
-    method: str  # "brew" or "npm"
+    method: str  # "npm"
     package: str | None = None
-    cask: bool = False
-    tap: str | None = None
 
 
 @dataclass(frozen=True)
@@ -63,16 +61,12 @@ def load_agents(manifest_path: Path | None = None) -> list[Agent]:
             macos_cfg = AgentInstallConfig(
                 method=m.get("method", ""),
                 package=m.get("package") or None,
-                cask=bool(m.get("cask", False)),
-                tap=m.get("tap") or None,
             )
         if isinstance(entry.get("linux"), dict):
             li: dict[str, Any] = entry["linux"]
             linux_cfg = AgentInstallConfig(
                 method=li.get("method", ""),
                 package=li.get("package") or None,
-                cask=bool(li.get("cask", False)),
-                tap=li.get("tap") or None,
             )
 
         result.append(
@@ -100,6 +94,7 @@ def get_agent_version(agent: Agent) -> str | None:
     """Return a short version string for display, or None if unavailable."""
     if not shutil.which(agent.command):
         return None
+    # Most agents use --version; goose uses "version" subcommand as fallback
     for flag in ("--version", "version"):
         try:
             result = subprocess.run(
@@ -137,53 +132,17 @@ def _install_via_config(
     name: str, config: AgentInstallConfig, dry_run: bool
 ) -> tuple[bool, str]:
     pkg = config.package or name
-    if config.method == "brew":
-        return _install_brew(name, config, dry_run)
     if config.method == "npm":
         return _install_npm(name, pkg, dry_run)
     return False, f"Unknown install method: {config.method}"
 
 
-def _install_brew(
-    name: str, config: AgentInstallConfig, dry_run: bool
-) -> tuple[bool, str]:
-    if not shutil.which("brew"):
-        return False, "brew is not available"
-    pkg = config.package or name
-    if dry_run:
-        cask_flag = " --cask" if config.cask else ""
-        tap_msg = f" (tap: {config.tap})" if config.tap else ""
-        return True, f"Would install {pkg} via brew{cask_flag}{tap_msg}"
-    try:
-        if config.tap:
-            tap_result = subprocess.run(
-                ["brew", "tap", config.tap],
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-            if tap_result.returncode != 0:
-                return False, f"Failed to tap {config.tap}: {tap_result.stderr.strip()}"
-        cmd = ["brew", "install"]
-        if config.cask:
-            cmd.append("--cask")
-        cmd.append(pkg)
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        if result.returncode == 0:
-            return True, f"Installed {name} via brew"
-        return False, f"Failed to install {name}: {result.stderr.strip()}"
-    except subprocess.TimeoutExpired:
-        return False, f"Failed to install {name}: brew timed out"
-
-
 def _install_npm(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
     if not shutil.which("npm"):
-        return False, "npm is not available"
+        return (
+            False,
+            "npm is not available — install Node.js first, then re-run",
+        )
     if dry_run:
         return True, f"Would install {package} via npm install -g"
     try:
