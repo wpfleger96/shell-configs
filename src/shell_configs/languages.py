@@ -89,10 +89,25 @@ def load_languages(manifest_path: Path | None = None) -> list[Language]:
     return result
 
 
+def _resolve_check_path(check_path: str) -> Path | None:
+    """Resolve a check_path string to an existing Path, or None.
+
+    Supports glob patterns (e.g. ``~/.nvm/versions/node/v*/bin/node``) —
+    when ``*`` is present, returns the latest (sorted) match.
+    """
+    expanded = check_path.replace("~", str(Path.home()))
+    if "*" not in expanded:
+        p = Path(expanded)
+        return p if p.exists() else None
+    # Glob from filesystem root — expanded is an absolute path with wildcards
+    matches = sorted(Path("/").glob(expanded.lstrip("/")))
+    return matches[-1] if matches else None
+
+
 def is_language_installed(lang: Language) -> bool:
     """Return True if the language runtime is present on this machine."""
     if lang.check_path:
-        return Path(lang.check_path.replace("~", str(Path.home()))).exists()
+        return _resolve_check_path(lang.check_path) is not None
     return shutil.which(lang.command) is not None
 
 
@@ -121,8 +136,8 @@ def ensure_language_paths(languages: list[Language]) -> None:
     path = os.environ.get("PATH", "")
     for lang in languages:
         if lang.check_path:
-            resolved = Path(lang.check_path.replace("~", str(Path.home())))
-            if resolved.exists():
+            resolved = _resolve_check_path(lang.check_path)
+            if resolved is not None:
                 bin_dir = str(resolved.parent)
                 if bin_dir not in path:
                     path = bin_dir + os.pathsep + path
