@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v0.45.0 (2026-05-25)
+
+### Features
+
+- **agents**: Add AI coding agent CLI auto-installation
+  ([#46](https://github.com/wpfleger96/shell-configs/pull/46),
+  [`c7f580e`](https://github.com/wpfleger96/shell-configs/commit/c7f580e0de9dcb47ea46b582707330a8832193bc))
+
+### Refactoring
+
+- **agents**: Drop Homebrew, use canonical install scripts
+  ([#46](https://github.com/wpfleger96/shell-configs/pull/46),
+  [`c7f580e`](https://github.com/wpfleger96/shell-configs/commit/c7f580e0de9dcb47ea46b582707330a8832193bc))
+
+
 ## v0.44.1 (2026-05-23)
 
 ### Bug Fixes
