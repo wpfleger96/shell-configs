@@ -172,6 +172,7 @@ class TestBuiltinExtensionsCursorLocal:
         builtins = get_builtin_extensions("cursor-local")
         assert "anysphere.remote-wsl" in builtins
         assert "anysphere.cursorpyright" in builtins
+        assert "ms-vscode-remote.remote-wsl" in builtins
 
     def test_compute_diff_ignores_builtin_extensions(self):
         manager = ExtensionManager()
