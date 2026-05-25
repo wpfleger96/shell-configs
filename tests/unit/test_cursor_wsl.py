@@ -129,3 +129,35 @@ class TestCursorWSLRemoteCli:
         shell = CursorShell()
         result = shell.get_extension_cli()
         assert result == "cursor"
+
+
+@pytest.mark.unit
+class TestCursorExtensionsJsonPath:
+    def test_returns_path_on_wsl_when_file_exists(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            "shell_configs.shells.cursor.is_platform",
+            lambda p: p == Platform.WSL,
+        )
+        monkeypatch.setattr("shell_configs.shells.cursor.Path.home", lambda: tmp_path)
+        ext_json = tmp_path / ".cursor-server" / "extensions" / "extensions.json"
+        ext_json.parent.mkdir(parents=True)
+        ext_json.write_text("[]")
+        shell = CursorShell()
+        result = shell.get_extensions_json_path()
+        assert result == ext_json
+
+    def test_returns_none_on_wsl_when_file_missing(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            "shell_configs.shells.cursor.is_platform",
+            lambda p: p == Platform.WSL,
+        )
+        monkeypatch.setattr("shell_configs.shells.cursor.Path.home", lambda: tmp_path)
+        shell = CursorShell()
+        result = shell.get_extensions_json_path()
+        assert result is None
+
+    def test_returns_none_on_non_wsl(self, monkeypatch):
+        monkeypatch.setattr("shell_configs.shells.cursor.is_platform", lambda p: False)
+        shell = CursorShell()
+        result = shell.get_extensions_json_path()
+        assert result is None

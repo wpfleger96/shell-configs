@@ -1,5 +1,6 @@
 """Tests for IDE extension management."""
 
+import json
 import subprocess
 
 from pathlib import Path
@@ -13,6 +14,7 @@ from shell_configs.extensions import (
     ExtensionManager,
     ExtensionResultStatus,
     load_extension_file,
+    load_extensions_json,
 )
 from shell_configs.profiles.loader import ProfileLoader
 
@@ -293,6 +295,159 @@ class TestGetInstalledExtensions:
         ):
             result = manager.get_installed_extensions("code")
         assert result is None
+
+
+@pytest.mark.unit
+class TestLoadExtensionsJson:
+    def test_parses_extension_ids(self, temp_dir):
+        path = temp_dir / "extensions.json"
+        path.write_text(
+            json.dumps(
+                [
+                    {"identifier": {"id": "golang.go"}, "version": "0.52.2"},
+                    {
+                        "identifier": {"id": "rust-lang.rust-analyzer"},
+                        "version": "0.3.2",
+                    },
+                ]
+            )
+        )
+        result = load_extensions_json(path)
+        assert result == {"golang.go", "rust-lang.rust-analyzer"}
+
+    def test_returns_none_when_file_missing(self, temp_dir):
+        result = load_extensions_json(temp_dir / "nonexistent.json")
+        assert result is None
+
+    def test_returns_none_on_invalid_json(self, temp_dir):
+        path = temp_dir / "extensions.json"
+        path.write_text("not valid json{{{")
+        result = load_extensions_json(path)
+        assert result is None
+
+    def test_skips_entries_without_identifier(self, temp_dir):
+        path = temp_dir / "extensions.json"
+        path.write_text(
+            json.dumps(
+                [
+                    {"identifier": {"id": "golang.go"}},
+                    {"version": "1.0"},
+                    {"identifier": {}},
+                ]
+            )
+        )
+        result = load_extensions_json(path)
+        assert result == {"golang.go"}
+
+    def test_normalizes_to_lowercase(self, temp_dir):
+        path = temp_dir / "extensions.json"
+        path.write_text(
+            json.dumps(
+                [
+                    {"identifier": {"id": "GitHub.Copilot-Chat"}},
+                ]
+            )
+        )
+        result = load_extensions_json(path)
+        assert result == {"github.copilot-chat"}
+
+    def test_empty_array_returns_empty_set(self, temp_dir):
+        path = temp_dir / "extensions.json"
+        path.write_text("[]")
+        result = load_extensions_json(path)
+        assert result == set()
+
+
+@pytest.mark.unit
+class TestGetInstalledExtensionsFallback:
+    def test_cli_success_ignores_filesystem(self, temp_dir):
+        mock_result = type(
+            "Result",
+            (),
+            {
+                "returncode": 0,
+                "stdout": "golang.go\nrust-lang.rust-analyzer\n",
+                "stderr": "",
+            },
+        )()
+        fs_path = temp_dir / "extensions.json"
+        fs_path.write_text(
+            json.dumps(
+                [
+                    {"identifier": {"id": "different.extension"}},
+                ]
+            )
+        )
+        manager = ExtensionManager()
+        with patch("shell_configs.extensions.subprocess.run", return_value=mock_result):
+            result = manager.get_installed_extensions(
+                "code", extensions_json_path=fs_path
+            )
+        assert result == {"golang.go", "rust-lang.rust-analyzer"}
+
+    def test_cli_empty_falls_back_to_filesystem(self, temp_dir):
+        mock_result = type(
+            "Result",
+            (),
+            {
+                "returncode": 0,
+                "stdout": "Message {}\n",
+                "stderr": "",
+            },
+        )()
+        fs_path = temp_dir / "extensions.json"
+        fs_path.write_text(
+            json.dumps(
+                [
+                    {"identifier": {"id": "golang.go"}},
+                    {"identifier": {"id": "rust-lang.rust-analyzer"}},
+                ]
+            )
+        )
+        manager = ExtensionManager()
+        with patch("shell_configs.extensions.subprocess.run", return_value=mock_result):
+            result = manager.get_installed_extensions(
+                "code", extensions_json_path=fs_path
+            )
+        assert result == {"golang.go", "rust-lang.rust-analyzer"}
+
+    def test_cli_failure_falls_back_to_filesystem(self, temp_dir):
+        fs_path = temp_dir / "extensions.json"
+        fs_path.write_text(
+            json.dumps(
+                [
+                    {"identifier": {"id": "golang.go"}},
+                ]
+            )
+        )
+        manager = ExtensionManager()
+        with patch(
+            "shell_configs.extensions.subprocess.run", side_effect=FileNotFoundError
+        ):
+            result = manager.get_installed_extensions(
+                "code", extensions_json_path=fs_path
+            )
+        assert result == {"golang.go"}
+
+    def test_no_cli_no_path_returns_none(self):
+        manager = ExtensionManager()
+        result = manager.get_installed_extensions(None)
+        assert result is None
+
+    def test_cli_empty_no_fallback_returns_empty_set(self):
+        mock_result = type(
+            "Result",
+            (),
+            {
+                "returncode": 0,
+                "stdout": "Message {}\n",
+                "stderr": "",
+            },
+        )()
+        manager = ExtensionManager()
+        with patch("shell_configs.extensions.subprocess.run", return_value=mock_result):
+            result = manager.get_installed_extensions("code")
+        assert result == set()
 
 
 @pytest.mark.unit

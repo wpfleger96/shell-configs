@@ -214,6 +214,9 @@ class Shell(ABC):
         """
         return []
 
+    def get_extensions_json_path(self) -> Path | None:
+        return None
+
     def get_additional_files(self) -> list[AdditionalFile]:
         """Get additional files that should be installed for this shell.
 

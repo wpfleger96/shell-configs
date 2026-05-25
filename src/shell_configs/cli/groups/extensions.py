@@ -70,7 +70,11 @@ def extensions_status(shells: list[str] | None, profile_name: str | None) -> Non
         desired = ext_manager.load_desired_extensions(
             shell.name, shell.get_extension_list_paths(), profile=active_profile
         )
-        installed = ext_manager.get_installed_extensions(cli_cmd, invoker=invoker)
+        installed = ext_manager.get_installed_extensions(
+            cli_cmd,
+            invoker=invoker,
+            extensions_json_path=shell.get_extensions_json_path(),
+        )
         if installed is None:
             continue
         diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
@@ -146,7 +150,11 @@ def extensions_diff(shells: list[str] | None, profile_name: str | None) -> None:
         desired = ext_manager.load_desired_extensions(
             shell.name, shell.get_extension_list_paths(), profile=active_profile
         )
-        installed = ext_manager.get_installed_extensions(cli_cmd, invoker=invoker)
+        installed = ext_manager.get_installed_extensions(
+            cli_cmd,
+            invoker=invoker,
+            extensions_json_path=shell.get_extensions_json_path(),
+        )
         if installed is None:
             continue
         diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
@@ -233,7 +241,11 @@ def extensions_install(
         desired = ext_manager.load_desired_extensions(
             shell.name, shell.get_extension_list_paths(), profile=active_profile
         )
-        installed = ext_manager.get_installed_extensions(cli_cmd, invoker=invoker)
+        installed = ext_manager.get_installed_extensions(
+            cli_cmd,
+            invoker=invoker,
+            extensions_json_path=shell.get_extensions_json_path(),
+        )
         if installed is None:
             continue
         diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
@@ -340,7 +352,11 @@ def extensions_list(shells: list[str] | None, profile_name: str | None) -> None:
         desired = ext_manager.load_desired_extensions(
             shell.name, shell.get_extension_list_paths(), profile=active_profile
         )
-        installed = ext_manager.get_installed_extensions(cli_cmd, invoker=invoker)
+        installed = ext_manager.get_installed_extensions(
+            cli_cmd,
+            invoker=invoker,
+            extensions_json_path=shell.get_extensions_json_path(),
+        )
         if installed is None:
             continue
         diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)

@@ -32,6 +32,9 @@ class ShellRegistry:
         if is_platform(Platform.WSL):
             self.register(CursorLocalShell())
             self.register(VSCodeLocalShell())
+            from shell_configs.shells.windows_terminal import WindowsTerminalShell
+
+            self.register(WindowsTerminalShell())
 
     def register(self, shell: Shell) -> None:
         """Register a shell implementation.

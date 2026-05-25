@@ -81,6 +81,41 @@ class TestCursorLocalShell:
         shell = CursorLocalShell()
         assert shell.get_extension_invoker() is None
 
+    def test_returns_invoker_on_wsl_with_underscore_path(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            "shell_configs.shells.cursor.is_platform",
+            lambda p: p == Platform.WSL,
+        )
+        monkeypatch.setattr(
+            "shell_configs.shells.cursor.get_windows_username",
+            lambda: "testuser",
+        )
+        cursor_cmd = (
+            tmp_path
+            / "Users"
+            / "testuser"
+            / "AppData"
+            / "Local"
+            / "Programs"
+            / "cursor"
+            / "_"
+            / "resources"
+            / "app"
+            / "bin"
+            / "cursor.cmd"
+        )
+        cursor_cmd.parent.mkdir(parents=True)
+        cursor_cmd.touch()
+
+        monkeypatch.setattr(
+            "shell_configs.shells.cursor.Path",
+            lambda p: tmp_path / p.removeprefix("/mnt/c/"),
+        )
+
+        shell = CursorLocalShell()
+        invoker = shell.get_extension_invoker()
+        assert isinstance(invoker, PowerShellExtensionInvoker)
+
     def test_returns_none_when_cursor_cmd_not_found(self, monkeypatch):
         monkeypatch.setattr(
             "shell_configs.shells.cursor.is_platform",
