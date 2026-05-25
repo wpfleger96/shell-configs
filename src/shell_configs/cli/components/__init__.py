@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from shell_configs.cli.components.agents import AgentsComponent
 from shell_configs.cli.components.completions import CompletionsComponent
 from shell_configs.cli.components.configs import ConfigsComponent
 from shell_configs.cli.components.extensions import ExtensionsComponent
@@ -19,6 +20,7 @@ from shell_configs.cli.context import Component
 INSTALL_COMPONENTS: list[Component] = [
     RequiredPackagesComponent(),
     LanguagesComponent(),
+    AgentsComponent(),
     ConfigsComponent(),
     OptionalPackagesComponent(),
     GhAuthComponent(),
@@ -33,6 +35,7 @@ STATUS_COMPONENTS: list[Component] = [
     CompletionsComponent(),
     OptionalPackagesComponent(),
     LanguagesComponent(),
+    AgentsComponent(),
     ExtensionsComponent(),
     ScriptsComponent(),
     GhAuthComponent(),

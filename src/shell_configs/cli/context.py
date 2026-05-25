@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from shell_configs.agents import Agent
     from shell_configs.config import ConfigReader
     from shell_configs.extensions import ExtensionDiff
     from shell_configs.gh_extensions import GhExtension
@@ -108,6 +109,12 @@ class LanguagesPlan(ComponentPlan):
     all_languages: list[Language] = field(default_factory=list)
     missing: list[Language] = field(default_factory=list)
     status_only: list[Language] = field(default_factory=list)
+
+
+@dataclass
+class AgentsPlan(ComponentPlan):
+    all_agents: list[Agent] = field(default_factory=list)
+    missing: list[Agent] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
