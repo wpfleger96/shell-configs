@@ -100,7 +100,29 @@ def merge_json_with_profile(
     return json.dumps(merged, indent=4, ensure_ascii=False) + "\n"
 
 
-def merge_json_into_target(source_path: Path, target_path: Path) -> str:
+def _json_is_subset(source: object, target: object) -> bool:
+    """Check if all source keys/values exist in target (recursively).
+
+    For dicts: every source key must exist in target with matching value.
+    For lists: every source element must exist somewhere in target.
+    For scalars: values must be equal.
+    """
+    if isinstance(source, dict) and isinstance(target, dict):
+        return all(
+            k in target and _json_is_subset(v, target[k]) for k, v in source.items()
+        )
+    if isinstance(source, list) and isinstance(target, list):
+        return all(any(_json_is_subset(s, t) for t in target) for s in source)
+    return source == target
+
+
+def merge_json_into_target(source_path: Path, target_path: Path) -> tuple[str, bool]:
+    """Merge source JSON keys into existing target JSON.
+
+    Returns (merged_content, is_synced) where is_synced uses subset
+    checking — True when every source key/value already exists in
+    the target, ignoring extra target keys and formatting.
+    """
     import json
 
     try:
@@ -113,8 +135,10 @@ def merge_json_into_target(source_path: Path, target_path: Path) -> str:
     except Exception:
         target = {}
 
+    is_synced = _json_is_subset(source, target)
     merged = deep_merge(target, source)
-    return json.dumps(merged, indent=4, ensure_ascii=False) + "\n"
+    content = json.dumps(merged, indent=4, ensure_ascii=False) + "\n"
+    return content, is_synced
 
 
 def merge_json_files(base_path: Path, override_path: Path) -> str:

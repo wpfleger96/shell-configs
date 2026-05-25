@@ -102,18 +102,23 @@ class ConfigsComponent(Component):
                 elif additional_file.target_merge:
                     from shell_configs.shells.base import merge_json_into_target
 
-                    merged_content = merge_json_into_target(
+                    merged_content, is_synced = merge_json_into_target(
                         additional_file.source_path,
                         additional_file.target_path,
                     )
-                    result, message, diff_text = (
-                        manager.install_additional_file_from_content(
-                            merged_content,
-                            additional_file.target_path,
-                            dry_run=ctx.dry_run,
-                            backup_dir=additional_file.backup_dir,
+                    if is_synced:
+                        result = OperationResult.ALREADY_SYNCED
+                        message = f"Already synced: {additional_file.target_path}"
+                        diff_text = None
+                    else:
+                        result, message, diff_text = (
+                            manager.install_additional_file_from_content(
+                                merged_content,
+                                additional_file.target_path,
+                                dry_run=ctx.dry_run,
+                                backup_dir=additional_file.backup_dir,
+                            )
                         )
-                    )
                 elif additional_file.base_source_path:
                     profile_overrides = (
                         ctx.profile.settings_overrides.get(shell.name)
@@ -302,12 +307,9 @@ class ConfigsComponent(Component):
                     if additional_file.target_merge:
                         from shell_configs.shells.base import merge_json_into_target
 
-                        merged_content = merge_json_into_target(
+                        _, synced = merge_json_into_target(
                             additional_file.source_path,
                             additional_file.target_path,
-                        )
-                        synced = manager.content_matches(
-                            merged_content, additional_file.target_path
                         )
                     elif additional_file.base_source_path:
                         profile_overrides = (
