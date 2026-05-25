@@ -2,6 +2,35 @@
 
 <!-- version list -->
 
+## v0.46.0 (2026-05-25)
+
+### Bug Fixes
+
+- Match Windows Terminal JSON format and add cursor-local builtin
+  ([#47](https://github.com/wpfleger96/shell-configs/pull/47),
+  [`6cfe819`](https://github.com/wpfleger96/shell-configs/commit/6cfe819a9ef96db2e1b03d9dcab06907ec83e3c4))
+
+- Use JSON-aware comparison for target_merge sync checks
+  ([#47](https://github.com/wpfleger96/shell-configs/pull/47),
+  [`6cfe819`](https://github.com/wpfleger96/shell-configs/commit/6cfe819a9ef96db2e1b03d9dcab06907ec83e3c4))
+
+- **extensions**: WSL extension detection across terminal contexts
+  ([#47](https://github.com/wpfleger96/shell-configs/pull/47),
+  [`6cfe819`](https://github.com/wpfleger96/shell-configs/commit/6cfe819a9ef96db2e1b03d9dcab06907ec83e3c4))
+
+### Chores
+
+- Populate Windows Terminal settings config
+  ([#47](https://github.com/wpfleger96/shell-configs/pull/47),
+  [`6cfe819`](https://github.com/wpfleger96/shell-configs/commit/6cfe819a9ef96db2e1b03d9dcab06907ec83e3c4))
+
+### Features
+
+- Add target_merge flag for JSON deep-merge into existing target
+  ([#47](https://github.com/wpfleger96/shell-configs/pull/47),
+  [`6cfe819`](https://github.com/wpfleger96/shell-configs/commit/6cfe819a9ef96db2e1b03d9dcab06907ec83e3c4))
+
+
 ## v0.45.0 (2026-05-25)
 
 ### Features
