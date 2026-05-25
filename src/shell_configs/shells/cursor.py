@@ -74,6 +74,12 @@ class CursorShell(Shell):
             config_dir / "cursor" / "extensions.txt",
         ]
 
+    def get_extensions_json_path(self) -> Path | None:
+        if not is_platform(Platform.WSL):
+            return None
+        path = Path.home() / ".cursor-server" / "extensions" / "extensions.json"
+        return path if path.exists() else None
+
     def get_config_files(self) -> list[ConfigFile]:
         """Get Cursor configuration files.
 
@@ -146,17 +152,22 @@ class CursorLocalShell(Shell):
         win_user = get_windows_username()
         if not win_user:
             return None
-        win_path = (
-            f"C:\\Users\\{win_user}\\AppData\\Local\\Programs"
-            f"\\cursor\\resources\\app\\bin\\cursor.cmd"
-        )
-        wsl_path = Path(
-            f"/mnt/c/Users/{win_user}/AppData/Local/Programs"
-            f"/cursor/resources/app/bin/cursor.cmd"
-        )
-        if not wsl_path.exists():
-            return None
-        return win_path, wsl_path
+        base_win = f"C:\\Users\\{win_user}\\AppData\\Local\\Programs\\cursor"
+        base_wsl = Path(f"/mnt/c/Users/{win_user}/AppData/Local/Programs/cursor")
+        candidates = [
+            (
+                f"{base_win}\\_\\resources\\app\\bin\\cursor.cmd",
+                base_wsl / "_" / "resources" / "app" / "bin" / "cursor.cmd",
+            ),
+            (
+                f"{base_win}\\resources\\app\\bin\\cursor.cmd",
+                base_wsl / "resources" / "app" / "bin" / "cursor.cmd",
+            ),
+        ]
+        for win_path, wsl_path in candidates:
+            if wsl_path.exists():
+                return win_path, wsl_path
+        return None
 
     def get_extension_invoker(self) -> ExtensionInvoker | None:
         if not is_platform(Platform.WSL):

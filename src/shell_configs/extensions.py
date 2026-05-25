@@ -1,5 +1,6 @@
 """IDE extension management for VSCode and Cursor."""
 
+import json
 import logging
 import re
 import subprocess
@@ -25,7 +26,11 @@ BUILTIN_EXTENSIONS: dict[str, set[str]] = {
         "github.copilot-chat",
         "ms-python.vscode-pylance",
     },
-    "cursor-local": {"anysphere.remote-wsl", "anysphere.cursorpyright"},
+    "cursor-local": {
+        "anysphere.cursorpyright",
+        "anysphere.remote-wsl",
+        "ms-vscode-remote.remote-wsl",
+    },
 }
 
 
@@ -130,6 +135,25 @@ def load_extension_file(path: Path) -> set[str]:
     return extensions
 
 
+def load_extensions_json(path: Path) -> set[str] | None:
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        logger.warning("Failed to parse extensions manifest: %s", path)
+        return None
+    extensions: set[str] = set()
+    for entry in data:
+        try:
+            ext_id = entry["identifier"]["id"].lower().strip()
+            if _EXTENSION_ID_RE.match(ext_id):
+                extensions.add(ext_id)
+        except (KeyError, AttributeError):
+            continue
+    return extensions
+
+
 @dataclass(frozen=True)
 class ExtensionDiff:
     """Result of comparing desired vs installed extensions."""
@@ -187,18 +211,9 @@ class ExtensionManager:
 
         return desired
 
-    def get_installed_extensions(
+    def _get_installed_via_cli(
         self, cli_command: str | None = None, *, invoker: ExtensionInvoker | None = None
     ) -> set[str] | None:
-        """Query installed extensions via the IDE CLI.
-
-        Args:
-            cli_command: CLI binary name (e.g., "code", "cursor")
-            invoker: ExtensionInvoker to use (takes precedence over cli_command)
-
-        Returns:
-            Set of lowercase extension IDs, or None on failure
-        """
         if invoker is None:
             if cli_command is None:
                 return None
@@ -231,6 +246,28 @@ class ExtensionManager:
         except subprocess.TimeoutExpired:
             logger.warning("%s --list-extensions timed out", invoker.display_name)
             return None
+
+    def get_installed_extensions(
+        self,
+        cli_command: str | None = None,
+        *,
+        invoker: ExtensionInvoker | None = None,
+        extensions_json_path: Path | None = None,
+    ) -> set[str] | None:
+        cli_result = self._get_installed_via_cli(cli_command, invoker=invoker)
+        if cli_result is not None and len(cli_result) > 0:
+            return cli_result
+
+        if extensions_json_path is not None:
+            fs_result = load_extensions_json(extensions_json_path)
+            if fs_result is not None:
+                logger.debug(
+                    "Using filesystem fallback for extension listing: %s",
+                    extensions_json_path,
+                )
+                return fs_result
+
+        return cli_result
 
     def compute_diff(
         self,

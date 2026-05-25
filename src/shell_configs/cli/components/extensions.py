@@ -31,7 +31,11 @@ class ExtensionsComponent(Component):
                 shell.get_extension_list_paths(),
                 profile=ctx.profile,
             )
-            installed = ext_manager.get_installed_extensions(cli_cmd, invoker=invoker)
+            installed = ext_manager.get_installed_extensions(
+                cli_cmd,
+                invoker=invoker,
+                extensions_json_path=shell.get_extensions_json_path(),
+            )
             if installed is None:
                 continue
 
@@ -184,7 +188,9 @@ class ExtensionsComponent(Component):
                 shell.name, shell.get_extension_list_paths(), profile=ctx.profile
             )
             ext_installed = ext_manager.get_installed_extensions(
-                cli_cmd, invoker=invoker
+                cli_cmd,
+                invoker=invoker,
+                extensions_json_path=shell.get_extensions_json_path(),
             )
             if ext_installed is None:
                 continue

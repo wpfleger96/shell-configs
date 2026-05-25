@@ -51,6 +51,12 @@ class VSCodeShell(Shell):
             config_dir / "vscode" / "extensions.txt",
         ]
 
+    def get_extensions_json_path(self) -> Path | None:
+        if not is_platform(Platform.WSL):
+            return None
+        path = Path.home() / ".vscode-server" / "extensions" / "extensions.json"
+        return path if path.exists() else None
+
     def get_config_files(self) -> list[ConfigFile]:
         """Get VS Code configuration files.
 
