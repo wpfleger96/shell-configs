@@ -58,6 +58,9 @@ class LanguagesComponent(Component):
             else:
                 print_error(msg, indent=2)
                 success = False
+
+        ensure_language_paths(plan.all_languages)
+
         return success
 
     def status(self, ctx: Context) -> None:

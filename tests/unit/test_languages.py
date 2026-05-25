@@ -12,6 +12,7 @@ import pytest
 from shell_configs.languages import (
     Language,
     LanguageInstallConfig,
+    _resolve_check_path,
     get_language_version,
     install_language,
     is_language_installed,
@@ -142,6 +143,39 @@ class TestLoadLanguages:
 
 
 # ---------------------------------------------------------------------------
+# TestResolveCheckPath
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestResolveCheckPath:
+    def test_static_path_exists(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        target = tmp_path / ".cargo" / "bin" / "rustup"
+        target.parent.mkdir(parents=True)
+        target.touch()
+        assert _resolve_check_path("~/.cargo/bin/rustup") == target
+
+    def test_static_path_missing(self, monkeypatch):
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: Path("/nonexistent")))
+        assert _resolve_check_path("~/.cargo/bin/rustup") is None
+
+    def test_glob_matches_latest(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        for ver in ("v18.0.0", "v20.20.2", "v22.1.0"):
+            node_bin = tmp_path / ".nvm" / "versions" / "node" / ver / "bin"
+            node_bin.mkdir(parents=True)
+            (node_bin / "node").touch()
+        result = _resolve_check_path("~/.nvm/versions/node/v*/bin/node")
+        assert result is not None
+        assert "v22.1.0" in str(result)
+
+    def test_glob_no_matches(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        assert _resolve_check_path("~/.nvm/versions/node/v*/bin/node") is None
+
+
+# ---------------------------------------------------------------------------
 # TestIsLanguageInstalled
 # ---------------------------------------------------------------------------
 
@@ -181,6 +215,27 @@ class TestIsLanguageInstalled:
     def test_no_check_path_command_missing(self):
         with patch("shell_configs.languages.shutil.which", return_value=None):
             assert not is_language_installed(_make_lang(command="go"))
+
+    def test_glob_check_path_matches(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        node_bin = tmp_path / ".nvm" / "versions" / "node" / "v20.0.0" / "bin"
+        node_bin.mkdir(parents=True)
+        (node_bin / "node").touch()
+        lang = _make_lang(
+            name="node",
+            command="node",
+            check_path="~/.nvm/versions/node/v*/bin/node",
+        )
+        assert is_language_installed(lang)
+
+    def test_glob_check_path_no_match(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        lang = _make_lang(
+            name="node",
+            command="node",
+            check_path="~/.nvm/versions/node/v*/bin/node",
+        )
+        assert not is_language_installed(lang)
 
 
 # ---------------------------------------------------------------------------
@@ -419,10 +474,16 @@ class TestLanguagesComponent:
         lang = _make_lang(name="go", command="go", description="Go")
         plan = LanguagesPlan(has_changes=True, all_languages=[lang], missing=[lang])
 
-        with patch(
-            "shell_configs.languages.install_language",
-            return_value=(True, "Installed go"),
-        ) as mock_install:
+        with (
+            patch(
+                "shell_configs.languages.install_language",
+                return_value=(True, "Installed go"),
+            ) as mock_install,
+            patch(
+                "shell_configs.languages.ensure_language_paths",
+            ) as mock_paths,
+        ):
             LanguagesComponent().apply(self._make_ctx(), plan)
 
         mock_install.assert_called_once_with(lang, dry_run=False)
+        assert mock_paths.call_count == 2

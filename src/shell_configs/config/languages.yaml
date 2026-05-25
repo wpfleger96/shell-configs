@@ -21,8 +21,12 @@ languages:
   - name: node
     command: node
     description: "Node.js (via nvm)"
-    install_cmd: "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash"
-    check_path: "~/.nvm/nvm.sh"
+    install_cmd: >-
+      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash &&
+      export NVM_DIR="$HOME/.nvm" &&
+      . "$NVM_DIR/nvm.sh" &&
+      nvm install --lts
+    check_path: "~/.nvm/versions/node/v*/bin/node"
 
   - name: ruby
     command: ruby
