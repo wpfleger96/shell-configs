@@ -43,6 +43,7 @@ class WindowsTerminalShell(Shell):
                 name="settings.json",
                 source_path=config_dir / "windows-terminal" / "settings.json",
                 target_path=settings_dir / "settings.json",
+                target_merge=True,
             ),
         ]
 

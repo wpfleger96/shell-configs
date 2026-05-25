@@ -313,6 +313,17 @@ def _compute_diffs_for_shells(
 
                 installed_content = section.content
                 repo_content = manager.strip_json_outer_brackets(repo_content)
+            elif additional_file.target_merge:
+                from shell_configs.shells.base import merge_json_into_target
+
+                merged_content = merge_json_into_target(
+                    additional_file.source_path,
+                    additional_file.target_path,
+                )
+                if manager.content_matches(merged_content, additional_file.target_path):
+                    continue
+                installed_content = additional_file.target_path.read_text()
+                repo_content = merged_content
             else:
                 if additional_file.base_source_path:
                     if manager.content_matches(

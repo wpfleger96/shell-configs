@@ -34,6 +34,7 @@ class AdditionalFile:
     base_source_path: Path | None = field(default=None)
     backup_dir: Path | None = field(default=None)
     ini_merge: bool = False
+    target_merge: bool = False
 
 
 @dataclass
@@ -96,6 +97,23 @@ def merge_json_with_profile(
 
     merged = json.loads(merged_str)
     merged = deep_merge(merged, profile_overrides)
+    return json.dumps(merged, indent=4, ensure_ascii=False) + "\n"
+
+
+def merge_json_into_target(source_path: Path, target_path: Path) -> str:
+    import json
+
+    try:
+        source = json.loads(source_path.read_text()) if source_path.exists() else {}
+    except Exception:
+        source = {}
+
+    try:
+        target = json.loads(target_path.read_text()) if target_path.exists() else {}
+    except Exception:
+        target = {}
+
+    merged = deep_merge(target, source)
     return json.dumps(merged, indent=4, ensure_ascii=False) + "\n"
 
 
