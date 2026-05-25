@@ -240,7 +240,7 @@ class Shell(ABC):
         """
         return None
 
-    def get_extension_invoker(self) -> "ExtensionInvoker | None":
+    def get_extension_invoker(self) -> ExtensionInvoker | None:
         """Get an ExtensionInvoker for this shell.
 
         When an invoker is returned, callers use it instead of get_extension_cli().
@@ -305,7 +305,7 @@ class Shell(ABC):
 
         return additional_files
 
-    def get_preferences_files(self) -> list["PreferencesFile"]:
+    def get_preferences_files(self) -> list[PreferencesFile]:
         """Get preferences files to install via the macOS defaults system.
 
         Returns:

@@ -10,7 +10,7 @@ import shutil
 import tempfile
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from importlib.resources import files
 from pathlib import Path
@@ -131,7 +131,7 @@ class ScriptManifest:
         self.scripts[name] = ManifestEntry(
             source_hash=source_hash,
             source_path=source_path,
-            installed_at=datetime.now(timezone.utc).isoformat(),
+            installed_at=datetime.now(UTC).isoformat(),
         )
 
     def remove(self, name: str) -> None:
@@ -255,7 +255,7 @@ def get_script_status(
 
     try:
         source_bytes = _read_script_bytes(script.rel_path, source_dir)
-    except (FileNotFoundError, TypeError):
+    except FileNotFoundError, TypeError:
         return ScriptStatus.MISSING
 
     source_hash = _hash_bytes(source_bytes)

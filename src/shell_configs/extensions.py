@@ -189,7 +189,7 @@ class ExtensionManager:
         self,
         shell_name: str,
         extension_paths: list[Path],
-        profile: "Profile | None" = None,
+        profile: Profile | None = None,
     ) -> set[str]:
         """Load the desired extension set by merging base + IDE-specific + profile.
 
