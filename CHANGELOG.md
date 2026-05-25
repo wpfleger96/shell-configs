@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v0.46.1 (2026-05-25)
+
+### Bug Fixes
+
+- **languages**: Install Node.js LTS via nvm, not just the version manager
+  ([#49](https://github.com/wpfleger96/shell-configs/pull/49),
+  [`f8c1554`](https://github.com/wpfleger96/shell-configs/commit/f8c155475d4c2c0e928d695f38fd18af86aaf892))
+
+
 ## v0.46.0 (2026-05-25)
 
 ### Bug Fixes
