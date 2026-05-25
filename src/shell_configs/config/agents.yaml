@@ -1,0 +1,30 @@
+agents:
+  - name: claude-code
+    command: claude
+    description: "Claude Code — Anthropic AI coding agent"
+    install_cmd: "curl -fsSL https://claude.ai/install.sh | bash"
+
+  - name: goose
+    command: goose
+    description: "Goose — Block AI coding agent"
+    install_cmd: "curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash"
+
+  - name: gemini-cli
+    command: gemini
+    description: "Gemini CLI — Google AI coding agent"
+    macos:
+      method: npm
+      package: "@google/gemini-cli"
+    linux:
+      method: npm
+      package: "@google/gemini-cli"
+
+  - name: codex
+    command: codex
+    description: "Codex CLI — OpenAI coding agent"
+    install_cmd: "curl -fsSL https://chatgpt.com/codex/install.sh | sh"
+
+  - name: amp
+    command: amp
+    description: "Amp — Ampcode AI coding agent"
+    install_cmd: "curl -fsSL https://ampcode.com/install.sh | bash"

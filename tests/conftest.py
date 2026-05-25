@@ -13,14 +13,20 @@ from click.testing import CliRunner
 PASSTHROUGH_COMMANDS = {"bash", "git", "zsh"}
 
 STUB_COMMANDS = {
+    "amp",
     "brew",
+    "claude",
     "code",
+    "codex",
     "curl",
     "cursor",
     "defaults",
+    "gemini",
     "gh",
     "go",
+    "goose",
     "node",
+    "npm",
     "ruby",
     "rustup",
     "ssh",
