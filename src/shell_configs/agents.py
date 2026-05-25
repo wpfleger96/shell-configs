@@ -106,7 +106,7 @@ def get_agent_version(agent: Agent) -> str | None:
             if result.returncode == 0:
                 first_line = (result.stdout or result.stderr).splitlines()[0].strip()
                 return first_line if first_line else None
-        except (FileNotFoundError, subprocess.TimeoutExpired, IndexError):
+        except FileNotFoundError, subprocess.TimeoutExpired, IndexError:
             continue
     return None
 
