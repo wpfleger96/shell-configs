@@ -2,6 +2,29 @@
 
 <!-- version list -->
 
+## v0.46.2 (2026-05-26)
+
+### Bug Fixes
+
+- Regenerate lockfile for Python 3.14 ([#48](https://github.com/wpfleger96/shell-configs/pull/48),
+  [`f58ad2c`](https://github.com/wpfleger96/shell-configs/commit/f58ad2c008b03041d928956bdb8b48ff7a8799d6))
+
+### Chores
+
+- Upgrade to Python 3.14 ([#48](https://github.com/wpfleger96/shell-configs/pull/48),
+  [`f58ad2c`](https://github.com/wpfleger96/shell-configs/commit/f58ad2c008b03041d928956bdb8b48ff7a8799d6))
+
+### Code Style
+
+- Apply ruff fixes for Python 3.14 target
+  ([#48](https://github.com/wpfleger96/shell-configs/pull/48),
+  [`f58ad2c`](https://github.com/wpfleger96/shell-configs/commit/f58ad2c008b03041d928956bdb8b48ff7a8799d6))
+
+- Format agents.py for Python 3.14 target
+  ([#48](https://github.com/wpfleger96/shell-configs/pull/48),
+  [`f58ad2c`](https://github.com/wpfleger96/shell-configs/commit/f58ad2c008b03041d928956bdb8b48ff7a8799d6))
+
+
 ## v0.46.1 (2026-05-25)
 
 ### Bug Fixes
