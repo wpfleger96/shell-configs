@@ -20,7 +20,7 @@ class AutoUpdateConfig:
     active_profile: str | None = None
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "AutoUpdateConfig":
+    def from_dict(cls, data: dict[str, Any]) -> AutoUpdateConfig:
         """Create from dict, using dataclass defaults for missing keys."""
         fields = {f.name for f in dataclasses.fields(cls)}
         kwargs = {k: v for k, v in data.items() if k in fields}
@@ -71,7 +71,7 @@ def load_auto_update_config(package_name: str = "shell-configs") -> AutoUpdateCo
         with open(config_path) as f:
             data = yaml.safe_load(f) or {}
         return AutoUpdateConfig.from_dict(data)
-    except (yaml.YAMLError, OSError):
+    except yaml.YAMLError, OSError:
         return AutoUpdateConfig()
 
 

@@ -557,7 +557,7 @@ class TestInstallExtensions:
 class TestProfileExtensionInheritance:
     """Tests for extension overrides in profile inheritance."""
 
-    def _make_loader(self, temp_dir: Path, profiles: dict[str, Any]) -> "ProfileLoader":
+    def _make_loader(self, temp_dir: Path, profiles: dict[str, Any]) -> ProfileLoader:
         import yaml
 
         from shell_configs.profiles.loader import ProfileLoader

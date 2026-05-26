@@ -1028,7 +1028,7 @@ class ConfigManager:
                             for item in raw
                             if (item[0], item[1]) not in current_key_set
                         ]
-                except (json.JSONDecodeError, Exception):
+                except json.JSONDecodeError, Exception:
                     stale_keys = []
 
             installed = self._parse_ini(file_text)

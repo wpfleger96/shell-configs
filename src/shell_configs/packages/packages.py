@@ -31,7 +31,7 @@ def _is_pwsh_module_installed(name: str) -> bool:
             timeout=10,
         )
         return name in result.stdout
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    except subprocess.TimeoutExpired, FileNotFoundError:
         return False
 
 
@@ -196,7 +196,7 @@ class HomebrewManager(PackageManager):
                     self._installed_cache = set(result.stdout.strip().split("\n"))
                 else:
                     self._installed_cache = set()
-            except (subprocess.TimeoutExpired, FileNotFoundError):
+            except subprocess.TimeoutExpired, FileNotFoundError:
                 self._installed_cache = set()
         return self._installed_cache
 
@@ -214,7 +214,7 @@ class HomebrewManager(PackageManager):
                     self._cask_cache = set(result.stdout.strip().split("\n"))
                 else:
                     self._cask_cache = set()
-            except (subprocess.TimeoutExpired, FileNotFoundError):
+            except subprocess.TimeoutExpired, FileNotFoundError:
                 self._cask_cache = set()
         return self._cask_cache
 
@@ -420,7 +420,7 @@ class LinuxInstaller(PackageManager):
                     timeout=10,
                 )
                 return result.returncode == 0
-            except (subprocess.TimeoutExpired, FileNotFoundError):
+            except subprocess.TimeoutExpired, FileNotFoundError:
                 return False
 
         return False
@@ -771,7 +771,7 @@ def sort_packages_for_uninstall(packages: list[Package]) -> list[Package]:
 
 
 def load_packages_for_profile(
-    profile: "Profile | None",
+    profile: Profile | None,
     manifest_path: Path | None = None,
 ) -> list[Package]:
     """Load packages filtered and extended by a profile.

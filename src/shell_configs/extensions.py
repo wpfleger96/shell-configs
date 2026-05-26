@@ -140,7 +140,7 @@ def load_extensions_json(path: Path) -> set[str] | None:
         return None
     try:
         data = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
+    except OSError, json.JSONDecodeError:
         logger.warning("Failed to parse extensions manifest: %s", path)
         return None
     extensions: set[str] = set()
@@ -149,7 +149,7 @@ def load_extensions_json(path: Path) -> set[str] | None:
             ext_id = entry["identifier"]["id"].lower().strip()
             if _EXTENSION_ID_RE.match(ext_id):
                 extensions.add(ext_id)
-        except (KeyError, AttributeError):
+        except KeyError, AttributeError:
             continue
     return extensions
 
@@ -189,7 +189,7 @@ class ExtensionManager:
         self,
         shell_name: str,
         extension_paths: list[Path],
-        profile: "Profile | None" = None,
+        profile: Profile | None = None,
     ) -> set[str]:
         """Load the desired extension set by merging base + IDE-specific + profile.
 

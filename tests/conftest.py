@@ -51,7 +51,7 @@ def _stub_ssh_keygen(cmd: list[Any]) -> subprocess.CompletedProcess[str]:
             key_path.with_suffix(".pub").write_text(
                 "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAFAKEKEYDATA test@stubbed\n"
             )
-    except (ValueError, IndexError):
+    except ValueError, IndexError:
         pass
     return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
 

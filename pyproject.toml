@@ -3,7 +3,7 @@ name = "shell-configs"
 version = "0.46.1"
 description = "Manage shell configuration files across machines with version control"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 license = "MIT"
 authors = [
     { name = "Will Pfleger", email = "pfleger.will@gmail.com" }
@@ -26,7 +26,6 @@ dependencies = [
     "packaging>=26.2",
     "rich>=15.0.0",
     "pyyaml>=6.0.3",
-    "tomli>=2.0.0; python_version<'3.11'",
     "pydantic>=2.13.4",
 ]
 
@@ -83,7 +82,6 @@ name = "pypi"
 url = "https://pypi.org/simple"
 
 [tool.mypy]
-python_version = "3.13"
 mypy_path = "src"
 namespace_packages = true
 explicit_package_bases = true

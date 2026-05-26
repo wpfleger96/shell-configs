@@ -39,7 +39,7 @@ class ConfigReader:
         self,
         shell_name: str,
         config_name: str | None,
-        profile: "Profile | None" = None,
+        profile: Profile | None = None,
     ) -> str | None:
         """Get the content of a configuration file.
 
@@ -87,7 +87,7 @@ class ConfigReader:
     def get_shared_config_content(
         self,
         shell_name: str,
-        profile: "Profile | None" = None,
+        profile: Profile | None = None,
     ) -> str | None:
         """Get the content of shared configuration with platform overlay.
 

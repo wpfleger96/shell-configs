@@ -351,7 +351,7 @@ class TestConfigManagerSharedConfig:
 class TestConfigManagerIniMerge:
     """Test ConfigManager INI merge methods."""
 
-    def _write_source(self, path: "Path") -> None:
+    def _write_source(self, path: Path) -> None:
         path.write_text(
             "[Default Applications]\n"
             "text/html=wslview.desktop\n"
