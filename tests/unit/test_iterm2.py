@@ -110,13 +110,28 @@ class TestITerm2Registry:
     """Test ITerm2Shell is registered."""
 
     @pytest.mark.unit
-    def test_iterm2_registered(self):
+    def test_iterm2_registered_on_macos(self, monkeypatch, mock_home):
+        monkeypatch.setattr(
+            "shell_configs.platform.is_platform",
+            lambda p: p == Platform.MACOS,
+        )
         from shell_configs.shells.registry import ShellRegistry
 
         registry = ShellRegistry()
         shell = registry.get("iterm2")
         assert shell is not None
         assert isinstance(shell, ITerm2Shell)
+
+    @pytest.mark.unit
+    def test_iterm2_not_registered_on_linux(self, monkeypatch, mock_home):
+        monkeypatch.setattr(
+            "shell_configs.platform.is_platform",
+            lambda p: p == Platform.LINUX,
+        )
+        from shell_configs.shells.registry import ShellRegistry
+
+        registry = ShellRegistry()
+        assert registry.get("iterm2") is None
 
 
 class TestConfigManagerPreferences:

@@ -19,8 +19,8 @@ class TestCursorWSLPaths:
             lambda p: p == Platform.WSL,
         )
         monkeypatch.setattr(
-            "shell_configs.shells.cursor.get_windows_username",
-            lambda: "testuser",
+            "shell_configs.shells.cursor.get_windows_appdata_roaming",
+            lambda: Path("/mnt/c/Users/testuser/AppData/Roaming"),
         )
 
         shell = CursorShell()
@@ -35,8 +35,8 @@ class TestCursorWSLPaths:
             lambda p: p == Platform.WSL,
         )
         monkeypatch.setattr(
-            "shell_configs.shells.cursor.get_windows_username",
-            lambda: "",
+            "shell_configs.shells.cursor.get_windows_appdata_roaming",
+            lambda: None,
         )
 
         shell = CursorShell()

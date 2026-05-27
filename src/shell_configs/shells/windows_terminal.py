@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import logging
+
 from pathlib import Path
 
 from shell_configs.config import get_config_dir
 from shell_configs.platform import Platform, is_platform
 from shell_configs.shells.base import AdditionalFile, ConfigFile, Shell
-from shell_configs.shells.utils import get_windows_username
+from shell_configs.shells.utils import get_windows_appdata_local
+
+logger = logging.getLogger(__name__)
 
 
 class WindowsTerminalShell(Shell):
@@ -22,12 +26,15 @@ class WindowsTerminalShell(Shell):
     def _get_windows_terminal_settings_dir(self) -> Path | None:
         if not is_platform(Platform.WSL):
             return None
-        win_user = get_windows_username()
-        if not win_user:
+        appdata_local = get_windows_appdata_local()
+        if appdata_local is None:
+            logger.debug("Windows Terminal: Windows AppData/Local not found")
             return None
-        return Path(
-            f"/mnt/c/Users/{win_user}/AppData/Local/Packages"
-            f"/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
+        return (
+            appdata_local
+            / "Packages"
+            / "Microsoft.WindowsTerminal_8wekyb3d8bbwe"
+            / "LocalState"
         )
 
     def get_config_files(self) -> list[ConfigFile]:

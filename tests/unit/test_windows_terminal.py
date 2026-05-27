@@ -36,8 +36,8 @@ class TestWindowsTerminalShell:
             lambda p: p == Platform.WSL,
         )
         monkeypatch.setattr(
-            "shell_configs.shells.windows_terminal.get_windows_username",
-            lambda: "testuser",
+            "shell_configs.shells.windows_terminal.get_windows_appdata_local",
+            lambda: Path("/mnt/c/Users/testuser/AppData/Local"),
         )
         monkeypatch.setattr(
             "shell_configs.shells.windows_terminal.get_config_dir",
@@ -70,8 +70,8 @@ class TestWindowsTerminalShell:
             lambda p: p == Platform.WSL,
         )
         monkeypatch.setattr(
-            "shell_configs.shells.windows_terminal.get_windows_username",
-            lambda: "",
+            "shell_configs.shells.windows_terminal.get_windows_appdata_local",
+            lambda: None,
         )
         shell = WindowsTerminalShell()
         assert shell.get_additional_files() == []

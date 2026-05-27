@@ -128,23 +128,14 @@ class TestVSCodeLocalShell:
             "shell_configs.shells.vscode.get_windows_username",
             lambda: "testuser",
         )
-        code_cmd = (
-            tmp_path
-            / "Users"
-            / "testuser"
-            / "AppData"
-            / "Local"
-            / "Programs"
-            / "Microsoft VS Code"
-            / "bin"
-            / "code.cmd"
-        )
+        programs = tmp_path / "Programs"
+        code_cmd = programs / "Microsoft VS Code" / "bin" / "code.cmd"
         code_cmd.parent.mkdir(parents=True)
         code_cmd.touch()
 
         monkeypatch.setattr(
-            "shell_configs.shells.vscode.Path",
-            lambda p: tmp_path / p.removeprefix("/mnt/c/"),
+            "shell_configs.shells.vscode.get_windows_programs",
+            lambda: programs,
         )
 
         shell = VSCodeLocalShell()

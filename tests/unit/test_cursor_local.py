@@ -44,25 +44,14 @@ class TestCursorLocalShell:
             "shell_configs.shells.cursor.get_windows_username",
             lambda: "testuser",
         )
-        cursor_cmd = (
-            tmp_path
-            / "Users"
-            / "testuser"
-            / "AppData"
-            / "Local"
-            / "Programs"
-            / "cursor"
-            / "resources"
-            / "app"
-            / "bin"
-            / "cursor.cmd"
-        )
+        programs = tmp_path / "Programs"
+        cursor_cmd = programs / "cursor" / "resources" / "app" / "bin" / "cursor.cmd"
         cursor_cmd.parent.mkdir(parents=True)
         cursor_cmd.touch()
 
         monkeypatch.setattr(
-            "shell_configs.shells.cursor.Path",
-            lambda p: tmp_path / p.removeprefix("/mnt/c/"),
+            "shell_configs.shells.cursor.get_windows_programs",
+            lambda: programs,
         )
 
         shell = CursorLocalShell()
@@ -90,26 +79,16 @@ class TestCursorLocalShell:
             "shell_configs.shells.cursor.get_windows_username",
             lambda: "testuser",
         )
+        programs = tmp_path / "Programs"
         cursor_cmd = (
-            tmp_path
-            / "Users"
-            / "testuser"
-            / "AppData"
-            / "Local"
-            / "Programs"
-            / "cursor"
-            / "_"
-            / "resources"
-            / "app"
-            / "bin"
-            / "cursor.cmd"
+            programs / "cursor" / "_" / "resources" / "app" / "bin" / "cursor.cmd"
         )
         cursor_cmd.parent.mkdir(parents=True)
         cursor_cmd.touch()
 
         monkeypatch.setattr(
-            "shell_configs.shells.cursor.Path",
-            lambda p: tmp_path / p.removeprefix("/mnt/c/"),
+            "shell_configs.shells.cursor.get_windows_programs",
+            lambda: programs,
         )
 
         shell = CursorLocalShell()
