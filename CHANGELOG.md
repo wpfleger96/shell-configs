@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v0.47.1 (2026-05-27)
+
+### Bug Fixes
+
+- Centralize WSL/Windows path resolution and harden platform guards
+  ([#54](https://github.com/wpfleger96/shell-configs/pull/54),
+  [`d031742`](https://github.com/wpfleger96/shell-configs/commit/d03174212fcc81f53d30cbdee8a2c95323bba6d5))
+
+### Chores
+
+- **deps**: Lock file maintenance ([#55](https://github.com/wpfleger96/shell-configs/pull/55),
+  [`bc62020`](https://github.com/wpfleger96/shell-configs/commit/bc62020a8c455fddd1f997eab0fc9fe3281c235a))
+
+
 ## v0.47.0 (2026-05-27)
 
 ### Bug Fixes
