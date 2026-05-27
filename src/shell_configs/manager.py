@@ -1206,17 +1206,17 @@ class ConfigManager:
                 return False
             for src_elem in managed:
                 name = src_elem.get("name")
+                if name is None:
+                    continue
                 target_elem = next(
                     (e for e in target_guiconfigs if e.get("name") == name),
                     None,
                 )
                 if target_elem is None:
                     return False
-                if src_elem.attrib != target_elem.attrib:
-                    return False
                 if (
-                    src_elem.text
-                    and src_elem.text.strip() != (target_elem.text or "").strip()
+                    ET.tostring(src_elem, encoding="unicode").strip()
+                    != ET.tostring(target_elem, encoding="unicode").strip()
                 ):
                     return False
             return True
@@ -1239,6 +1239,8 @@ class ConfigManager:
             lines = []
             for src_elem in managed:
                 name = src_elem.get("name")
+                if name is None:
+                    continue
                 target_elem = (
                     next(
                         (e for e in target_guiconfigs if e.get("name") == name),
@@ -1249,11 +1251,12 @@ class ConfigManager:
                 )
                 src_str = ET.tostring(src_elem, encoding="unicode").strip()
                 if target_elem is None:
-                    lines.append(f"  + {src_str}")
+                    lines.append(f"+ {src_str}")
                 else:
                     tgt_str = ET.tostring(target_elem, encoding="unicode").strip()
                     if src_str != tgt_str:
-                        lines.append(f"  ~ {tgt_str} → {src_str}")
+                        lines.append(f"- {tgt_str}")
+                        lines.append(f"+ {src_str}")
             return "\n".join(lines) if lines else None
         except Exception:
             return None
@@ -1309,6 +1312,8 @@ class ConfigManager:
 
             for src_elem in managed:
                 name = src_elem.get("name")
+                if name is None:
+                    continue
                 target_elem = next(
                     (e for e in target_guiconfigs if e.get("name") == name),
                     None,
@@ -1316,8 +1321,11 @@ class ConfigManager:
                 if target_elem is not None:
                     target_elem.attrib.clear()
                     target_elem.attrib.update(src_elem.attrib)
-                    if src_elem.text and src_elem.text.strip():
-                        target_elem.text = src_elem.text
+                    target_elem.text = (
+                        src_elem.text
+                        if src_elem.text and src_elem.text.strip()
+                        else None
+                    )
                 else:
                     import copy as _copy
 
@@ -1328,6 +1336,8 @@ class ConfigManager:
             if removed_files:
                 backup_msg += f"; removed {len(removed_files)} old backup(s)"
 
+            # ET.indent reformats the entire tree; Notepad++ uses 4-space indentation
+            # natively so this is a no-op in practice.
             ET.indent(target_tree, space="    ")
             xml_content = ET.tostring(
                 target_root, encoding="unicode", xml_declaration=False
@@ -1352,11 +1362,10 @@ class ConfigManager:
         config_file: Path,
         dry_run: bool = False,
     ) -> tuple[OperationResult, str]:
-        """Remove managed GUIConfig elements from target by resetting to defaults.
+        """Remove managed GUIConfig elements from target.
 
-        Since we can't know the original values, we remove the attributes we
-        set and leave the elements with only their 'name' attribute, which
-        prompts Notepad++ to use its built-in defaults on next launch.
+        Removes the elements entirely from the XML tree. Notepad++ regenerates
+        missing GUIConfig elements with built-in defaults on next launch.
         """
         try:
             if not config_file.exists():
@@ -1371,7 +1380,9 @@ class ConfigManager:
                 )
 
             managed = self._parse_guiconfigs_from_source(source_path)
-            managed_names = {e.get("name") for e in managed}
+            managed_names = {
+                e.get("name") for e in managed if e.get("name") is not None
+            }
 
             target_tree = ET.parse(config_file)
             target_root = target_tree.getroot()

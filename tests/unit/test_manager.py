@@ -717,6 +717,7 @@ _TARGET_XML = (
     "<NotepadPlus>\n"
     "    <GUIConfigs>\n"
     '        <GUIConfig name="DarkMode" enable="no" />\n'
+    '        <GUIConfig name="NewDocDefaultSettings" format="0" encoding="0" lang="0" codepage="-1" openAnsiAsUTF8="no" />\n'
     "    </GUIConfigs>\n"
     "</NotepadPlus>\n"
 )
@@ -726,6 +727,7 @@ _SOURCE_XML = (
     "<NotepadPlus>\n"
     "    <GUIConfigs>\n"
     '        <GUIConfig name="DarkMode" enable="yes" darkTitleBar="yes" />\n'
+    '        <GUIConfig name="NewDocDefaultSettings" format="1" encoding="4" lang="0" codepage="-1" openAnsiAsUTF8="yes" />\n'
     "    </GUIConfigs>\n"
     "</NotepadPlus>\n"
 )
@@ -747,12 +749,13 @@ class TestXmlGuiconfigMerge:
         manager = ConfigManager()
         source = temp_dir / "source.xml"
         target = temp_dir / "config.xml"
-        # Source and target both have DarkMode enable="yes" darkTitleBar="yes"
+        # Target matches source exactly (both elements)
         matching_xml = (
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             "<NotepadPlus>\n"
             "    <GUIConfigs>\n"
             '        <GUIConfig name="DarkMode" enable="yes" darkTitleBar="yes" />\n'
+            '        <GUIConfig name="NewDocDefaultSettings" format="1" encoding="4" lang="0" codepage="-1" openAnsiAsUTF8="yes" />\n'
             "    </GUIConfigs>\n"
             "</NotepadPlus>\n"
         )
@@ -835,12 +838,13 @@ class TestXmlGuiconfigMerge:
         source = temp_dir / "source.xml"
         target = temp_dir / "config.xml"
         source.write_text(_SOURCE_XML)
-        # Target already matches source exactly
+        # Target already matches source exactly (both elements)
         matching_xml = (
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             "<NotepadPlus>\n"
             "    <GUIConfigs>\n"
             '        <GUIConfig name="DarkMode" enable="yes" darkTitleBar="yes" />\n'
+            '        <GUIConfig name="NewDocDefaultSettings" format="1" encoding="4" lang="0" codepage="-1" openAnsiAsUTF8="yes" />\n'
             "    </GUIConfigs>\n"
             "</NotepadPlus>\n"
         )
@@ -886,13 +890,17 @@ class TestXmlGuiconfigMerge:
 
         # First install to get managed elements into the target
         manager.install_xml_guiconfig_file(source, target)
-        assert 'name="DarkMode"' in target.read_text()
+        content = target.read_text()
+        assert 'name="DarkMode"' in content
+        assert 'name="NewDocDefaultSettings"' in content
 
-        # Now uninstall — managed elements should be removed
+        # Now uninstall — both managed elements should be removed
         result, message = manager.uninstall_xml_guiconfig_file(source, target)
 
         assert result == OperationResult.REMOVED
-        assert 'name="DarkMode"' not in target.read_text()
+        content = target.read_text()
+        assert 'name="DarkMode"' not in content
+        assert 'name="NewDocDefaultSettings"' not in content
 
     def test_uninstall_xml_guiconfig_file_returns_not_found_when_file_missing(
         self, temp_dir

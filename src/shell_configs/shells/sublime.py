@@ -46,6 +46,10 @@ class SublimeShell(Shell):
         settings_dir = self._get_settings_dir()
         if settings_dir is None:
             return []
+        # settings_dir is .../Packages/User — three levels up is the base install dir
+        # (e.g. "Sublime Text" or "sublime-text"). Skip if Sublime isn't installed.
+        if not settings_dir.parent.parent.parent.exists():
+            return []
         config_dir = get_config_dir()
         return [
             AdditionalFile(

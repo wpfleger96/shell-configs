@@ -43,6 +43,8 @@ class TestSublimeShell:
             "shell_configs.shells.sublime.get_config_dir",
             lambda: Path("/fake/config"),
         )
+        # The WSL base dir lives under /mnt/c which won't exist in tests; patch exists()
+        monkeypatch.setattr(Path, "exists", lambda self: True)
         shell = SublimeShell()
         files = shell.get_additional_files()
         assert len(files) == 1
@@ -63,6 +65,9 @@ class TestSublimeShell:
             "shell_configs.shells.sublime.get_config_dir",
             lambda: Path("/fake/config"),
         )
+        # Create the base install dir so the existence check passes
+        base_dir = mock_home / "Library" / "Application Support" / "Sublime Text"
+        base_dir.mkdir(parents=True)
         shell = SublimeShell()
         files = shell.get_additional_files()
         assert len(files) == 1
@@ -87,6 +92,9 @@ class TestSublimeShell:
             "shell_configs.shells.sublime.get_config_dir",
             lambda: Path("/fake/config"),
         )
+        # Create the base install dir so the existence check passes
+        base_dir = mock_home / ".config" / "sublime-text"
+        base_dir.mkdir(parents=True)
         shell = SublimeShell()
         files = shell.get_additional_files()
         assert len(files) == 1
@@ -100,6 +108,21 @@ class TestSublimeShell:
             / "Preferences.sublime-settings"
         )
         assert files[0].target_path == expected_target
+
+    def test_additional_files_empty_when_sublime_not_installed(
+        self, monkeypatch, mock_home
+    ):
+        monkeypatch.setattr(
+            "shell_configs.shells.sublime.is_platform",
+            lambda p: p == Platform.LINUX,
+        )
+        monkeypatch.setattr(
+            "shell_configs.shells.sublime.get_config_dir",
+            lambda: Path("/fake/config"),
+        )
+        # Do NOT create ~/.config/sublime-text — simulate Sublime not installed
+        shell = SublimeShell()
+        assert shell.get_additional_files() == []
 
     def test_additional_files_empty_when_no_username_on_wsl(self, monkeypatch):
         monkeypatch.setattr(
