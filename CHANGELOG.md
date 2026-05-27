@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.47.2 (2026-05-27)
+
+### Bug Fixes
+
+- Remove hardcoded Go check_path that fails on macOS brew installs
+  ([`0a0bc67`](https://github.com/wpfleger96/shell-configs/commit/0a0bc67603beb70ce5dda84ceb8f8ea2d942ce80))
+
+
 ## v0.47.1 (2026-05-27)
 
 ### Bug Fixes
