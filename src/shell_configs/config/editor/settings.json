@@ -85,5 +85,7 @@
     "terminal.integrated.scrollback": 50000,
     "terminal.integrated.tabs.description": "${task}${separator}${local}${separator}${cwdFolder}",
     "terminal.integrated.tabs.title": "${sequence}",
-    "workbench.colorTheme": "Visual Studio Dark"
+    "workbench.colorTheme": "Visual Studio Dark",
+    "workbench.trustedDomains": ["*"],
+    "workbench.trustedDomains.promptInTrustedWorkspace": false
 }

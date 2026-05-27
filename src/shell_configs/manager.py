@@ -9,6 +9,7 @@ import plistlib
 import shutil
 import subprocess
 import tempfile
+import xml.etree.ElementTree as ET
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -1182,6 +1183,268 @@ class ConfigManager:
 
         except Exception as e:
             return (OperationResult.ERROR, f"Error uninstalling INI file: {e}")
+
+    def _parse_guiconfigs_from_source(self, source_path: Path) -> list[ET.Element]:
+        """Parse <GUIConfig> elements from a partial source XML file."""
+        tree = ET.parse(source_path)
+        root = tree.getroot()
+        guiconfigs = root.find("GUIConfigs")
+        if guiconfigs is None:
+            return []
+        return list(guiconfigs)
+
+    def check_xml_guiconfig_synced(self, source_path: Path, config_file: Path) -> bool:
+        """Check if all managed GUIConfig elements match the target file."""
+        if not config_file.exists():
+            return False
+        try:
+            managed = self._parse_guiconfigs_from_source(source_path)
+            target_tree = ET.parse(config_file)
+            target_root = target_tree.getroot()
+            target_guiconfigs = target_root.find("GUIConfigs")
+            if target_guiconfigs is None:
+                return False
+            for src_elem in managed:
+                name = src_elem.get("name")
+                if name is None:
+                    continue
+                target_elem = next(
+                    (e for e in target_guiconfigs if e.get("name") == name),
+                    None,
+                )
+                if target_elem is None:
+                    return False
+                # Check only managed attributes — extra target attrs are ignored
+                for key, value in src_elem.attrib.items():
+                    if target_elem.get(key) != value:
+                        return False
+                src_text = (src_elem.text or "").strip()
+                tgt_text = (target_elem.text or "").strip()
+                if src_text != tgt_text:
+                    return False
+            return True
+        except Exception:
+            return False
+
+    def diff_xml_guiconfig_file(
+        self, source_path: Path, config_file: Path
+    ) -> str | None:
+        """Return a human-readable diff of managed GUIConfig elements vs target."""
+        try:
+            managed = self._parse_guiconfigs_from_source(source_path)
+            target_exists = config_file.exists()
+            target_tree = ET.parse(config_file) if target_exists else None
+            target_root = target_tree.getroot() if target_tree else None
+            target_guiconfigs = (
+                target_root.find("GUIConfigs") if target_root is not None else None
+            )
+
+            lines = []
+            for src_elem in managed:
+                name = src_elem.get("name")
+                if name is None:
+                    continue
+                target_elem = (
+                    next(
+                        (e for e in target_guiconfigs if e.get("name") == name),
+                        None,
+                    )
+                    if target_guiconfigs is not None
+                    else None
+                )
+                if target_elem is None:
+                    src_str = ET.tostring(src_elem, encoding="unicode").strip()
+                    lines.append(f"+ {src_str}")
+                else:
+                    # Show only the managed attributes that differ
+                    attr_diffs = []
+                    for key, value in src_elem.attrib.items():
+                        tgt_value = target_elem.get(key)
+                        if tgt_value != value:
+                            if tgt_value is None:
+                                attr_diffs.append(f'  + {key}="{value}"')
+                            else:
+                                attr_diffs.append(
+                                    f'  {key}: "{tgt_value}" -> "{value}"'
+                                )
+                    if attr_diffs:
+                        lines.append(f"[{name}]")
+                        lines.extend(attr_diffs)
+            return "\n".join(lines) if lines else None
+        except Exception:
+            return None
+
+    def install_xml_guiconfig_file(
+        self,
+        source_path: Path,
+        config_file: Path,
+        dry_run: bool = False,
+    ) -> tuple[OperationResult, str, str | None]:
+        """Merge managed GUIConfig elements into an existing Notepad++ config.xml.
+
+        Requires the target file to already exist — we do not create it from
+        scratch because Notepad++ config.xml has dozens of required elements.
+        """
+        try:
+            if not source_path.exists():
+                return (
+                    OperationResult.ERROR,
+                    f"Source file does not exist: {source_path}",
+                    None,
+                )
+            if not config_file.exists():
+                return (
+                    OperationResult.ERROR,
+                    f"Target config does not exist: {config_file} "
+                    "(Notepad++ must be installed and launched at least once)",
+                    None,
+                )
+
+            if self.check_xml_guiconfig_synced(source_path, config_file):
+                return (
+                    OperationResult.ALREADY_SYNCED,
+                    f"{config_file} is already synced",
+                    None,
+                )
+
+            diff_text = self.diff_xml_guiconfig_file(source_path, config_file)
+
+            if dry_run:
+                return (
+                    OperationResult.UPDATED,
+                    f"Would update {config_file}",
+                    diff_text,
+                )
+
+            managed = self._parse_guiconfigs_from_source(source_path)
+            target_tree = ET.parse(config_file)
+            target_root = target_tree.getroot()
+            target_guiconfigs = target_root.find("GUIConfigs")
+            if target_guiconfigs is None:
+                target_guiconfigs = ET.SubElement(target_root, "GUIConfigs")
+
+            for src_elem in managed:
+                name = src_elem.get("name")
+                if name is None:
+                    continue
+                target_elem = next(
+                    (e for e in target_guiconfigs if e.get("name") == name),
+                    None,
+                )
+                if target_elem is not None:
+                    # Merge managed attributes only — preserves extra Notepad++ attrs
+                    target_elem.attrib.update(src_elem.attrib)
+                    target_elem.text = (
+                        src_elem.text
+                        if src_elem.text and src_elem.text.strip()
+                        else None
+                    )
+                else:
+                    import copy as _copy
+
+                    target_guiconfigs.append(_copy.deepcopy(src_elem))
+
+            backup_path, removed_files = self.create_backup(config_file)
+            backup_msg = f" (backup: {backup_path.name})"
+            if removed_files:
+                backup_msg += f"; removed {len(removed_files)} old backup(s)"
+
+            # ET.indent reformats the entire tree; Notepad++ uses 4-space indentation
+            # natively so this is a no-op in practice.
+            ET.indent(target_tree, space="    ")
+            xml_content = ET.tostring(
+                target_root, encoding="unicode", xml_declaration=False
+            )
+            xml_content = (
+                '<?xml version="1.0" encoding="UTF-8"?>\n' + xml_content + "\n"
+            )
+            self._atomic_write(config_file, xml_content)
+
+            return (
+                OperationResult.UPDATED,
+                f"Updated {config_file}{backup_msg}",
+                diff_text,
+            )
+
+        except Exception as e:
+            return (OperationResult.ERROR, f"Error updating XML config: {e}", None)
+
+    def uninstall_xml_guiconfig_file(
+        self,
+        source_path: Path,
+        config_file: Path,
+        dry_run: bool = False,
+    ) -> tuple[OperationResult, str]:
+        """Remove managed GUIConfig elements from target.
+
+        Removes the elements entirely from the XML tree. Notepad++ regenerates
+        missing GUIConfig elements with built-in defaults on next launch.
+        """
+        try:
+            if not config_file.exists():
+                return (
+                    OperationResult.NOT_FOUND,
+                    f"{config_file} does not exist",
+                )
+            if not source_path.exists():
+                return (
+                    OperationResult.ERROR,
+                    f"Source file does not exist: {source_path}",
+                )
+
+            managed = self._parse_guiconfigs_from_source(source_path)
+            managed_names = {
+                e.get("name") for e in managed if e.get("name") is not None
+            }
+
+            target_tree = ET.parse(config_file)
+            target_root = target_tree.getroot()
+            target_guiconfigs = target_root.find("GUIConfigs")
+
+            if target_guiconfigs is None:
+                return (
+                    OperationResult.NOT_FOUND,
+                    f"No GUIConfigs section found in {config_file}",
+                )
+
+            found = any(e.get("name") in managed_names for e in target_guiconfigs)
+            if not found:
+                return (
+                    OperationResult.NOT_FOUND,
+                    f"No managed GUIConfig elements found in {config_file}",
+                )
+
+            if dry_run:
+                return (
+                    OperationResult.REMOVED,
+                    f"Would remove managed GUIConfig elements from {config_file}",
+                )
+
+            backup_path, removed_files = self.create_backup(config_file)
+            backup_msg = f" (backup: {backup_path.name})"
+            if removed_files:
+                backup_msg += f"; removed {len(removed_files)} old backup(s)"
+
+            for elem in list(target_guiconfigs):
+                if elem.get("name") in managed_names:
+                    target_guiconfigs.remove(elem)
+
+            ET.indent(target_tree, space="    ")
+            xml_content = ET.tostring(
+                target_root, encoding="unicode", xml_declaration=False
+            )
+            xml_content = (
+                '<?xml version="1.0" encoding="UTF-8"?>\n' + xml_content + "\n"
+            )
+            self._atomic_write(config_file, xml_content)
+
+            return (
+                OperationResult.REMOVED,
+                f"Removed managed GUIConfig elements from {config_file}{backup_msg}",
+            )
+
+        except Exception as e:
+            return (OperationResult.ERROR, f"Error uninstalling XML config: {e}")
 
     def files_match(self, file1: Path, file2: Path) -> bool:
         """Check if two files have identical content.

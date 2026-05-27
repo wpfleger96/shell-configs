@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NotepadPlus>
+    <GUIConfigs>
+        <GUIConfig name="DarkMode" enable="yes" darkThemeName="DarkModeDefault.xml" darkTitleBar="yes" />
+        <GUIConfig name="NewDocDefaultSettings" format="1" encoding="4" lang="0" codepage="-1" openAnsiAsUTF8="yes" />
+    </GUIConfigs>
+</NotepadPlus>

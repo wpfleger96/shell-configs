@@ -269,6 +269,27 @@ def _compute_diffs_for_shells(
             else:
                 repo_content = additional_file.source_path.read_text()
 
+            if additional_file.xml_guiconfig_merge:
+                if manager.check_xml_guiconfig_synced(
+                    additional_file.source_path, additional_file.target_path
+                ):
+                    continue
+                xml_diff = manager.diff_xml_guiconfig_file(
+                    additional_file.source_path, additional_file.target_path
+                )
+                if xml_diff:
+                    diffs.append(
+                        FileDiff(
+                            shell_name=shell.display_name,
+                            file_path=str(additional_file.target_path),
+                            diff_text=xml_diff,
+                            file_type="additional",
+                            current_content="",
+                            desired_content=repo_content,
+                        )
+                    )
+                continue
+
             if additional_file.ini_merge:
                 if manager.check_ini_file_synced(
                     additional_file.source_path, additional_file.target_path

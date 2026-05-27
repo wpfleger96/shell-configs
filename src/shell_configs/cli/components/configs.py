@@ -85,7 +85,13 @@ class ConfigsComponent(Component):
         for shell in ctx.selected_shells:
             additional_files = shell.get_additional_files()
             for additional_file in additional_files:
-                if additional_file.ini_merge:
+                if additional_file.xml_guiconfig_merge:
+                    result, message, diff_text = manager.install_xml_guiconfig_file(
+                        additional_file.source_path,
+                        additional_file.target_path,
+                        dry_run=ctx.dry_run,
+                    )
+                elif additional_file.ini_merge:
                     result, message, diff_text = manager.install_ini_file(
                         additional_file.source_path,
                         additional_file.target_path,
@@ -280,7 +286,13 @@ class ConfigsComponent(Component):
 
             additional_files = shell.get_additional_files()
             for i, additional_file in enumerate(additional_files):
-                if additional_file.ini_merge:
+                if additional_file.xml_guiconfig_merge:
+                    exists = additional_file.target_path.exists()
+                    synced = manager.check_xml_guiconfig_synced(
+                        additional_file.source_path,
+                        additional_file.target_path,
+                    )
+                elif additional_file.ini_merge:
                     exists = additional_file.target_path.exists()
                     synced = manager.check_ini_file_synced(
                         additional_file.source_path,
@@ -372,7 +384,12 @@ class ConfigsComponent(Component):
         for shell in ctx.selected_shells:
             additional_files = shell.get_additional_files()
             for additional_file in additional_files:
-                if additional_file.ini_merge:
+                if additional_file.xml_guiconfig_merge:
+                    result, message = manager.uninstall_xml_guiconfig_file(
+                        additional_file.source_path,
+                        additional_file.target_path,
+                    )
+                elif additional_file.ini_merge:
                     result, message = manager.uninstall_ini_file(
                         additional_file.target_path,
                     )
