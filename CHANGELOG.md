@@ -2,6 +2,47 @@
 
 <!-- version list -->
 
+## v0.47.0 (2026-05-27)
+
+### Bug Fixes
+
+- Address code review findings from PR #53
+  ([#53](https://github.com/wpfleger96/shell-configs/pull/53),
+  [`d03265a`](https://github.com/wpfleger96/shell-configs/commit/d03265a31e566e4a318bba3f50ddcd2ca0232899))
+
+- Use attribute-subset merge for xml_guiconfig_merge strategy
+  ([#53](https://github.com/wpfleger96/shell-configs/pull/53),
+  [`d03265a`](https://github.com/wpfleger96/shell-configs/commit/d03265a31e566e4a318bba3f50ddcd2ca0232899))
+
+### Chores
+
+- Sync Justfile
+  ([`b041ac2`](https://github.com/wpfleger96/shell-configs/commit/b041ac25bf770917fd193b33fd5b36a0fd5164ed))
+
+- **deps**: Lock file maintenance ([#52](https://github.com/wpfleger96/shell-configs/pull/52),
+  [`438bc4d`](https://github.com/wpfleger96/shell-configs/commit/438bc4da994775ce6d773a0aaa412441cf052642))
+
+### Continuous Integration
+
+- Sync release workflow
+  ([`7e18e26`](https://github.com/wpfleger96/shell-configs/commit/7e18e2610638412ebf7c4835d4245695e8482b2c))
+
+- Sync shared files
+  ([`2a413fd`](https://github.com/wpfleger96/shell-configs/commit/2a413fd8ebeaf666c3d001b4f6f23e896b152ba4))
+
+- Sync shared files
+  ([`cb7bbc7`](https://github.com/wpfleger96/shell-configs/commit/cb7bbc792d8136b3aebb7bc2c225ee768df49e13))
+
+- Sync shared files
+  ([`6abe941`](https://github.com/wpfleger96/shell-configs/commit/6abe94121fba4b0a7585c5c4d2e9315779293e48))
+
+### Features
+
+- Add Sublime Text + Notepad++ handlers, disable trusted domains prompt
+  ([#53](https://github.com/wpfleger96/shell-configs/pull/53),
+  [`d03265a`](https://github.com/wpfleger96/shell-configs/commit/d03265a31e566e4a318bba3f50ddcd2ca0232899))
+
+
 ## v0.46.2 (2026-05-26)
 
 ### Bug Fixes
