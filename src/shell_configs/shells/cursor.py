@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
+import logging
+
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from shell_configs.config import get_config_dir
 from shell_configs.platform import Platform, is_platform
 from shell_configs.shells.base import AdditionalFile, ConfigFile, Shell
-from shell_configs.shells.utils import get_windows_username
+from shell_configs.shells.utils import (
+    get_windows_appdata_roaming,
+    get_windows_programs,
+    get_windows_username,
+)
 
 if TYPE_CHECKING:
     from shell_configs.extensions import ExtensionInvoker
+
+logger = logging.getLogger(__name__)
 
 
 class CursorShell(Shell):
@@ -32,10 +40,11 @@ class CursorShell(Shell):
             Path to Cursor User directory or None if unable to determine
         """
         if is_platform(Platform.WSL):
-            win_user = get_windows_username()
-            if not win_user:
+            appdata = get_windows_appdata_roaming()
+            if appdata is None:
+                logger.debug("Cursor: Windows AppData/Roaming not found")
                 return None
-            return Path(f"/mnt/c/Users/{win_user}/AppData/Roaming/Cursor/User")
+            return appdata / "Cursor" / "User"
         elif is_platform(Platform.MACOS):
             return Path.home() / "Library" / "Application Support" / "Cursor" / "User"
         else:
@@ -46,6 +55,9 @@ class CursorShell(Shell):
             remote_cli = self._find_cursor_remote_cli()
             if remote_cli:
                 return str(remote_cli)
+            logger.info(
+                "Cursor remote CLI not found — open a Cursor WSL window first to initialize"
+            )
             return None
         return "cursor"
 
@@ -152,8 +164,11 @@ class CursorLocalShell(Shell):
         win_user = get_windows_username()
         if not win_user:
             return None
+        programs = get_windows_programs()
+        if programs is None:
+            return None
         base_win = f"C:\\Users\\{win_user}\\AppData\\Local\\Programs\\cursor"
-        base_wsl = Path(f"/mnt/c/Users/{win_user}/AppData/Local/Programs/cursor")
+        base_wsl = programs / "cursor"
         candidates = [
             (
                 f"{base_win}\\_\\resources\\app\\bin\\cursor.cmd",
