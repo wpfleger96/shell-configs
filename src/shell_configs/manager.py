@@ -1214,10 +1214,13 @@ class ConfigManager:
                 )
                 if target_elem is None:
                     return False
-                if (
-                    ET.tostring(src_elem, encoding="unicode").strip()
-                    != ET.tostring(target_elem, encoding="unicode").strip()
-                ):
+                # Check only managed attributes — extra target attrs are ignored
+                for key, value in src_elem.attrib.items():
+                    if target_elem.get(key) != value:
+                        return False
+                src_text = (src_elem.text or "").strip()
+                tgt_text = (target_elem.text or "").strip()
+                if src_text != tgt_text:
                     return False
             return True
         except Exception:
@@ -1249,14 +1252,24 @@ class ConfigManager:
                     if target_guiconfigs is not None
                     else None
                 )
-                src_str = ET.tostring(src_elem, encoding="unicode").strip()
                 if target_elem is None:
+                    src_str = ET.tostring(src_elem, encoding="unicode").strip()
                     lines.append(f"+ {src_str}")
                 else:
-                    tgt_str = ET.tostring(target_elem, encoding="unicode").strip()
-                    if src_str != tgt_str:
-                        lines.append(f"- {tgt_str}")
-                        lines.append(f"+ {src_str}")
+                    # Show only the managed attributes that differ
+                    attr_diffs = []
+                    for key, value in src_elem.attrib.items():
+                        tgt_value = target_elem.get(key)
+                        if tgt_value != value:
+                            if tgt_value is None:
+                                attr_diffs.append(f'  + {key}="{value}"')
+                            else:
+                                attr_diffs.append(
+                                    f'  {key}: "{tgt_value}" -> "{value}"'
+                                )
+                    if attr_diffs:
+                        lines.append(f"[{name}]")
+                        lines.extend(attr_diffs)
             return "\n".join(lines) if lines else None
         except Exception:
             return None
@@ -1319,7 +1332,7 @@ class ConfigManager:
                     None,
                 )
                 if target_elem is not None:
-                    target_elem.attrib.clear()
+                    # Merge managed attributes only — preserves extra Notepad++ attrs
                     target_elem.attrib.update(src_elem.attrib)
                     target_elem.text = (
                         src_elem.text

@@ -716,8 +716,8 @@ _TARGET_XML = (
     '<?xml version="1.0" encoding="UTF-8"?>\n'
     "<NotepadPlus>\n"
     "    <GUIConfigs>\n"
-    '        <GUIConfig name="DarkMode" enable="no" />\n'
-    '        <GUIConfig name="NewDocDefaultSettings" format="0" encoding="0" lang="0" codepage="-1" openAnsiAsUTF8="no" />\n'
+    '        <GUIConfig name="DarkMode" enable="no" colorTone="0" customColorTop="2105376" />\n'
+    '        <GUIConfig name="NewDocDefaultSettings" format="0" encoding="0" lang="0" codepage="-1" openAnsiAsUTF8="no" addNewDocumentOnStartup="no" />\n'
     "    </GUIConfigs>\n"
     "</NotepadPlus>\n"
 )
@@ -749,13 +749,13 @@ class TestXmlGuiconfigMerge:
         manager = ConfigManager()
         source = temp_dir / "source.xml"
         target = temp_dir / "config.xml"
-        # Target matches source exactly (both elements)
+        # Target has managed attrs matching source plus extra Notepad++-native attrs
         matching_xml = (
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             "<NotepadPlus>\n"
             "    <GUIConfigs>\n"
-            '        <GUIConfig name="DarkMode" enable="yes" darkTitleBar="yes" />\n'
-            '        <GUIConfig name="NewDocDefaultSettings" format="1" encoding="4" lang="0" codepage="-1" openAnsiAsUTF8="yes" />\n'
+            '        <GUIConfig name="DarkMode" enable="yes" darkTitleBar="yes" colorTone="0" />\n'
+            '        <GUIConfig name="NewDocDefaultSettings" format="1" encoding="4" lang="0" codepage="-1" openAnsiAsUTF8="yes" addNewDocumentOnStartup="no" />\n'
             "    </GUIConfigs>\n"
             "</NotepadPlus>\n"
         )
@@ -808,8 +808,14 @@ class TestXmlGuiconfigMerge:
 
         assert result == OperationResult.UPDATED
         content = target.read_text()
+        # Managed attributes updated
         assert 'enable="yes"' in content
         assert 'darkTitleBar="yes"' in content
+        assert 'format="1"' in content
+        # Non-managed Notepad++ attributes preserved
+        assert 'colorTone="0"' in content
+        assert 'customColorTop="2105376"' in content
+        assert 'addNewDocumentOnStartup="no"' in content
 
     def test_install_xml_guiconfig_file_appends_new_element(self, temp_dir):
         manager = ConfigManager()
@@ -838,13 +844,13 @@ class TestXmlGuiconfigMerge:
         source = temp_dir / "source.xml"
         target = temp_dir / "config.xml"
         source.write_text(_SOURCE_XML)
-        # Target already matches source exactly (both elements)
+        # Target has managed attrs matching source plus extra Notepad++-native attrs
         matching_xml = (
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             "<NotepadPlus>\n"
             "    <GUIConfigs>\n"
-            '        <GUIConfig name="DarkMode" enable="yes" darkTitleBar="yes" />\n'
-            '        <GUIConfig name="NewDocDefaultSettings" format="1" encoding="4" lang="0" codepage="-1" openAnsiAsUTF8="yes" />\n'
+            '        <GUIConfig name="DarkMode" enable="yes" darkTitleBar="yes" colorTone="0" />\n'
+            '        <GUIConfig name="NewDocDefaultSettings" format="1" encoding="4" lang="0" codepage="-1" openAnsiAsUTF8="yes" addNewDocumentOnStartup="no" />\n'
             "    </GUIConfigs>\n"
             "</NotepadPlus>\n"
         )
