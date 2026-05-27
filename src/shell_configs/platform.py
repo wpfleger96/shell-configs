@@ -46,6 +46,13 @@ def detect_platform() -> Platform:
             pass
         return Platform.LINUX
 
+    if system == "windows":
+        raise SystemExit(
+            "shell-configs is designed for Unix-like environments (macOS, Linux, WSL).\n"
+            "Native Windows is not supported. Use WSL instead:\n"
+            "  https://learn.microsoft.com/en-us/windows/wsl/install"
+        )
+
     return Platform.LINUX
 
 
