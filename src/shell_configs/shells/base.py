@@ -35,6 +35,7 @@ class AdditionalFile:
     backup_dir: Path | None = field(default=None)
     ini_merge: bool = False
     target_merge: bool = False
+    xml_guiconfig_merge: bool = False
 
 
 @dataclass

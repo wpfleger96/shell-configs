@@ -710,3 +710,198 @@ class TestConfigManagerIniMerge:
 
         assert result == OperationResult.ERROR
         assert not sidecar.exists()
+
+
+_TARGET_XML = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+    "<NotepadPlus>\n"
+    "    <GUIConfigs>\n"
+    '        <GUIConfig name="DarkMode" enable="no" />\n'
+    "    </GUIConfigs>\n"
+    "</NotepadPlus>\n"
+)
+
+_SOURCE_XML = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+    "<NotepadPlus>\n"
+    "    <GUIConfigs>\n"
+    '        <GUIConfig name="DarkMode" enable="yes" darkTitleBar="yes" />\n'
+    "    </GUIConfigs>\n"
+    "</NotepadPlus>\n"
+)
+
+
+@pytest.mark.unit
+class TestXmlGuiconfigMerge:
+    """Test ConfigManager XML GUIConfig merge methods."""
+
+    def test_check_xml_guiconfig_synced_returns_false_when_file_missing(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.xml"
+        source.write_text(_SOURCE_XML)
+        missing = temp_dir / "nonexistent.xml"
+
+        assert manager.check_xml_guiconfig_synced(source, missing) is False
+
+    def test_check_xml_guiconfig_synced_returns_true_when_all_match(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.xml"
+        target = temp_dir / "config.xml"
+        # Source and target both have DarkMode enable="yes" darkTitleBar="yes"
+        matching_xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            "<NotepadPlus>\n"
+            "    <GUIConfigs>\n"
+            '        <GUIConfig name="DarkMode" enable="yes" darkTitleBar="yes" />\n'
+            "    </GUIConfigs>\n"
+            "</NotepadPlus>\n"
+        )
+        source.write_text(_SOURCE_XML)
+        target.write_text(matching_xml)
+
+        assert manager.check_xml_guiconfig_synced(source, target) is True
+
+    def test_check_xml_guiconfig_synced_returns_false_when_attr_differs(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.xml"
+        target = temp_dir / "config.xml"
+        source.write_text(_SOURCE_XML)
+        target.write_text(_TARGET_XML)  # has enable="no", missing darkTitleBar
+
+        assert manager.check_xml_guiconfig_synced(source, target) is False
+
+    def test_install_xml_guiconfig_file_returns_error_when_source_missing(
+        self, temp_dir
+    ):
+        manager = ConfigManager()
+        source = temp_dir / "missing_source.xml"
+        target = temp_dir / "config.xml"
+        target.write_text(_TARGET_XML)
+
+        result, message, _ = manager.install_xml_guiconfig_file(source, target)
+
+        assert result == OperationResult.ERROR
+
+    def test_install_xml_guiconfig_file_returns_error_when_target_missing(
+        self, temp_dir
+    ):
+        manager = ConfigManager()
+        source = temp_dir / "source.xml"
+        target = temp_dir / "missing_config.xml"
+        source.write_text(_SOURCE_XML)
+
+        result, message, _ = manager.install_xml_guiconfig_file(source, target)
+
+        assert result == OperationResult.ERROR
+
+    def test_install_xml_guiconfig_file_updates_existing_element(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.xml"
+        target = temp_dir / "config.xml"
+        source.write_text(_SOURCE_XML)
+        target.write_text(_TARGET_XML)
+
+        result, message, _ = manager.install_xml_guiconfig_file(source, target)
+
+        assert result == OperationResult.UPDATED
+        content = target.read_text()
+        assert 'enable="yes"' in content
+        assert 'darkTitleBar="yes"' in content
+
+    def test_install_xml_guiconfig_file_appends_new_element(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.xml"
+        target = temp_dir / "config.xml"
+        source.write_text(_SOURCE_XML)
+        # Target has no DarkMode element at all
+        target.write_text(
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            "<NotepadPlus>\n"
+            "    <GUIConfigs>\n"
+            '        <GUIConfig name="ScintillaViewsSplitter" vertical="yes" />\n'
+            "    </GUIConfigs>\n"
+            "</NotepadPlus>\n"
+        )
+
+        result, message, _ = manager.install_xml_guiconfig_file(source, target)
+
+        assert result == OperationResult.UPDATED
+        content = target.read_text()
+        assert 'name="DarkMode"' in content
+        assert 'enable="yes"' in content
+
+    def test_install_xml_guiconfig_file_returns_already_synced(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.xml"
+        target = temp_dir / "config.xml"
+        source.write_text(_SOURCE_XML)
+        # Target already matches source exactly
+        matching_xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            "<NotepadPlus>\n"
+            "    <GUIConfigs>\n"
+            '        <GUIConfig name="DarkMode" enable="yes" darkTitleBar="yes" />\n'
+            "    </GUIConfigs>\n"
+            "</NotepadPlus>\n"
+        )
+        target.write_text(matching_xml)
+
+        result, message, _ = manager.install_xml_guiconfig_file(source, target)
+
+        assert result == OperationResult.ALREADY_SYNCED
+
+    def test_install_xml_guiconfig_file_dry_run(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.xml"
+        target = temp_dir / "config.xml"
+        source.write_text(_SOURCE_XML)
+        target.write_text(_TARGET_XML)
+        original_content = _TARGET_XML
+
+        result, message, _ = manager.install_xml_guiconfig_file(
+            source, target, dry_run=True
+        )
+
+        assert result == OperationResult.UPDATED
+        assert target.read_text() == original_content
+
+    def test_install_xml_guiconfig_file_creates_backup(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.xml"
+        target = temp_dir / "config.xml"
+        source.write_text(_SOURCE_XML)
+        target.write_text(_TARGET_XML)
+
+        manager.install_xml_guiconfig_file(source, target)
+
+        backups = list(temp_dir.glob("config.xml.shell-configs-backup.*"))
+        assert len(backups) >= 1
+
+    def test_uninstall_xml_guiconfig_file_removes_elements(self, temp_dir):
+        manager = ConfigManager()
+        source = temp_dir / "source.xml"
+        target = temp_dir / "config.xml"
+        source.write_text(_SOURCE_XML)
+        target.write_text(_TARGET_XML)
+
+        # First install to get managed elements into the target
+        manager.install_xml_guiconfig_file(source, target)
+        assert 'name="DarkMode"' in target.read_text()
+
+        # Now uninstall — managed elements should be removed
+        result, message = manager.uninstall_xml_guiconfig_file(source, target)
+
+        assert result == OperationResult.REMOVED
+        assert 'name="DarkMode"' not in target.read_text()
+
+    def test_uninstall_xml_guiconfig_file_returns_not_found_when_file_missing(
+        self, temp_dir
+    ):
+        manager = ConfigManager()
+        source = temp_dir / "source.xml"
+        target = temp_dir / "missing_config.xml"
+        source.write_text(_SOURCE_XML)
+
+        result, message = manager.uninstall_xml_guiconfig_file(source, target)
+
+        assert result == OperationResult.NOT_FOUND
