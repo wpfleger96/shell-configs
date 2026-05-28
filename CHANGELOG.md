@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v0.47.3 (2026-05-28)
+
+### Bug Fixes
+
+- **release**: Include uv.lock in semantic-release commit
+  ([#57](https://github.com/wpfleger96/shell-configs/pull/57),
+  [`75eeaac`](https://github.com/wpfleger96/shell-configs/commit/75eeaac8dacf8cd212ee30d0c253fe0bfe39cd44))
+
+
 ## v0.47.2 (2026-05-27)
 
 ### Bug Fixes
