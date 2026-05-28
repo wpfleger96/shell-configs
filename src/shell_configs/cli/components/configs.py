@@ -12,19 +12,48 @@ class ConfigsComponent(Component):
     def plan(self, ctx: Context) -> ConfigsPlan:
         from shell_configs.bootstrap import load_auto_update_config
         from shell_configs.cli.helpers import _compute_diffs_for_shells
-        from shell_configs.manager import ConfigManager
+        from shell_configs.manager import (
+            AdditionalFileManifest,
+            ConfigManager,
+            get_default_additional_manifest_path,
+        )
 
         auto_update_config = load_auto_update_config()
         manager = ConfigManager(backup_retention=auto_update_config.backup_retention)
         diffs = _compute_diffs_for_shells(ctx, manager)
-        return ConfigsPlan(has_changes=bool(diffs), diffs=diffs)
+
+        additional_manifest = AdditionalFileManifest(
+            get_default_additional_manifest_path()
+        )
+        if additional_manifest.is_new:
+            orphaned_additional_files: list[str] = []
+        else:
+            current_targets = {
+                str(af.target_path)
+                for shell in ctx.selected_shells
+                for af in shell.get_additional_files()
+            }
+            orphaned_additional_files = additional_manifest.find_orphans(
+                current_targets
+            )
+
+        return ConfigsPlan(
+            has_changes=bool(diffs) or bool(orphaned_additional_files),
+            diffs=diffs,
+            orphaned_additional_files=orphaned_additional_files,
+        )
 
     def display_plan(self, plan: ComponentPlan) -> None:
         from shell_configs.cli.helpers import _render_diffs
+        from shell_configs.display import console, print_section
 
         if not isinstance(plan, ConfigsPlan):
             raise TypeError(f"expected ConfigsPlan, got {type(plan).__name__}")
         _render_diffs(plan.diffs)
+        if plan.orphaned_additional_files:
+            print_section("Orphaned Additional Files")
+            for path_str in plan.orphaned_additional_files:
+                console.print(f"  {path_str}: [red]orphaned (source removed)[/red]")
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
         if not isinstance(plan, ConfigsPlan):
@@ -83,9 +112,25 @@ class ConfigsComponent(Component):
                     print_diff(diff_text)
                 results[shell.name] = result
 
+        from shell_configs.manager import (
+            AdditionalFileManifest,
+            get_default_additional_manifest_path,
+        )
+
+        additional_manifest = AdditionalFileManifest(
+            get_default_additional_manifest_path()
+        )
+        is_first_manifest_run = additional_manifest.is_new
+
         for shell in ctx.selected_shells:
             additional_files = shell.get_additional_files()
             for additional_file in additional_files:
+                is_merge_mode = bool(
+                    additional_file.xml_guiconfig_merge
+                    or additional_file.ini_merge
+                    or additional_file.comment_prefix
+                    or additional_file.target_merge
+                )
                 if additional_file.xml_guiconfig_merge:
                     result, message, diff_text = manager.install_xml_guiconfig_file(
                         additional_file.source_path,
@@ -162,6 +207,37 @@ class ConfigsComponent(Component):
                 if diff_text and result == OperationResult.UPDATED:
                     print_diff(diff_text)
                 additional_file_results[str(additional_file.target_path)] = result
+                if not ctx.dry_run and result not in (
+                    OperationResult.NOT_FOUND,
+                    OperationResult.ERROR,
+                ):
+                    additional_manifest.record_install(
+                        str(additional_file.target_path),
+                        shell.name,
+                        owned_file=not is_merge_mode,
+                    )
+
+        if not is_first_manifest_run and not ctx.dry_run:
+            from pathlib import Path
+
+            for target_str in plan.orphaned_additional_files:
+                entry = additional_manifest.files.get(target_str)
+                if entry and entry.owned_file:
+                    orphan_result, orphan_msg = manager.uninstall_additional_file(
+                        Path(target_str)
+                    )
+                    if orphan_result != OperationResult.NOT_FOUND:
+                        print_operation_result(orphan_result, orphan_msg)
+                    # Only remove the manifest entry when the file was actually gone or
+                    # successfully deleted; keep it if uninstall failed so the orphan
+                    # is re-detected on the next run.
+                    if orphan_result in (
+                        OperationResult.REMOVED,
+                        OperationResult.NOT_FOUND,
+                    ):
+                        additional_manifest.remove(target_str)
+                # Non-owned (merge-mode) orphans: keep the manifest entry — we lack
+                # enough context here to invoke the correct uninstall_* method.
 
         preferences_results: dict[str, OperationResult] = {}
         for shell in ctx.selected_shells:
@@ -213,6 +289,9 @@ class ConfigsComponent(Component):
                     active_profile=ctx.profile_name,
                 )
             )
+
+        if not ctx.dry_run:
+            additional_manifest.save()
 
         return True
 
@@ -373,6 +452,31 @@ class ConfigsComponent(Component):
                     add_additional_file_row(table, path_display, status_str)
 
         console.print(table)
+
+        from shell_configs.manager import (
+            AdditionalFileManifest,
+            get_default_additional_manifest_path,
+        )
+
+        additional_manifest = AdditionalFileManifest(
+            get_default_additional_manifest_path()
+        )
+        if not additional_manifest.is_new:
+            from shell_configs.display import print_warning
+
+            current_targets = {
+                str(af.target_path)
+                for shell in ctx.selected_shells
+                for af in shell.get_additional_files()
+            }
+            orphaned = additional_manifest.find_orphans(current_targets)
+            if orphaned:
+                print_warning(
+                    f"{len(orphaned)} orphaned additional file(s) no longer in config"
+                    " — run 'shell-configs install' to clean up",
+                    indent=2,
+                )
+
         console.print()
 
     def uninstall(self, ctx: Context) -> None:

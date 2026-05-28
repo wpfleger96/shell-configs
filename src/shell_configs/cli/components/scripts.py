@@ -10,10 +10,12 @@ class ScriptsComponent(Component):
     display_name = "Scripts"
 
     def plan(self, ctx: Context) -> ScriptsPlan:
+        from shell_configs.platform import detect_platform
         from shell_configs.script_manager import (
             ScriptManifest,
             ScriptStatus,
             discover_scripts,
+            find_orphaned_scripts,
             get_default_manifest_path,
             get_default_target_dir,
             get_script_status,
@@ -21,12 +23,21 @@ class ScriptsComponent(Component):
 
         target_dir = get_default_target_dir()
         manifest = ScriptManifest(get_default_manifest_path())
+        # Use include_all=True when computing orphans so platform-filtered scripts
+        # (e.g. macOS-only on WSL) aren't false-flagged as orphaned. Derive the
+        # current-platform subset from the same list to avoid a second directory walk.
+        all_scripts = discover_scripts(include_all=True)
+        current_platform = detect_platform()
         entries = [
             (entry, get_script_status(entry, target_dir, manifest))
-            for entry in discover_scripts()
+            for entry in all_scripts
+            if current_platform in entry.platforms
         ]
-        has_changes = any(status != ScriptStatus.INSTALLED for _, status in entries)
-        return ScriptsPlan(has_changes=has_changes, entries=entries)
+        orphaned = find_orphaned_scripts(manifest, all_scripts)
+        has_changes = any(
+            status != ScriptStatus.INSTALLED for _, status in entries
+        ) or bool(orphaned)
+        return ScriptsPlan(has_changes=has_changes, entries=entries, orphaned=orphaned)
 
     def display_plan(self, plan: ComponentPlan) -> None:
         if not isinstance(plan, ScriptsPlan):
@@ -50,6 +61,10 @@ class ScriptsComponent(Component):
             if st != ScriptStatus.INSTALLED:
                 label = status_labels.get(st, st.value)
                 console.print(f"  {target_dir / entry.name}: {label}")
+        for name in plan.orphaned:
+            console.print(
+                f"  {target_dir / name}: [red]orphaned (source removed)[/red]"
+            )
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
         if not isinstance(plan, ScriptsPlan):
@@ -61,9 +76,11 @@ class ScriptsComponent(Component):
             InstallResult,
             ScriptManifest,
             ScriptStatus,
+            UninstallResult,
             get_default_manifest_path,
             get_default_target_dir,
             install_script,
+            uninstall_script,
         )
 
         target_dir = get_default_target_dir()
@@ -81,6 +98,23 @@ class ScriptsComponent(Component):
                 InstallResult.SKIPPED_PLATFORM,
             ):
                 success = False
+
+        for name in plan.orphaned:
+            uninstall_result, uninstall_msg = uninstall_script(
+                name, target_dir, manifest, force=False
+            )
+            if uninstall_result == UninstallResult.MODIFIED:
+                from shell_configs.display import print_warning
+
+                print_warning(
+                    f"Orphaned script was modified by user, skipping: {uninstall_msg}"
+                )
+            elif uninstall_result not in (
+                UninstallResult.REMOVED,
+                UninstallResult.NOT_FOUND,
+            ):
+                success = False
+
         return success
 
     def install(self, ctx: Context) -> bool:
@@ -97,10 +131,13 @@ class ScriptsComponent(Component):
         from shell_configs.script_manager import (
             InstallResult,
             ScriptManifest,
+            UninstallResult,
             discover_scripts,
+            find_orphaned_scripts,
             get_default_manifest_path,
             get_default_target_dir,
             install_script,
+            uninstall_script,
         )
 
         console.print()
@@ -131,6 +168,21 @@ class ScriptsComponent(Component):
                 else:
                     print_error(msg)
 
+        all_scripts = discover_scripts(include_all=True)
+        orphaned = find_orphaned_scripts(manifest, all_scripts)
+        for name in orphaned:
+            uninstall_result, msg = uninstall_script(
+                name, target_dir, manifest, force=False, dry_run=ctx.dry_run
+            )
+            if uninstall_result == UninstallResult.REMOVED:
+                print_success(f"Removed orphaned script: {msg}")
+            elif uninstall_result == UninstallResult.WOULD_REMOVE:
+                print_would(msg)
+            elif uninstall_result == UninstallResult.MODIFIED:
+                print_warning(f"Orphaned script was modified by user, skipping: {msg}")
+            elif uninstall_result != UninstallResult.NOT_FOUND:
+                print_error(msg)
+
         return True
 
     def status(self, ctx: Context) -> None:
@@ -150,16 +202,23 @@ class ScriptsComponent(Component):
 
         if total == 0:
             print_dim("No scripts available for this platform", indent=2)
-        elif installed == total:
+        elif installed == total and not plan.orphaned:
             print_success(
                 f"{installed}/{total} scripts installed (~/.local/bin)", indent=2
             )
         else:
-            print_warning(
-                f"{installed}/{total} scripts installed ({total - installed} missing)",
-                indent=2,
-            )
-            print_hint("Run 'shell-configs scripts status' for details", indent=2)
+            if installed < total:
+                print_warning(
+                    f"{installed}/{total} scripts installed ({total - installed} missing)",
+                    indent=2,
+                )
+                print_hint("Run 'shell-configs scripts status' for details", indent=2)
+            if plan.orphaned:
+                print_warning(
+                    f"{len(plan.orphaned)} orphaned script(s) in ~/.local/bin"
+                    " (source removed) — run 'shell-configs install' to clean up",
+                    indent=2,
+                )
 
         console.print()
 
