@@ -38,6 +38,7 @@ def build_context(
     config_dir: Path | None = None,
     dry_run: bool = False,
     yes: bool = False,
+    force: bool = False,
 ) -> Context | None:
     """Build a Context from common CLI parameters.
 
@@ -60,6 +61,7 @@ def build_context(
     return Context(
         dry_run=dry_run,
         yes=yes,
+        force=force,
         profile_name=profile_name,
         profile=active_profile,
         selected_shells=tuple(selected_shells),

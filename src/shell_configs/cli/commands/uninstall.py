@@ -47,6 +47,7 @@ def uninstall(shells: list[str] | None, yes: bool) -> None:
     ctx = Context(
         dry_run=False,
         yes=yes,
+        force=False,
         profile_name=None,
         profile=None,
         selected_shells=tuple(selected_shells),

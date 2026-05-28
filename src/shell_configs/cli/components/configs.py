@@ -76,6 +76,7 @@ class ConfigsComponent(Component):
                     content,
                     dry_run=ctx.dry_run,
                     shared_content=shared_content,
+                    force=ctx.force,
                 )
                 print_operation_result(result, message)
                 if diff_text and result == OperationResult.UPDATED:
@@ -90,12 +91,14 @@ class ConfigsComponent(Component):
                         additional_file.source_path,
                         additional_file.target_path,
                         dry_run=ctx.dry_run,
+                        force=ctx.force,
                     )
                 elif additional_file.ini_merge:
                     result, message, diff_text = manager.install_ini_file(
                         additional_file.source_path,
                         additional_file.target_path,
                         dry_run=ctx.dry_run,
+                        force=ctx.force,
                     )
                 elif additional_file.comment_prefix:
                     content = additional_file.source_path.read_text()
@@ -104,6 +107,7 @@ class ConfigsComponent(Component):
                         content,
                         dry_run=ctx.dry_run,
                         comment_prefix=additional_file.comment_prefix,
+                        force=ctx.force,
                     )
                 elif additional_file.target_merge:
                     from shell_configs.shells.base import merge_json_into_target
@@ -112,7 +116,7 @@ class ConfigsComponent(Component):
                         additional_file.source_path,
                         additional_file.target_path,
                     )
-                    if is_synced:
+                    if is_synced and not ctx.force:
                         result = OperationResult.ALREADY_SYNCED
                         message = f"Already synced: {additional_file.target_path}"
                         diff_text = None
@@ -123,6 +127,7 @@ class ConfigsComponent(Component):
                                 additional_file.target_path,
                                 dry_run=ctx.dry_run,
                                 backup_dir=additional_file.backup_dir,
+                                force=ctx.force,
                             )
                         )
                 elif additional_file.base_source_path:
@@ -142,6 +147,7 @@ class ConfigsComponent(Component):
                             additional_file.target_path,
                             dry_run=ctx.dry_run,
                             backup_dir=additional_file.backup_dir,
+                            force=ctx.force,
                         )
                     )
                 else:
@@ -150,6 +156,7 @@ class ConfigsComponent(Component):
                         additional_file.target_path,
                         dry_run=ctx.dry_run,
                         backup_dir=additional_file.backup_dir,
+                        force=ctx.force,
                     )
                 print_operation_result(result, message)
                 if diff_text and result == OperationResult.UPDATED:
@@ -165,6 +172,7 @@ class ConfigsComponent(Component):
                     pref_file.domain,
                     dry_run=ctx.dry_run,
                     app_name=pref_file.app_name,
+                    force=ctx.force,
                 )
                 print_operation_result(result, message)
                 if diff_text and result == OperationResult.UPDATED:

@@ -46,7 +46,12 @@ def install(
     from shell_configs.display import print_info, print_warning
 
     ctx = build_context(
-        profile_name, shells, config_dir=config_dir, dry_run=dry_run, yes=yes
+        profile_name,
+        shells,
+        config_dir=config_dir,
+        dry_run=dry_run,
+        yes=yes,
+        force=force,
     )
     if ctx is None:
         print_warning("No shells to install")

@@ -298,6 +298,7 @@ class ConfigManager:
         dry_run: bool = False,
         shared_content: str | None = None,
         comment_prefix: str = "#",
+        force: bool = False,
     ) -> tuple[OperationResult, str, str | None]:
         """Install or update a managed section in a config file.
 
@@ -316,8 +317,12 @@ class ConfigManager:
 
             existing_section = self.extract_managed_section(config_file, comment_prefix)
 
-            if existing_section and self.managed_content_matches(
-                existing_section.content, final_content
+            if (
+                not force
+                and existing_section
+                and self.managed_content_matches(
+                    existing_section.content, final_content
+                )
             ):
                 return (
                     OperationResult.ALREADY_SYNCED,
@@ -648,6 +653,7 @@ class ConfigManager:
         target_path: Path,
         dry_run: bool = False,
         backup_dir: Path | None = None,
+        force: bool = False,
     ) -> tuple[OperationResult, str, str | None]:
         """Install or update an additional file.
 
@@ -674,7 +680,7 @@ class ConfigManager:
                 None,
             )
         return self.install_additional_file_from_content(
-            content, target_path, dry_run=dry_run, backup_dir=backup_dir
+            content, target_path, dry_run=dry_run, backup_dir=backup_dir, force=force
         )
 
     def install_additional_file_from_content(
@@ -683,6 +689,7 @@ class ConfigManager:
         target_path: Path,
         dry_run: bool = False,
         backup_dir: Path | None = None,
+        force: bool = False,
     ) -> tuple[OperationResult, str, str | None]:
         """Install or update an additional file from pre-computed content.
 
@@ -697,7 +704,11 @@ class ConfigManager:
             Tuple of (result, message, diff_text)
         """
         try:
-            if target_path.exists() and self.content_matches(content, target_path):
+            if (
+                not force
+                and target_path.exists()
+                and self.content_matches(content, target_path)
+            ):
                 return (
                     OperationResult.ALREADY_SYNCED,
                     f"{target_path} is already synced",
@@ -1005,6 +1016,7 @@ class ConfigManager:
         source_path: Path,
         config_file: Path,
         dry_run: bool = False,
+        force: bool = False,
     ) -> tuple[OperationResult, str, str | None]:
         try:
             managed_keys = self._managed_keys_from_source(source_path)
@@ -1063,7 +1075,7 @@ class ConfigManager:
             file_existed = config_file.exists()
             new_sidecar_data = [[s, k] for s, k, _ in managed_keys]
 
-            if already_synced:
+            if already_synced and not force:
                 if not old_sidecar_path.exists():
                     self._atomic_write(
                         old_sidecar_path, json.dumps(new_sidecar_data) + "\n"
@@ -1279,6 +1291,7 @@ class ConfigManager:
         source_path: Path,
         config_file: Path,
         dry_run: bool = False,
+        force: bool = False,
     ) -> tuple[OperationResult, str, str | None]:
         """Merge managed GUIConfig elements into an existing Notepad++ config.xml.
 
@@ -1300,7 +1313,7 @@ class ConfigManager:
                     None,
                 )
 
-            if self.check_xml_guiconfig_synced(source_path, config_file):
+            if not force and self.check_xml_guiconfig_synced(source_path, config_file):
                 return (
                     OperationResult.ALREADY_SYNCED,
                     f"{config_file} is already synced",
@@ -1543,6 +1556,7 @@ class ConfigManager:
         domain: str,
         dry_run: bool = False,
         app_name: str | None = None,
+        force: bool = False,
     ) -> tuple[OperationResult, str, str | None]:
         """Install preferences from a JSON file into a macOS defaults domain.
 
@@ -1588,7 +1602,7 @@ class ConfigManager:
                     domain_data.get(key) == value
                     for key, value in managed_prefs.items()
                 )
-                if all_match:
+                if all_match and not force:
                     return (
                         OperationResult.ALREADY_SYNCED,
                         f"{domain} preferences are already synced",
