@@ -1,7 +1,5 @@
 # CHANGELOG
 
-<!-- version list -->
-
 ## v0.49.0 (2026-05-28)
 
 ### Features
