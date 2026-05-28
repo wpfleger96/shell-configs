@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v0.49.0 (2026-05-28)
+
+### Features
+
+- Detect and clean up orphaned installed files
+  ([#59](https://github.com/wpfleger96/shell-configs/pull/59),
+  [`319457a`](https://github.com/wpfleger96/shell-configs/commit/319457ab6b1a84154f8bc9b9dfd4b5787bf29493))
+
+
 ## v0.48.0 (2026-05-28)
 
 ### Bug Fixes
