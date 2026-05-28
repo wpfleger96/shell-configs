@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 class Context:
     dry_run: bool
     yes: bool
+    force: bool
     profile_name: str | None
     profile: Profile | None
     selected_shells: tuple[Shell, ...]

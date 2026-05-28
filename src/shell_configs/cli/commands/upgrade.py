@@ -132,8 +132,8 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
 
         shell_configs_bin = shutil.which("shell-configs")
         if shell_configs_bin:
-            subprocess.run([shell_configs_bin, "install", "--yes"])
+            subprocess.run([shell_configs_bin, "install", "--yes", "--force"])
         else:
             from shell_configs.cli.commands.install import install
 
-            ctx.invoke(install, yes=True)
+            ctx.invoke(install, yes=True, force=True)

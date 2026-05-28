@@ -56,6 +56,32 @@ class TestInstallCommand:
         bashrc = mock_home / ".bashrc"
         assert not bashrc.exists()
 
+    def test_install_force_reapplies_when_in_sync(
+        self, test_repo, mock_home, cli_runner, monkeypatch
+    ):
+        monkeypatch.chdir(test_repo)
+
+        from shell_configs.cli.components.configs import ConfigsComponent
+
+        # Use only ConfigsComponent so we can reach a fully-synced state
+        monkeypatch.setattr(
+            "shell_configs.cli.components.INSTALL_COMPONENTS",
+            [ConfigsComponent()],
+        )
+
+        cli_runner.invoke(cli, ["install", "-y"])
+
+        # Second install: configs synced → install exits early with this exact message
+        result = cli_runner.invoke(cli, ["install", "-y"])
+        assert result.exit_code == 0
+        assert "Everything is already in sync" in result.output
+
+        # With --force: install should NOT exit early; applies all components
+        result = cli_runner.invoke(cli, ["install", "-y", "--force"])
+        assert result.exit_code == 0
+        assert "Everything is already in sync" not in result.output
+        assert "Force mode: re-applying all components" in result.output
+
 
 @pytest.mark.integration
 @pytest.mark.cli

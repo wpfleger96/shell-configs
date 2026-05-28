@@ -24,6 +24,9 @@ from shell_configs.cli.helpers import (
 )
 @click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
 @click.option(
+    "--force", is_flag=True, help="Force apply all components even if already in sync"
+)
+@click.option(
     "--config-dir",
     type=click.Path(exists=True, path_type=Path),
     hidden=True,
@@ -34,6 +37,7 @@ def install(
     shells: list[str] | None,
     dry_run: bool,
     yes: bool,
+    force: bool,
     config_dir: Path | None,
     profile_name: str | None,
 ) -> None:
@@ -42,7 +46,12 @@ def install(
     from shell_configs.display import print_info, print_warning
 
     ctx = build_context(
-        profile_name, shells, config_dir=config_dir, dry_run=dry_run, yes=yes
+        profile_name,
+        shells,
+        config_dir=config_dir,
+        dry_run=dry_run,
+        yes=yes,
+        force=force,
     )
     if ctx is None:
         print_warning("No shells to install")
@@ -57,9 +66,12 @@ def install(
             has_changes = True
             component.display_plan(plan)
 
-    if not has_changes:
+    if not has_changes and not force:
         print_info("Everything is already in sync")
         return
+
+    if not has_changes and force:
+        print_info("Force mode: re-applying all components")
 
     if not ctx.yes and not ctx.dry_run:
         if not click.confirm("Apply all changes?"):
@@ -98,25 +110,27 @@ def install(
         else:
             parallel_comps.append(comp)
 
-    if required_pkg and plans[required_pkg].has_changes:
+    if required_pkg and (plans[required_pkg].has_changes or force):
         required_pkg.apply(ctx, plans[required_pkg])
 
-    if languages_comp and plans[languages_comp].has_changes:
+    if languages_comp and (plans[languages_comp].has_changes or force):
         languages_comp.apply(ctx, plans[languages_comp])
 
-    if agents_comp and plans[agents_comp].has_changes:
+    if agents_comp and (plans[agents_comp].has_changes or force):
         agents_comp.apply(ctx, plans[agents_comp])
 
-    parallel_plans = {c: plans[c] for c in parallel_comps if plans[c].has_changes}
+    parallel_plans = {
+        c: plans[c] for c in parallel_comps if plans[c].has_changes or force
+    }
     if parallel_plans:
         run_components_parallel(
             list(parallel_plans.keys()), "apply", ctx, plans=parallel_plans
         )
 
     # gh auth state is mutated by these components; run sequentially to avoid races
-    if gh_auth_comp and plans[gh_auth_comp].has_changes:
+    if gh_auth_comp and (plans[gh_auth_comp].has_changes or force):
         gh_auth_comp.apply(ctx, plans[gh_auth_comp])
-    if signing_comp and plans[signing_comp].has_changes:
+    if signing_comp and (plans[signing_comp].has_changes or force):
         signing_comp.apply(ctx, plans[signing_comp])
-    if gh_ext_comp and plans[gh_ext_comp].has_changes:
+    if gh_ext_comp and (plans[gh_ext_comp].has_changes or force):
         gh_ext_comp.apply(ctx, plans[gh_ext_comp])
