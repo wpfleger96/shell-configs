@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v0.48.0 (2026-05-28)
+
+### Bug Fixes
+
+- **install**: Propagate --force through ConfigManager to re-write synced files
+  ([#58](https://github.com/wpfleger96/shell-configs/pull/58),
+  [`1088297`](https://github.com/wpfleger96/shell-configs/commit/1088297e52d3415d571e89c4fbc8f56382b5bad8))
+
+- **install**: Skip target_merge re-write when semantically synced under --force
+  ([#58](https://github.com/wpfleger96/shell-configs/pull/58),
+  [`1088297`](https://github.com/wpfleger96/shell-configs/commit/1088297e52d3415d571e89c4fbc8f56382b5bad8))
+
+### Features
+
+- **install**: Add --force flag to bypass change detection
+  ([#58](https://github.com/wpfleger96/shell-configs/pull/58),
+  [`1088297`](https://github.com/wpfleger96/shell-configs/commit/1088297e52d3415d571e89c4fbc8f56382b5bad8))
+
+
 ## v0.47.3 (2026-05-28)
 
 ### Bug Fixes
