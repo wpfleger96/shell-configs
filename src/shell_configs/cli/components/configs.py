@@ -116,7 +116,7 @@ class ConfigsComponent(Component):
                         additional_file.source_path,
                         additional_file.target_path,
                     )
-                    if is_synced and not ctx.force:
+                    if is_synced:
                         result = OperationResult.ALREADY_SYNCED
                         message = f"Already synced: {additional_file.target_path}"
                         diff_text = None
