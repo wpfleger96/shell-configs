@@ -58,6 +58,7 @@ class FileDiff:
 @dataclass
 class ConfigsPlan(ComponentPlan):
     diffs: list[FileDiff] = field(default_factory=list)
+    orphaned_additional_files: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -103,6 +104,7 @@ class GhExtensionsPlan(ComponentPlan):
 @dataclass
 class ScriptsPlan(ComponentPlan):
     entries: list[tuple[DiscoveredScript, ScriptStatus]] = field(default_factory=list)
+    orphaned: list[str] = field(default_factory=list)
 
 
 @dataclass

@@ -373,3 +373,17 @@ def uninstall_script(
     manifest.remove(name)
     manifest.save()
     return UninstallResult.REMOVED, f"{name}: removed"
+
+
+def find_orphaned_scripts(
+    manifest: ScriptManifest,
+    current_scripts: list[DiscoveredScript],
+) -> list[str]:
+    """Return manifest entries that no longer correspond to any discovered script.
+
+    Uses include_all=True semantics — callers should pass all scripts regardless
+    of platform so that platform-filtered scripts (e.g. macOS-only on WSL) are
+    not incorrectly flagged as orphans.
+    """
+    current_names = {s.name for s in current_scripts}
+    return sorted(name for name in manifest.scripts if name not in current_names)

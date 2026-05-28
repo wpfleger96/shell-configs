@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from shell_configs.manager import ConfigManager, OperationResult
+from shell_configs.manager import AdditionalFileManifest, ConfigManager, OperationResult
 
 
 @pytest.mark.unit
@@ -919,3 +919,102 @@ class TestXmlGuiconfigMerge:
         result, message = manager.uninstall_xml_guiconfig_file(source, target)
 
         assert result == OperationResult.NOT_FOUND
+
+
+@pytest.mark.unit
+class TestAdditionalFileManifest:
+    def test_is_new_when_file_does_not_exist(self, temp_dir):
+        manifest = AdditionalFileManifest(temp_dir / "manifest.json")
+        assert manifest.is_new is True
+
+    def test_is_not_new_when_file_exists(self, temp_dir):
+        path = temp_dir / "manifest.json"
+        path.write_text('{"version": 1, "files": {}}')
+        manifest = AdditionalFileManifest(path)
+        assert manifest.is_new is False
+
+    def test_save_and_reload_roundtrip(self, temp_dir):
+        path = temp_dir / "manifest.json"
+        manifest = AdditionalFileManifest(path)
+        manifest.record_install(
+            "/home/user/.bash/git-prompt.sh", "bash", owned_file=True
+        )
+        manifest.record_install(
+            "/home/user/.config/mimeapps.list", "xdg", owned_file=False
+        )
+        manifest.save()
+
+        loaded = AdditionalFileManifest(path)
+        assert "/home/user/.bash/git-prompt.sh" in loaded.files
+        assert loaded.files["/home/user/.bash/git-prompt.sh"].shell_name == "bash"
+        assert loaded.files["/home/user/.bash/git-prompt.sh"].owned_file is True
+        assert "/home/user/.config/mimeapps.list" in loaded.files
+        assert loaded.files["/home/user/.config/mimeapps.list"].owned_file is False
+
+    def test_find_orphans_no_orphans(self, temp_dir):
+        path = temp_dir / "manifest.json"
+        manifest = AdditionalFileManifest(path)
+        manifest.record_install("/home/user/.bash/git-prompt.sh", "bash")
+        manifest.record_install("/home/user/.config/git/ignore", "git")
+        manifest.save()
+
+        loaded = AdditionalFileManifest(path)
+        current = {"/home/user/.bash/git-prompt.sh", "/home/user/.config/git/ignore"}
+        assert loaded.find_orphans(current) == []
+
+    def test_find_orphans_detects_removed_entry(self, temp_dir):
+        path = temp_dir / "manifest.json"
+        manifest = AdditionalFileManifest(path)
+        manifest.record_install("/home/user/.bash/git-prompt.sh", "bash")
+        manifest.record_install("/home/user/.bash/old-script.sh", "bash")
+        manifest.record_install("/home/user/.config/git/ignore", "git")
+        manifest.save()
+
+        loaded = AdditionalFileManifest(path)
+        current = {"/home/user/.bash/git-prompt.sh", "/home/user/.config/git/ignore"}
+        assert loaded.find_orphans(current) == ["/home/user/.bash/old-script.sh"]
+
+    def test_find_orphans_returns_sorted(self, temp_dir):
+        path = temp_dir / "manifest.json"
+        manifest = AdditionalFileManifest(path)
+        manifest.record_install("/z/file", "bash")
+        manifest.record_install("/a/file", "bash")
+        manifest.record_install("/m/file", "bash")
+        manifest.save()
+
+        loaded = AdditionalFileManifest(path)
+        assert loaded.find_orphans(set()) == ["/a/file", "/m/file", "/z/file"]
+
+    def test_find_orphans_empty_current_set_returns_all(self, temp_dir):
+        path = temp_dir / "manifest.json"
+        manifest = AdditionalFileManifest(path)
+        manifest.record_install("/home/user/.bash/git-prompt.sh", "bash")
+        manifest.record_install("/home/user/.config/git/ignore", "git")
+        manifest.save()
+
+        loaded = AdditionalFileManifest(path)
+        orphans = loaded.find_orphans(set())
+        assert len(orphans) == 2
+
+    def test_remove_entry(self, temp_dir):
+        path = temp_dir / "manifest.json"
+        manifest = AdditionalFileManifest(path)
+        manifest.record_install("/home/user/.bash/git-prompt.sh", "bash")
+        manifest.record_install("/home/user/.config/git/ignore", "git")
+        manifest.remove("/home/user/.bash/git-prompt.sh")
+
+        assert "/home/user/.bash/git-prompt.sh" not in manifest.files
+        assert "/home/user/.config/git/ignore" in manifest.files
+
+    def test_owned_file_defaults_to_true(self, temp_dir):
+        path = temp_dir / "manifest.json"
+        manifest = AdditionalFileManifest(path)
+        manifest.record_install("/home/user/.bash/git-prompt.sh", "bash")
+        assert manifest.files["/home/user/.bash/git-prompt.sh"].owned_file is True
+
+    def test_corrupt_manifest_loads_empty(self, temp_dir):
+        path = temp_dir / "manifest.json"
+        path.write_text("not valid json {{{")
+        manifest = AdditionalFileManifest(path)
+        assert manifest.files == {}
+        assert manifest.is_new is False  # file existed, just corrupt
