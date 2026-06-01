@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [0.49.1](https://github.com/wpfleger96/shell-configs/compare/v0.49.0...v0.49.1) (2026-06-01)
+
+
+### Bug Fixes
+
+* **editor:** trust all JSON schema download URLs ([86cadaa](https://github.com/wpfleger96/shell-configs/commit/86cadaaad4b204582972f7e2bba77fee2daf5928))
+
+
+### Continuous Integration
+
+* migrate to release-please ([#60](https://github.com/wpfleger96/shell-configs/issues/60)) ([b57bcf7](https://github.com/wpfleger96/shell-configs/commit/b57bcf79afb78ffdd8cb36bbfd7b7564a6b257c6))
+* sync CI workflow ([13ac1ec](https://github.com/wpfleger96/shell-configs/commit/13ac1ec46025da98e76e465c2324570b7ec544d9))
+* sync release workflow ([4cd5770](https://github.com/wpfleger96/shell-configs/commit/4cd57703243c2238983d28f77f91afafdc7cc171))
+* sync release workflow ([cec2e1e](https://github.com/wpfleger96/shell-configs/commit/cec2e1e35ee76638615111dc51bdffd075240bc4))
+* sync release workflow ([1f781d4](https://github.com/wpfleger96/shell-configs/commit/1f781d46e5fb11981d2f7ce3cfdebe986075f4c5))
+* sync release workflow ([792e9b4](https://github.com/wpfleger96/shell-configs/commit/792e9b403e9ed2858af6145cbeac9d2027f67e42))
+
 ## v0.49.0 (2026-05-28)
 
 ### Features
