@@ -33,6 +33,10 @@
         "**/.pytest_cache": true
     },
     "go.toolsManagement.autoUpdate": true,
+    "json.schemaDownload.enable": true,
+    "json.schemaDownload.trustedDomains": {
+        "*": true
+    },
     "liveshare.anonymousGuestApproval": "reject",
     "liveshare.guestApprovalRequired": true,
     "liveshare.shareExternalFiles": false,
