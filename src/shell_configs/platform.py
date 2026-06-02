@@ -1,6 +1,7 @@
 """Platform detection and abstraction."""
 
-import platform
+import os
+import platform as _platform
 
 from enum import Enum
 from functools import lru_cache
@@ -10,52 +11,44 @@ class Platform(Enum):
     """Supported platforms."""
 
     MACOS = "macos"
-    WSL = "wsl"
     LINUX = "linux"
+    WINDOWS = "windows"
+    WSL = "wsl"
 
     @property
     def display_name(self) -> str:
-        """Human-readable platform name."""
         mapping = {
             Platform.MACOS: "macOS",
-            Platform.WSL: "WSL",
             Platform.LINUX: "Linux",
+            Platform.WINDOWS: "Windows",
+            Platform.WSL: "WSL",
         }
         return mapping[self]
+
+    @property
+    def is_unix_like(self) -> bool:
+        return self in (Platform.MACOS, Platform.LINUX, Platform.WSL)
 
 
 @lru_cache(maxsize=1)
 def detect_platform() -> Platform:
-    """Detect the current platform (cached).
-
-    Returns:
-        Platform enum value
-    """
-    system = platform.system().lower()
+    system = _platform.system().lower()
 
     if system == "darwin":
         return Platform.MACOS
 
-    if system == "linux":
-        try:
-            with open("/proc/version") as f:
-                version_info = f.read().lower()
-                if "microsoft" in version_info or "wsl" in version_info:
-                    return Platform.WSL
-        except OSError:
-            pass
-        return Platform.LINUX
-
     if system == "windows":
-        raise SystemExit(
-            "shell-configs is designed for Unix-like environments (macOS, Linux, WSL).\n"
-            "Native Windows is not supported. Use WSL instead:\n"
-            "  https://learn.microsoft.com/en-us/windows/wsl/install"
-        )
+        return Platform.WINDOWS
+
+    if system == "linux":
+        if "microsoft" in _platform.uname().release.lower():
+            return Platform.WSL
+        if os.environ.get("WSL_DISTRO_NAME"):
+            return Platform.WSL
+        return Platform.LINUX
 
     return Platform.LINUX
 
 
 def is_platform(target: Platform) -> bool:
-    """Check if running on a specific platform."""
     return detect_platform() == target

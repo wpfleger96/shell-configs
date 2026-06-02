@@ -20,6 +20,13 @@ class NotepadPPShell(Shell):
         return "Notepad++"
 
     def _get_config_dir(self) -> Path | None:
+        if is_platform(Platform.WINDOWS):
+            import os
+
+            appdata = os.environ.get("APPDATA")
+            if not appdata:
+                return None
+            return Path(appdata) / "Notepad++"
         if not is_platform(Platform.WSL):
             return None
         win_user = get_windows_username()
@@ -45,7 +52,7 @@ class NotepadPPShell(Shell):
         ]
 
     def _get_validation_command(self, temp_file: Path) -> list[str]:
-        return ["true"]
+        return self._noop_validation_command()
 
     def _get_temp_suffix(self) -> str:
         return ".xml"

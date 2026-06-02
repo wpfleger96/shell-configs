@@ -39,6 +39,13 @@ class VSCodeShell(Shell):
         Returns:
             Path to VS Code User directory or None if unable to determine
         """
+        if is_platform(Platform.WINDOWS):
+            import os
+
+            appdata_env = os.environ.get("APPDATA")
+            if not appdata_env:
+                return None
+            return Path(appdata_env) / "Code" / "User"
         if is_platform(Platform.WSL):
             appdata = get_windows_appdata_roaming()
             if appdata is None:
@@ -51,6 +58,10 @@ class VSCodeShell(Shell):
             return Path.home() / ".config" / "Code" / "User"
 
     def get_extension_cli(self) -> str | None:
+        if is_platform(Platform.WINDOWS):
+            from shell_configs.shells.utils import resolve_windows_cli
+
+            return resolve_windows_cli("code")
         return "code"
 
     def get_extension_list_paths(self) -> list[Path]:
@@ -108,7 +119,7 @@ class VSCodeShell(Shell):
         Returns:
             No-op command - JSON validation not required
         """
-        return ["true"]
+        return self._noop_validation_command()
 
     def _get_temp_suffix(self) -> str:
         """Get temp file suffix for VS Code.
@@ -178,7 +189,7 @@ class VSCodeLocalShell(Shell):
         return []
 
     def _get_validation_command(self, temp_file: Path) -> list[str]:
-        return ["true"]
+        return self._noop_validation_command()
 
     def _get_temp_suffix(self) -> str:
         return ".json"

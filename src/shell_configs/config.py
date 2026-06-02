@@ -107,6 +107,9 @@ class ConfigReader:
         if shell_name == "git":
             base_path = self.config_dir / "shared.gitconfig"
             suffix = ".gitconfig"
+        elif shell_name == "powershell":
+            base_path = self.config_dir / "shared.ps1"
+            suffix = ".ps1"
         else:
             base_path = self.config_dir / "shared.sh"
             suffix = ".sh"
@@ -124,7 +127,10 @@ class ConfigReader:
             if overlay:
                 content = f"{content}\n\n### Platform-Specific ({platform.display_name}) ###\n{overlay}"
 
-        if shell_name != "git":
+        if shell_name == "powershell":
+            config_dir_export = f'$env:SHELL_CONFIGS_DIR = "{self.config_dir}"'
+            content = f"{config_dir_export}\n\n{content}"
+        elif shell_name != "git":
             config_dir_export = f'export SHELL_CONFIGS_DIR="{self.config_dir}"'
             content = f"{config_dir_export}\n\n{content}"
 

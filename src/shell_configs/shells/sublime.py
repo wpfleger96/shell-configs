@@ -20,6 +20,13 @@ class SublimeShell(Shell):
         return "Sublime Text"
 
     def _get_settings_dir(self) -> Path | None:
+        if is_platform(Platform.WINDOWS):
+            import os
+
+            appdata = os.environ.get("APPDATA")
+            if not appdata:
+                return None
+            return Path(appdata) / "Sublime Text" / "Packages" / "User"
         if is_platform(Platform.WSL):
             win_user = get_windows_username()
             if not win_user:
@@ -61,7 +68,7 @@ class SublimeShell(Shell):
         ]
 
     def _get_validation_command(self, temp_file: Path) -> list[str]:
-        return ["true"]
+        return self._noop_validation_command()
 
     def _get_temp_suffix(self) -> str:
         return ".json"

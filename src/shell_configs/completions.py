@@ -28,6 +28,7 @@ class ShellConfig:
 SHELL_REGISTRY: dict[str, ShellConfig] = {
     "bash": ShellConfig("bash", [".bashrc", ".bash_profile", ".profile"]),
     "zsh": ShellConfig("zsh", [".zshrc", ".zprofile"]),
+    "powershell": ShellConfig("powershell", []),
 }
 
 
@@ -42,9 +43,17 @@ def detect_shell() -> str | None:
     Returns:
         Shell name if supported, None otherwise
     """
-    shell_path = os.environ.get("SHELL", "")
-    shell_name = Path(shell_path).name if shell_path else None
-    return shell_name if shell_name in SHELL_REGISTRY else None
+    try:
+        import shellingham
+
+        name, _ = shellingham.detect_shell()
+        if name in ("pwsh", "powershell"):
+            return "powershell"
+        return name if name in SHELL_REGISTRY else None
+    except Exception:
+        shell_path = os.environ.get("SHELL", "")
+        name = Path(shell_path).name if shell_path else None
+        return name if name in SHELL_REGISTRY else None
 
 
 def _get_shell_config_candidates(shell: str) -> list[Path]:
@@ -95,7 +104,7 @@ def generate_completion_script(shell: str) -> str:
     """Generate completion script with command-existence guard.
 
     Args:
-        shell: Shell name ('bash' or 'zsh')
+        shell: Shell name ('bash', 'zsh', or 'powershell')
 
     Returns:
         Completion script to add to shell config
@@ -103,13 +112,39 @@ def generate_completion_script(shell: str) -> str:
     Raises:
         ValueError: If shell is not supported
     """
+    env_var = f"_{PROG_NAME.upper().replace('-', '_')}_COMPLETE"
+
+    if shell == "powershell":
+        return f"""{COMPLETION_MARKER_START}
+if (Get-Command {PROG_NAME} -ErrorAction SilentlyContinue) {{
+    Register-ArgumentCompleter -Native -CommandName '{PROG_NAME}' -ScriptBlock {{
+        param($wordToComplete, $commandAst, $cursorPosition)
+        $words = $commandAst.CommandElements | ForEach-Object {{ $_.ToString() }}
+        $env:{env_var} = 'bash_source'
+        $env:COMP_WORDS = $words -join ' '
+        $env:COMP_CWORD = $words.Count - 1
+        try {{
+            $completions = & {PROG_NAME} 2>$null
+            $completions | ForEach-Object {{
+                $parts = $_ -split '\\s+', 2
+                $text = $parts[0]
+                $desc = if ($parts.Count -gt 1) {{ $parts[1] }} else {{ $text }}
+                [System.Management.Automation.CompletionResult]::new($text, $text, 'ParameterValue', $desc)
+            }}
+        }} finally {{
+            Remove-Item Env:{env_var} -ErrorAction SilentlyContinue
+            Remove-Item Env:COMP_WORDS -ErrorAction SilentlyContinue
+            Remove-Item Env:COMP_CWORD -ErrorAction SilentlyContinue
+        }}
+    }}
+}}
+{COMPLETION_MARKER_END}"""
+
     from click.shell_completion import get_completion_class
 
     comp_cls = get_completion_class(shell)
     if comp_cls is None:
         raise ValueError(f"Unsupported shell: {shell}")
-
-    env_var = f"_{PROG_NAME.upper().replace('-', '_')}_COMPLETE"
 
     return f"""{COMPLETION_MARKER_START}
 if command -v {PROG_NAME} >/dev/null 2>&1; then
@@ -134,11 +169,22 @@ def install_completion(shell: str, dry_run: bool = False) -> tuple[bool, str]:
 
     config_path = find_config_file(shell)
     if config_path is None:
-        return (
-            False,
-            f"No {shell} config file found. Expected one of: "
-            + ", ".join(str(p) for p in _get_shell_config_candidates(shell)),
-        )
+        if shell == "powershell":
+            from shell_configs.shells.powershell import _get_powershell_profile_path
+
+            profile = _get_powershell_profile_path()
+            if profile is None:
+                return False, "PowerShell is not installed"
+            if not dry_run:
+                profile.parent.mkdir(parents=True, exist_ok=True)
+                profile.touch()
+            config_path = profile
+        else:
+            return (
+                False,
+                f"No {shell} config file found. Expected one of: "
+                + ", ".join(str(p) for p in _get_shell_config_candidates(shell)),
+            )
 
     if is_completion_installed(config_path):
         return update_completion(shell, dry_run=dry_run)

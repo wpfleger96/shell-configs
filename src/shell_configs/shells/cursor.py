@@ -39,6 +39,13 @@ class CursorShell(Shell):
         Returns:
             Path to Cursor User directory or None if unable to determine
         """
+        if is_platform(Platform.WINDOWS):
+            import os
+
+            appdata_env = os.environ.get("APPDATA")
+            if not appdata_env:
+                return None
+            return Path(appdata_env) / "Cursor" / "User"
         if is_platform(Platform.WSL):
             appdata = get_windows_appdata_roaming()
             if appdata is None:
@@ -51,6 +58,10 @@ class CursorShell(Shell):
             return Path.home() / ".config" / "Cursor" / "User"
 
     def get_extension_cli(self) -> str | None:
+        if is_platform(Platform.WINDOWS):
+            from shell_configs.shells.utils import resolve_windows_cli
+
+            return resolve_windows_cli("cursor")
         if is_platform(Platform.WSL):
             remote_cli = self._find_cursor_remote_cli()
             if remote_cli:
@@ -134,7 +145,7 @@ class CursorShell(Shell):
         Returns:
             No-op command - JSON validation not required
         """
-        return ["true"]
+        return self._noop_validation_command()
 
     def _get_temp_suffix(self) -> str:
         """Get temp file suffix for Cursor.
@@ -206,7 +217,7 @@ class CursorLocalShell(Shell):
         return []
 
     def _get_validation_command(self, temp_file: Path) -> list[str]:
-        return ["true"]
+        return self._noop_validation_command()
 
     def _get_temp_suffix(self) -> str:
         return ".json"

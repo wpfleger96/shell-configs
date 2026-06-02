@@ -2,6 +2,7 @@
 
 import configparser
 import logging
+import os
 import subprocess
 
 from functools import lru_cache
@@ -17,6 +18,10 @@ def get_windows_username() -> str:
     Returns:
         Windows username or empty string if unable to determine
     """
+    from shell_configs.platform import Platform, is_platform
+
+    if is_platform(Platform.WINDOWS):
+        return os.environ.get("USERNAME", "")
     try:
         result = subprocess.run(
             ["cmd.exe", "/c", "echo %USERNAME%"],
@@ -67,6 +72,11 @@ def get_wsl_windows_drive(drive: str = "c") -> Path:
 
 def get_windows_home() -> Path | None:
     """Return the Windows user home directory via WSL mount, or None if unavailable."""
+    from shell_configs.platform import Platform, is_platform
+
+    if is_platform(Platform.WINDOWS):
+        home = Path.home()
+        return home if home.is_dir() else None
     username = get_windows_username()
     if not username:
         return None
@@ -76,15 +86,25 @@ def get_windows_home() -> Path | None:
 
 def get_windows_appdata_roaming() -> Path | None:
     """Return the Windows AppData/Roaming path, or None if unavailable."""
+    from shell_configs.platform import Platform, is_platform
+
+    if is_platform(Platform.WINDOWS):
+        appdata_env = os.environ.get("APPDATA")
+        return Path(appdata_env) if appdata_env else None
     home = get_windows_home()
     if home is None:
         return None
-    appdata = home / "AppData" / "Roaming"
-    return appdata if appdata.is_dir() else None
+    appdata_path = home / "AppData" / "Roaming"
+    return appdata_path if appdata_path.is_dir() else None
 
 
 def get_windows_appdata_local() -> Path | None:
     """Return the Windows AppData/Local path, or None if unavailable."""
+    from shell_configs.platform import Platform, is_platform
+
+    if is_platform(Platform.WINDOWS):
+        localappdata = os.environ.get("LOCALAPPDATA")
+        return Path(localappdata) if localappdata else None
     home = get_windows_home()
     if home is None:
         return None
@@ -99,3 +119,14 @@ def get_windows_programs() -> Path | None:
         return None
     programs = local / "Programs"
     return programs if programs.is_dir() else None
+
+
+def resolve_windows_cli(name: str) -> str:
+    import shutil
+
+    from shell_configs.platform import Platform, is_platform
+
+    if is_platform(Platform.WINDOWS):
+        resolved = shutil.which(name)
+        return resolved if resolved else name
+    return name

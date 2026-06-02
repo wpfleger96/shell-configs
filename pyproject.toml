@@ -27,6 +27,7 @@ dependencies = [
     "rich>=15.0.0",
     "pyyaml>=6.0.3",
     "pydantic>=2.13.4",
+    "shellingham>=1.0",
 ]
 
 [project.urls]
@@ -89,7 +90,7 @@ strict = true
 exclude = ["^src/shell_configs/scripts/"]
 
 [[tool.mypy.overrides]]
-module = ["yaml.*", "tomli.*"]
+module = ["yaml.*", "tomli.*", "shellingham.*"]
 ignore_missing_imports = true  # Only for external libs without stubs
 
 [[tool.mypy.overrides]]
