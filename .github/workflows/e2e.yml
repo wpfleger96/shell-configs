@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main
+      - wpfleger/windows-support
 
 concurrency:
   group: e2e-${{ github.ref }}
