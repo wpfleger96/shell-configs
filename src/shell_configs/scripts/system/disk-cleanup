@@ -901,6 +901,20 @@ def _interactive_select(targets: list[ScanTarget]) -> list[ScanTarget]:
         return []
 
     choices: list = []
+    # InquirerPy internally calls dataclasses.asdict() on Choice objects, which
+    # recursively converts any nested dataclass (like ScanTarget) into a plain dict.
+    # Plain dicts are unhashable and can't be used as dict keys. To work around this,
+    # we store integer indices as Choice.value and map them back to ScanTarget objects
+    # via target_lookup. Strings (sentinel values) and ints survive asdict() unchanged.
+    target_lookup: dict[int, ScanTarget] = {}
+    _next_idx = 0
+
+    def _target_choice(t: ScanTarget, name: str) -> Choice:
+        nonlocal _next_idx
+        idx = _next_idx
+        _next_idx += 1
+        target_lookup[idx] = t
+        return Choice(value=idx, name=name)
 
     grand_total = _human_size(sum(t.size_bytes for t in all_with_size))
     choices.append(Choice(value=_SELECT_ALL, name=f"Select all ({grand_total})"))
@@ -924,10 +938,7 @@ def _interactive_select(targets: list[ScanTarget]) -> list[ScanTarget]:
         )
         for t in sorted(incrementals, key=lambda t: t.size_bytes, reverse=True):
             choices.append(
-                Choice(
-                    value=t,
-                    name=f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})",
-                )
+                _target_choice(t, f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})")
             )
 
     if caches:
@@ -941,10 +952,7 @@ def _interactive_select(targets: list[ScanTarget]) -> list[ScanTarget]:
         )
         for t in sorted(caches, key=lambda t: t.size_bytes, reverse=True):
             choices.append(
-                Choice(
-                    value=t,
-                    name=f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})",
-                )
+                _target_choice(t, f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})")
             )
 
     if rust_targets:
@@ -958,10 +966,7 @@ def _interactive_select(targets: list[ScanTarget]) -> list[ScanTarget]:
         )
         for t in sorted(rust_targets, key=lambda t: t.size_bytes, reverse=True):
             choices.append(
-                Choice(
-                    value=t,
-                    name=f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})",
-                )
+                _target_choice(t, f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})")
             )
 
     if docker_targets:
@@ -979,7 +984,7 @@ def _interactive_select(targets: list[ScanTarget]) -> list[ScanTarget]:
                 if t.label == "docker system"
                 else f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})"
             )
-            choices.append(Choice(value=t, name=name))
+            choices.append(_target_choice(t, name))
 
     selected_raw = inquirer.checkbox(
         message="Select items to clean (space to toggle, enter to confirm):",
@@ -994,8 +999,8 @@ def _interactive_select(targets: list[ScanTarget]) -> list[ScanTarget]:
         group = section_map.get(item)
         if group is not None:
             result.extend(group)
-        elif isinstance(item, ScanTarget):
-            result.append(item)
+        elif isinstance(item, int) and item in target_lookup:
+            result.append(target_lookup[item])
 
     seen: set[int] = set()
     deduped: list[ScanTarget] = []
