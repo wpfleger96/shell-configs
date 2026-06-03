@@ -62,12 +62,13 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --cov=shell_configs --cov-report=term-missing"
+addopts = "-v --cov=shell_configs --cov-report=term-missing --ignore=tests/e2e"
 markers = [
     "unit: Unit tests that don't touch the filesystem",
     "integration: Integration tests that modify files",
     "cli: CLI command tests",
     "bootstrap: Bootstrap module tests",
+    "e2e: End-to-end subprocess tests that run the real CLI binary",
 ]
 
 [dependency-groups]
