@@ -128,7 +128,7 @@ class ConfigReader:
                 content = f"{content}\n\n### Platform-Specific ({platform.display_name}) ###\n{overlay}"
 
         if shell_name == "powershell":
-            config_dir_export = f'$env:SHELL_CONFIGS_DIR = "{self.config_dir}"'
+            config_dir_export = f"$env:SHELL_CONFIGS_DIR = '{self.config_dir}'"
             content = f"{config_dir_export}\n\n{content}"
         elif shell_name != "git":
             config_dir_export = f'export SHELL_CONFIGS_DIR="{self.config_dir}"'

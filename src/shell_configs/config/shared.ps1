@@ -6,6 +6,9 @@ $env:VISUAL = "vim"
 $env:PAGER = "less"
 
 ### Git - Aliases ###
+Remove-Alias -Name gc -Force -ErrorAction SilentlyContinue
+Remove-Alias -Name gp -Force -ErrorAction SilentlyContinue
+Remove-Alias -Name gl -Force -ErrorAction SilentlyContinue
 function ga { git add @args }
 function gaa { git add . }
 function gc { git commit @args }

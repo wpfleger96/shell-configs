@@ -12,6 +12,7 @@ from typing import Any
 
 import yaml
 
+from shell_configs.agents import _install_winget
 from shell_configs.config import get_config_dir
 from shell_configs.platform import Platform, is_platform
 
@@ -226,31 +227,6 @@ def _install_apt(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
         return False, f"Failed to install {name}: {result.stderr.strip()}"
     except subprocess.TimeoutExpired:
         return False, f"Failed to install {name}: apt timed out"
-
-
-def _install_winget(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
-    if not shutil.which("winget"):
-        return False, "winget is not available"
-    if dry_run:
-        return True, f"Would install {package} via winget"
-    try:
-        result = subprocess.run(
-            [
-                "winget",
-                "install",
-                package,
-                "--accept-source-agreements",
-                "--accept-package-agreements",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        if result.returncode == 0:
-            return True, f"Installed {name} via winget"
-        return False, f"Failed to install {name}: {result.stderr.strip()}"
-    except subprocess.TimeoutExpired:
-        return False, f"Failed to install {name}: winget timed out"
 
 
 def _install_via_script(name: str, install_cmd: str, dry_run: bool) -> tuple[bool, str]:

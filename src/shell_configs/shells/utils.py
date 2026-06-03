@@ -90,7 +90,12 @@ def get_windows_appdata_roaming() -> Path | None:
 
     if is_platform(Platform.WINDOWS):
         appdata_env = os.environ.get("APPDATA")
-        return Path(appdata_env) if appdata_env else None
+        if not appdata_env:
+            return None
+        path = Path(appdata_env)
+        if not path.is_absolute():
+            return None
+        return path
     home = get_windows_home()
     if home is None:
         return None
@@ -104,7 +109,12 @@ def get_windows_appdata_local() -> Path | None:
 
     if is_platform(Platform.WINDOWS):
         localappdata = os.environ.get("LOCALAPPDATA")
-        return Path(localappdata) if localappdata else None
+        if not localappdata:
+            return None
+        path = Path(localappdata)
+        if not path.is_absolute():
+            return None
+        return path
     home = get_windows_home()
     if home is None:
         return None

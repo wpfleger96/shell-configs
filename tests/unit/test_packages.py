@@ -1,6 +1,7 @@
 """Tests for package management functionality."""
 
 import shutil
+import subprocess
 
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from shell_configs.packages import (
     get_package_manager,
     load_packages,
 )
+from shell_configs.packages.packages import WingetManager
 from shell_configs.platform import Platform, detect_platform, is_platform
 
 
@@ -221,3 +223,74 @@ def test_linux_installer_binary_check_fallback() -> None:
 
     result = linux_installer.is_installed(pkg)
     assert result is True
+
+
+@pytest.mark.unit
+class TestWingetManager:
+    """Tests for WingetManager Windows package manager."""
+
+    def test_is_available_when_winget_on_path(self, monkeypatch):
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: "/usr/bin/winget" if name == "winget" else None,
+        )
+        manager = WingetManager()
+        assert manager.is_available() is True
+
+    def test_is_available_when_winget_missing(self, monkeypatch):
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: None,
+        )
+        manager = WingetManager()
+        assert manager.is_available() is False
+
+    def test_install_dry_run(self, monkeypatch):
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: None,
+        )
+        manager = WingetManager()
+        monkeypatch.setattr(manager, "is_installed", lambda pkg: False)
+        pkg = Package(
+            name="git",
+            windows=InstallConfig(method="winget", package="Git.Git"),
+        )
+        success, msg = manager.install(pkg, dry_run=True)
+        assert success is True
+        assert "Git.Git" in msg
+
+    def test_install_already_installed(self, monkeypatch):
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: "/usr/bin/git" if name == "git" else None,
+        )
+        manager = WingetManager()
+        pkg = Package(
+            name="git",
+            command="git",
+            windows=InstallConfig(method="winget", package="Git.Git"),
+        )
+        success, msg = manager.install(pkg, dry_run=False)
+        assert success is True
+        assert "already installed" in msg
+
+    def test_install_timeout(self, monkeypatch):
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: None,
+        )
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.subprocess.run",
+            lambda *a, **kw: (_ for _ in ()).throw(
+                subprocess.TimeoutExpired("winget", 300)
+            ),
+        )
+        manager = WingetManager()
+        pkg = Package(
+            name="git",
+            windows=InstallConfig(method="winget", package="Git.Git"),
+        )
+        success, msg = manager.install(pkg, dry_run=False)
+        assert success is False
+        assert "timed out" in msg

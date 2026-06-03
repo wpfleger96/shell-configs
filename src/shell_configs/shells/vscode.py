@@ -40,12 +40,10 @@ class VSCodeShell(Shell):
             Path to VS Code User directory or None if unable to determine
         """
         if is_platform(Platform.WINDOWS):
-            import os
-
-            appdata_env = os.environ.get("APPDATA")
-            if not appdata_env:
+            appdata = get_windows_appdata_roaming()
+            if appdata is None:
                 return None
-            return Path(appdata_env) / "Code" / "User"
+            return appdata / "Code" / "User"
         if is_platform(Platform.WSL):
             appdata = get_windows_appdata_roaming()
             if appdata is None:

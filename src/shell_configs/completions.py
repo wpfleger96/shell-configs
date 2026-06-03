@@ -75,11 +75,17 @@ def find_config_file(shell: str) -> Path | None:
     """Find the appropriate config file - first existing candidate.
 
     Args:
-        shell: Shell name ('bash' or 'zsh')
+        shell: Shell name ('bash', 'zsh', or 'powershell')
 
     Returns:
         Path to config file, or None if no candidates exist
     """
+    if shell == "powershell":
+        from shell_configs.shells.powershell import _get_powershell_profile_path
+
+        profile = _get_powershell_profile_path()
+        return profile if profile is not None and profile.exists() else None
+
     candidates = _get_shell_config_candidates(shell)
     return candidates[0] if candidates else None
 
@@ -120,15 +126,20 @@ if (Get-Command {PROG_NAME} -ErrorAction SilentlyContinue) {{
     Register-ArgumentCompleter -Native -CommandName '{PROG_NAME}' -ScriptBlock {{
         param($wordToComplete, $commandAst, $cursorPosition)
         $words = $commandAst.CommandElements | ForEach-Object {{ $_.ToString() }}
-        $env:{env_var} = 'bash_source'
+        $env:{env_var} = 'bash_complete'
         $env:COMP_WORDS = $words -join ' '
-        $env:COMP_CWORD = $words.Count - 1
+        if ($wordToComplete -eq '') {{
+            $env:COMP_CWORD = $words.Count
+        }} else {{
+            $env:COMP_CWORD = $words.Count - 1
+        }}
         try {{
             $completions = & {PROG_NAME} 2>$null
             $completions | ForEach-Object {{
-                $parts = $_ -split '\\s+', 2
-                $text = $parts[0]
-                $desc = if ($parts.Count -gt 1) {{ $parts[1] }} else {{ $text }}
+                $parts = $_ -split ',', 2
+                $text = $parts[1]
+                $type = $parts[0]
+                $desc = $text
                 [System.Management.Automation.CompletionResult]::new($text, $text, 'ParameterValue', $desc)
             }}
         }} finally {{

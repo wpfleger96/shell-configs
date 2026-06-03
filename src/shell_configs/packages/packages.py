@@ -1,5 +1,6 @@
 """Package management for shell-configs."""
 
+import re
 import shutil
 import subprocess
 
@@ -16,9 +17,18 @@ from pydantic import BaseModel
 
 from shell_configs.platform import Platform, is_platform
 
+_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def _validate_package_name(name: str) -> str:
+    if not _SAFE_NAME_RE.match(name):
+        raise ValueError(f"Invalid package name: {name!r}")
+    return name
+
 
 def _is_pwsh_module_installed(name: str) -> bool:
     """Check if a PowerShell module is installed."""
+    _validate_package_name(name)
     if not shutil.which("pwsh"):
         return False
 
@@ -37,6 +47,7 @@ def _is_pwsh_module_installed(name: str) -> bool:
 
 def _install_pwsh_module(name: str, dry_run: bool) -> tuple[bool, str]:
     """Install a PowerShell module via pwsh."""
+    _validate_package_name(name)
     if not shutil.which("pwsh"):
         return False, "PowerShell (pwsh) is not installed"
 
@@ -68,6 +79,7 @@ def _install_pwsh_module(name: str, dry_run: bool) -> tuple[bool, str]:
 
 def _uninstall_pwsh_module(name: str, dry_run: bool) -> tuple[bool, str]:
     """Uninstall a PowerShell module via pwsh."""
+    _validate_package_name(name)
     if not shutil.which("pwsh"):
         return False, "PowerShell (pwsh) is not installed"
 
@@ -743,6 +755,18 @@ class WingetManager(PackageManager):
             return _is_pwsh_module_installed(config.package or pkg.name)
         if shutil.which(pkg.get_command()):
             return True
+        # Fallback: check winget registry
+        if config and config.package:
+            try:
+                result = subprocess.run(
+                    ["winget", "list", "--id", config.package, "--exact"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                return result.returncode == 0 and config.package in result.stdout
+            except subprocess.TimeoutExpired, FileNotFoundError:
+                pass
         return False
 
     def can_uninstall(self, pkg: Package) -> bool:
@@ -777,6 +801,7 @@ class WingetManager(PackageManager):
                     "winget",
                     "install",
                     name,
+                    "--silent",
                     "--accept-source-agreements",
                     "--accept-package-agreements",
                 ],
@@ -812,7 +837,7 @@ class WingetManager(PackageManager):
 
         try:
             result = subprocess.run(
-                ["winget", "uninstall", name],
+                ["winget", "uninstall", name, "--silent"],
                 capture_output=True,
                 text=True,
                 timeout=120,

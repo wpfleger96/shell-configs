@@ -36,8 +36,8 @@ class TestSublimeShell:
             lambda p: p == Platform.WSL,
         )
         monkeypatch.setattr(
-            "shell_configs.shells.sublime.get_windows_username",
-            lambda: "testuser",
+            "shell_configs.shells.sublime.get_windows_appdata_roaming",
+            lambda: Path("/mnt/c/Users/testuser/AppData/Roaming"),
         )
         monkeypatch.setattr(
             "shell_configs.shells.sublime.get_config_dir",
@@ -124,14 +124,14 @@ class TestSublimeShell:
         shell = SublimeShell()
         assert shell.get_additional_files() == []
 
-    def test_additional_files_empty_when_no_username_on_wsl(self, monkeypatch):
+    def test_additional_files_empty_when_no_appdata_on_wsl(self, monkeypatch):
         monkeypatch.setattr(
             "shell_configs.shells.sublime.is_platform",
             lambda p: p == Platform.WSL,
         )
         monkeypatch.setattr(
-            "shell_configs.shells.sublime.get_windows_username",
-            lambda: "",
+            "shell_configs.shells.sublime.get_windows_appdata_roaming",
+            lambda: None,
         )
         shell = SublimeShell()
         assert shell.get_additional_files() == []

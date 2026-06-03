@@ -40,12 +40,10 @@ class CursorShell(Shell):
             Path to Cursor User directory or None if unable to determine
         """
         if is_platform(Platform.WINDOWS):
-            import os
-
-            appdata_env = os.environ.get("APPDATA")
-            if not appdata_env:
+            appdata = get_windows_appdata_roaming()
+            if appdata is None:
                 return None
-            return Path(appdata_env) / "Cursor" / "User"
+            return appdata / "Cursor" / "User"
         if is_platform(Platform.WSL):
             appdata = get_windows_appdata_roaming()
             if appdata is None:

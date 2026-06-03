@@ -186,6 +186,7 @@ def _install_winget(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
                 package,
                 "--accept-source-agreements",
                 "--accept-package-agreements",
+                "--silent",
             ],
             capture_output=True,
             text=True,
