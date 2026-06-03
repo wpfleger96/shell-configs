@@ -12,6 +12,7 @@ from typing import Any
 
 import yaml
 
+from shell_configs.agents import _install_winget
 from shell_configs.config import get_config_dir
 from shell_configs.platform import Platform, is_platform
 
@@ -35,6 +36,7 @@ class Language:
     install_cmd: str | None = None
     macos: LanguageInstallConfig | None = None
     linux: LanguageInstallConfig | None = None
+    windows: LanguageInstallConfig | None = None
 
 
 def load_languages(manifest_path: Path | None = None) -> list[Language]:
@@ -74,6 +76,14 @@ def load_languages(manifest_path: Path | None = None) -> list[Language]:
                 package=li.get("package") or None,
             )
 
+        windows_cfg: LanguageInstallConfig | None = None
+        if isinstance(entry.get("windows"), dict):
+            w: dict[str, Any] = entry["windows"]
+            windows_cfg = LanguageInstallConfig(
+                method=w.get("method", ""),
+                package=w.get("package") or None,
+            )
+
         result.append(
             Language(
                 name=name,
@@ -84,6 +94,7 @@ def load_languages(manifest_path: Path | None = None) -> list[Language]:
                 install_cmd=entry.get("install_cmd") or None,
                 macos=macos_cfg,
                 linux=linux_cfg,
+                windows=windows_cfg,
             )
         )
     return result
@@ -99,8 +110,9 @@ def _resolve_check_path(check_path: str) -> Path | None:
     if "*" not in expanded:
         p = Path(expanded)
         return p if p.exists() else None
-    # Glob from filesystem root — expanded is an absolute path with wildcards
-    matches = sorted(Path("/").glob(expanded.lstrip("/")))
+    parent = Path(expanded).anchor or "/"
+    rel_pattern = expanded[len(parent) :]
+    matches = sorted(Path(parent).glob(rel_pattern))
     return matches[-1] if matches else None
 
 
@@ -156,6 +168,8 @@ def install_language(lang: Language, dry_run: bool = False) -> tuple[bool, str]:
 
     if is_platform(Platform.MACOS) and lang.macos:
         ok, msg = _install_via_config(lang.name, lang.macos, dry_run)
+    elif is_platform(Platform.WINDOWS) and lang.windows:
+        ok, msg = _install_via_config(lang.name, lang.windows, dry_run)
     elif (is_platform(Platform.WSL) or is_platform(Platform.LINUX)) and lang.linux:
         ok, msg = _install_via_config(lang.name, lang.linux, dry_run)
     elif lang.install_cmd:
@@ -172,6 +186,8 @@ def _install_via_config(
         return _install_brew(name, pkg, dry_run)
     if config.method == "apt":
         return _install_apt(name, pkg, dry_run)
+    if config.method == "winget":
+        return _install_winget(name, pkg, dry_run)
     return False, f"Unknown install method: {config.method}"
 
 

@@ -174,3 +174,70 @@ class TestGetWindowsUsername:
             result = get_windows_username()
         assert result == ""
         assert "Unable to detect Windows username" in caplog.text
+
+    def test_get_windows_username_native_windows(self, monkeypatch):
+        from shell_configs.platform import Platform
+
+        monkeypatch.setattr(
+            "shell_configs.platform.is_platform",
+            lambda p: p == Platform.WINDOWS,
+        )
+        monkeypatch.setenv("USERNAME", "winuser")
+        get_windows_username.cache_clear()
+        result = get_windows_username()
+        assert result == "winuser"
+        get_windows_username.cache_clear()
+
+
+@pytest.mark.unit
+class TestGetWindowsAppdataRoamingNative:
+    """Tests for get_windows_appdata_roaming on native Windows."""
+
+    def test_get_windows_appdata_roaming_native_windows(self, monkeypatch, tmp_path):
+        from shell_configs.platform import Platform
+
+        monkeypatch.setattr(
+            "shell_configs.platform.is_platform",
+            lambda p: p == Platform.WINDOWS,
+        )
+        monkeypatch.setenv("APPDATA", str(tmp_path))
+        result = get_windows_appdata_roaming()
+        assert result == tmp_path
+
+    def test_get_windows_appdata_roaming_missing_env(self, monkeypatch):
+        from shell_configs.platform import Platform
+
+        monkeypatch.setattr(
+            "shell_configs.platform.is_platform",
+            lambda p: p == Platform.WINDOWS,
+        )
+        monkeypatch.delenv("APPDATA", raising=False)
+        result = get_windows_appdata_roaming()
+        assert result is None
+
+
+@pytest.mark.unit
+class TestGetWindowsAppdataLocalNative:
+    """Tests for get_windows_appdata_local on native Windows."""
+
+    def test_get_windows_appdata_local_native_windows(self, monkeypatch, tmp_path):
+        from shell_configs.platform import Platform
+
+        monkeypatch.setattr(
+            "shell_configs.platform.is_platform",
+            lambda p: p == Platform.WINDOWS,
+        )
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+        result = get_windows_appdata_local()
+        assert result == tmp_path
+
+    def test_get_windows_appdata_local_missing_env(self, monkeypatch):
+        from shell_configs.platform import Platform
+
+        monkeypatch.setattr(
+            "shell_configs.platform.is_platform",
+            lambda p: p == Platform.WINDOWS,
+        )
+        monkeypatch.delenv("LOCALAPPDATA", raising=False)
+        result = get_windows_appdata_local()
+        assert result is None

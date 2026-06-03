@@ -7,7 +7,7 @@ from pathlib import Path
 from shell_configs.config import get_config_dir
 from shell_configs.platform import Platform, is_platform
 from shell_configs.shells.base import AdditionalFile, ConfigFile, Shell
-from shell_configs.shells.utils import get_windows_username
+from shell_configs.shells.utils import get_windows_appdata_roaming
 
 
 class SublimeShell(Shell):
@@ -20,13 +20,16 @@ class SublimeShell(Shell):
         return "Sublime Text"
 
     def _get_settings_dir(self) -> Path | None:
-        if is_platform(Platform.WSL):
-            win_user = get_windows_username()
-            if not win_user:
+        if is_platform(Platform.WINDOWS):
+            appdata = get_windows_appdata_roaming()
+            if appdata is None:
                 return None
-            return Path(
-                f"/mnt/c/Users/{win_user}/AppData/Roaming/Sublime Text/Packages/User"
-            )
+            return appdata / "Sublime Text" / "Packages" / "User"
+        if is_platform(Platform.WSL):
+            appdata = get_windows_appdata_roaming()
+            if appdata is None:
+                return None
+            return appdata / "Sublime Text" / "Packages" / "User"
         elif is_platform(Platform.MACOS):
             return (
                 Path.home()
@@ -61,7 +64,7 @@ class SublimeShell(Shell):
         ]
 
     def _get_validation_command(self, temp_file: Path) -> list[str]:
-        return ["true"]
+        return self._noop_validation_command()
 
     def _get_temp_suffix(self) -> str:
         return ".json"

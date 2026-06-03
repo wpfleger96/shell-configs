@@ -52,7 +52,7 @@ class XdgShell(Shell):
         Returns:
             No-op command - no validation needed for INI files
         """
-        return ["true"]
+        return self._noop_validation_command()
 
     def _get_temp_suffix(self) -> str:
         """Get temp file suffix for XDG.

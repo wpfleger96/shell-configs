@@ -1,5 +1,6 @@
 """Package management for shell-configs."""
 
+import re
 import shutil
 import subprocess
 
@@ -16,9 +17,18 @@ from pydantic import BaseModel
 
 from shell_configs.platform import Platform, is_platform
 
+_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def _validate_package_name(name: str) -> str:
+    if not _SAFE_NAME_RE.match(name):
+        raise ValueError(f"Invalid package name: {name!r}")
+    return name
+
 
 def _is_pwsh_module_installed(name: str) -> bool:
     """Check if a PowerShell module is installed."""
+    _validate_package_name(name)
     if not shutil.which("pwsh"):
         return False
 
@@ -37,6 +47,7 @@ def _is_pwsh_module_installed(name: str) -> bool:
 
 def _install_pwsh_module(name: str, dry_run: bool) -> tuple[bool, str]:
     """Install a PowerShell module via pwsh."""
+    _validate_package_name(name)
     if not shutil.which("pwsh"):
         return False, "PowerShell (pwsh) is not installed"
 
@@ -68,6 +79,7 @@ def _install_pwsh_module(name: str, dry_run: bool) -> tuple[bool, str]:
 
 def _uninstall_pwsh_module(name: str, dry_run: bool) -> tuple[bool, str]:
     """Uninstall a PowerShell module via pwsh."""
+    _validate_package_name(name)
     if not shutil.which("pwsh"):
         return False, "PowerShell (pwsh) is not installed"
 
@@ -129,6 +141,7 @@ class Package(BaseModel):
     wsl_only: bool = False
     macos: InstallConfig | None = None
     linux: InstallConfig | None = None
+    windows: InstallConfig | None = None
 
     def get_command(self) -> str:
         """Get command name for system check."""
@@ -138,7 +151,11 @@ class Package(BaseModel):
         """Get install config for current platform."""
         if self.wsl_only and not is_platform(Platform.WSL):
             return None
-        return self.macos if is_platform(Platform.MACOS) else self.linux
+        if is_platform(Platform.MACOS):
+            return self.macos
+        if is_platform(Platform.WINDOWS):
+            return self.windows
+        return self.linux
 
 
 class PackageManager(ABC):
@@ -723,6 +740,117 @@ class LinuxInstaller(PackageManager):
             return False, f"Unexpected error: {e}"
 
 
+class WingetManager(PackageManager):
+    """Winget package manager for Windows."""
+
+    name = "winget"
+    display_name = "Winget"
+
+    def is_available(self) -> bool:
+        return shutil.which("winget") is not None
+
+    def is_installed(self, pkg: Package) -> bool:
+        config = pkg.windows
+        if config and config.method == "pwsh":
+            return _is_pwsh_module_installed(config.package or pkg.name)
+        if shutil.which(pkg.get_command()):
+            return True
+        # Fallback: check winget registry
+        if config and config.package:
+            try:
+                result = subprocess.run(
+                    ["winget", "list", "--id", config.package, "--exact"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                return result.returncode == 0 and config.package in result.stdout
+            except subprocess.TimeoutExpired, FileNotFoundError:
+                pass
+        return False
+
+    def can_uninstall(self, pkg: Package) -> bool:
+        config = pkg.windows
+        if not config or config.method in CANNOT_AUTO_UNINSTALL:
+            return False
+        if config.method == "pwsh":
+            return _is_pwsh_module_installed(config.package or pkg.name)
+        return self.is_installed(pkg)
+
+    def install(self, pkg: Package, dry_run: bool = False) -> tuple[bool, str]:
+        config = pkg.windows
+        if not config:
+            return False, f"No Windows config for {pkg.name}"
+
+        if self.is_installed(pkg):
+            return True, f"{pkg.name} is already installed"
+
+        if config.method == "pwsh":
+            return _install_pwsh_module(config.package or pkg.name, dry_run)
+
+        if config.method != "winget":
+            return False, f"Unknown method: {config.method}"
+
+        name = config.package or pkg.name
+        if dry_run:
+            return True, f"Would install {name} via winget"
+
+        try:
+            result = subprocess.run(
+                [
+                    "winget",
+                    "install",
+                    name,
+                    "--silent",
+                    "--accept-source-agreements",
+                    "--accept-package-agreements",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            if result.returncode == 0:
+                return True, f"Successfully installed {name}"
+            return False, result.stderr.strip() or "Installation failed"
+        except subprocess.TimeoutExpired:
+            return False, "Installation timed out"
+        except Exception as e:
+            return False, f"Unexpected error: {e}"
+
+    def uninstall(self, pkg: Package, dry_run: bool = False) -> tuple[bool, str]:
+        config = pkg.windows
+        if not config:
+            return False, f"No Windows config for {pkg.name}"
+
+        if not self.is_installed(pkg):
+            return True, f"{pkg.name} is not installed"
+
+        if config.method == "pwsh":
+            return _uninstall_pwsh_module(config.package or pkg.name, dry_run)
+
+        if config.method != "winget":
+            return False, f"Cannot uninstall {pkg.name} (method: {config.method})"
+
+        name = config.package or pkg.name
+        if dry_run:
+            return True, f"Would uninstall {name} via winget"
+
+        try:
+            result = subprocess.run(
+                ["winget", "uninstall", name, "--silent"],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            if result.returncode == 0:
+                return True, f"Successfully uninstalled {name}"
+            return False, result.stderr.strip() or "Uninstall failed"
+        except subprocess.TimeoutExpired:
+            return False, "Uninstall timed out"
+        except Exception as e:
+            return False, f"Unexpected error: {e}"
+
+
 def get_package_manager() -> PackageManager | None:
     """Get the appropriate package manager for this system.
 
@@ -732,6 +860,10 @@ def get_package_manager() -> PackageManager | None:
     if is_platform(Platform.MACOS):
         brew = HomebrewManager()
         return brew if brew.is_available() else None
+
+    if is_platform(Platform.WINDOWS):
+        winget = WingetManager()
+        return winget if winget.is_available() else None
 
     if is_platform(Platform.WSL) or is_platform(Platform.LINUX):
         linux_installer = LinuxInstaller()

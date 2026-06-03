@@ -4,6 +4,7 @@ from shell_configs.shells.base import Shell
 from shell_configs.shells.bash import BashShell
 from shell_configs.shells.cursor import CursorLocalShell, CursorShell
 from shell_configs.shells.git import GitShell
+from shell_configs.shells.powershell import PowerShellShell
 from shell_configs.shells.sublime import SublimeShell
 from shell_configs.shells.vscode import VSCodeLocalShell, VSCodeShell
 from shell_configs.shells.xdg import XdgShell
@@ -36,6 +37,14 @@ class ShellRegistry:
         if is_platform(Platform.WSL):
             self.register(CursorLocalShell())
             self.register(VSCodeLocalShell())
+            from shell_configs.shells.windows_terminal import WindowsTerminalShell
+
+            self.register(WindowsTerminalShell())
+            from shell_configs.shells.notepadpp import NotepadPPShell
+
+            self.register(NotepadPPShell())
+        if is_platform(Platform.WINDOWS):
+            self.register(PowerShellShell())
             from shell_configs.shells.windows_terminal import WindowsTerminalShell
 
             self.register(WindowsTerminalShell())

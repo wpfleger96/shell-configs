@@ -1,12 +1,19 @@
 """Unit tests for shell implementations."""
 
 import json
+import subprocess
+
+from pathlib import Path
 
 import pytest
 
 from shell_configs.shells import BashShell, GitShell, ShellRegistry, ZshShell
 from shell_configs.shells.base import merge_json_files
 from shell_configs.shells.cursor import CursorShell
+from shell_configs.shells.powershell import (
+    PowerShellShell,
+    _get_powershell_profile_path,
+)
 from shell_configs.shells.vscode import VSCodeShell
 
 
@@ -290,6 +297,62 @@ class TestVSCodeShell:
 
         assert keybindings.source_path == config_dir / "editor" / "keybindings.json"
         assert keybindings.base_source_path is None
+
+
+@pytest.mark.unit
+class TestPowerShellShell:
+    """Tests for PowerShellShell and _get_powershell_profile_path."""
+
+    @pytest.fixture(autouse=True)
+    def clear_profile_cache(self):
+        _get_powershell_profile_path.cache_clear()
+        yield
+        _get_powershell_profile_path.cache_clear()
+
+    def test_get_powershell_profile_path_pwsh_available(self, monkeypatch):
+        profile_path = "/home/user/.config/powershell/Microsoft.PowerShell_profile.ps1"
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[0] == "pwsh":
+                return subprocess.CompletedProcess(
+                    args=cmd, returncode=0, stdout=profile_path + "\n", stderr=""
+                )
+            raise FileNotFoundError(f"{cmd[0]} not found")
+
+        monkeypatch.setattr("shell_configs.shells.powershell.subprocess.run", fake_run)
+        result = _get_powershell_profile_path()
+        assert result == Path(profile_path)
+
+    def test_get_powershell_profile_path_neither_available(self, monkeypatch):
+        def fake_run(cmd, *args, **kwargs):
+            raise FileNotFoundError(f"{cmd[0]} not found")
+
+        monkeypatch.setattr("shell_configs.shells.powershell.subprocess.run", fake_run)
+        result = _get_powershell_profile_path()
+        assert result is None
+
+    def test_powershell_get_config_files_with_profile(self, monkeypatch):
+        profile_path = Path(
+            "/home/user/.config/powershell/Microsoft.PowerShell_profile.ps1"
+        )
+        monkeypatch.setattr(
+            "shell_configs.shells.powershell._get_powershell_profile_path",
+            lambda: profile_path,
+        )
+        shell = PowerShellShell()
+        config_files = shell.get_config_files()
+        assert len(config_files) == 1
+        assert config_files[0].path == profile_path
+        assert config_files[0].name == "Microsoft.PowerShell_profile.ps1"
+
+    def test_powershell_get_config_files_no_profile(self, monkeypatch):
+        monkeypatch.setattr(
+            "shell_configs.shells.powershell._get_powershell_profile_path",
+            lambda: None,
+        )
+        shell = PowerShellShell()
+        config_files = shell.get_config_files()
+        assert config_files == []
 
 
 @pytest.mark.unit

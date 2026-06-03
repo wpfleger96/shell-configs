@@ -7,7 +7,7 @@ from pathlib import Path
 from shell_configs.config import get_config_dir
 from shell_configs.platform import Platform, is_platform
 from shell_configs.shells.base import AdditionalFile, ConfigFile, Shell
-from shell_configs.shells.utils import get_windows_username
+from shell_configs.shells.utils import get_windows_appdata_roaming
 
 
 class NotepadPPShell(Shell):
@@ -20,12 +20,17 @@ class NotepadPPShell(Shell):
         return "Notepad++"
 
     def _get_config_dir(self) -> Path | None:
+        if is_platform(Platform.WINDOWS):
+            appdata = get_windows_appdata_roaming()
+            if appdata is None:
+                return None
+            return appdata / "Notepad++"
         if not is_platform(Platform.WSL):
             return None
-        win_user = get_windows_username()
-        if not win_user:
+        appdata = get_windows_appdata_roaming()
+        if appdata is None:
             return None
-        return Path(f"/mnt/c/Users/{win_user}/AppData/Roaming/Notepad++")
+        return appdata / "Notepad++"
 
     def get_config_files(self) -> list[ConfigFile]:
         return []
@@ -45,7 +50,7 @@ class NotepadPPShell(Shell):
         ]
 
     def _get_validation_command(self, temp_file: Path) -> list[str]:
-        return ["true"]
+        return self._noop_validation_command()
 
     def _get_temp_suffix(self) -> str:
         return ".xml"

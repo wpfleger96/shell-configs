@@ -213,6 +213,13 @@ class Shell(ABC):
             File suffix (e.g., ".sh", ".zsh", ".gitconfig")
         """
 
+    def _noop_validation_command(self) -> list[str]:
+        from shell_configs.platform import Platform, is_platform
+
+        if is_platform(Platform.WINDOWS):
+            return ["cmd", "/c", "exit", "0"]
+        return ["true"]
+
     def validate_syntax(self, content: str) -> tuple[bool, str]:
         """Validate the syntax of configuration content.
 
