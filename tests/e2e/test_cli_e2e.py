@@ -43,6 +43,7 @@ class TestListShells:
 
 @pytest.mark.e2e
 class TestValidate:
+    @pytest.mark.skipif(sys.platform == "win32", reason="bash requires WSL on Windows")
     def test_validate_bundled_config(self, run_cli):
         result = run_cli(["validate", "--shells", "bash"])
         output = strip_ansi(result.stdout + result.stderr)
