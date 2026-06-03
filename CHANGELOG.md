@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [0.50.0](https://github.com/wpfleger96/shell-configs/compare/v0.49.1...v0.50.0) (2026-06-03)
+
+
+### Features
+
+* add native Windows support ([#64](https://github.com/wpfleger96/shell-configs/issues/64)) ([2f62911](https://github.com/wpfleger96/shell-configs/commit/2f62911136f353c431d5b8515e4ee89a89e425c1))
+* **testing:** add cross-platform E2E test suite ([#65](https://github.com/wpfleger96/shell-configs/issues/65)) ([b427b6d](https://github.com/wpfleger96/shell-configs/commit/b427b6dd59063bbfed8dba0719ec07667c460163))
+
+
+### Bug Fixes
+
+* **disk-cleanup:** use index-based lookup in interactive selection ([bf234b1](https://github.com/wpfleger96/shell-configs/commit/bf234b15a58a68cf334445383690f7f7dbd55049))
+
 ## [0.49.1](https://github.com/wpfleger96/shell-configs/compare/v0.49.0...v0.49.1) (2026-06-01)
 
 
