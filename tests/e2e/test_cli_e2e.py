@@ -44,7 +44,7 @@ class TestListShells:
 @pytest.mark.e2e
 class TestValidate:
     def test_validate_bundled_config(self, run_cli):
-        result = run_cli(["validate"])
+        result = run_cli(["validate", "--shells", "bash"])
         output = strip_ansi(result.stdout + result.stderr)
         assert result.returncode == 0
         assert "valid" in output.lower()

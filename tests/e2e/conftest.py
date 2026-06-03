@@ -82,7 +82,7 @@ def run_cli(e2e_home):
         return subprocess.run(
             [sys.executable, "-m", "shell_configs.cli", *args],
             capture_output=True,
-            text=True,
+            encoding="utf-8",
             check=False,
             cwd=repo_root,
             env=env,
