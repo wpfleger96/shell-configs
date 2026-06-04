@@ -106,7 +106,7 @@ def _du_size_bytes(path: Path) -> int | None:
         )
         if result.returncode == 0:
             return int(result.stdout.split()[0]) * 1024
-    except (subprocess.TimeoutExpired, ValueError, IndexError, OSError):
+    except subprocess.TimeoutExpired, ValueError, IndexError, OSError:
         pass
     return None
 
@@ -149,7 +149,7 @@ class SizeCache:
                 and isinstance(v.get("size_bytes"), int)
                 and now - v.get("ts", 0) <= self._ttl
             }
-        except (OSError, json.JSONDecodeError, KeyError, TypeError, AttributeError):
+        except OSError, json.JSONDecodeError, KeyError, TypeError, AttributeError:
             self._data = {}
 
     def get(self, path: Path) -> int | None:
@@ -222,7 +222,7 @@ def _scan_dev_tree(
             continue
         try:
             entries = list(os.scandir(current))
-        except (PermissionError, OSError):
+        except PermissionError, OSError:
             continue
 
         if current.name == "target":
@@ -425,7 +425,7 @@ def _wsl_caches() -> list[ScanTarget]:
                         ),
                     ]
                 )
-    except (subprocess.TimeoutExpired, OSError):
+    except subprocess.TimeoutExpired, OSError:
         pass  # WSL path resolution failure is non-fatal
 
     return targets
@@ -480,7 +480,7 @@ def _docker_targets() -> list[ScanTarget]:
         )
         if result.returncode != 0:
             return []
-    except (subprocess.TimeoutExpired, OSError):
+    except subprocess.TimeoutExpired, OSError:
         return []
 
     # Sentinel target — no path, handled specially in report and fix
@@ -885,15 +885,17 @@ def _scan_discovery_walk(
     progress_callback: Callable[[int], None] | None = None,
     max_depth: int = 8,
 ) -> list[DiscoveryItem]:
-    name_skip_set = frozenset({
-        ".git",
-        "node_modules",
-        "__pycache__",
-        ".Trash",
-        ".Spotlight-V100",
-        ".fseventsd",
-        ".TemporaryItems",
-    })
+    name_skip_set = frozenset(
+        {
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".Trash",
+            ".Spotlight-V100",
+            ".fseventsd",
+            ".TemporaryItems",
+        }
+    )
 
     stack: list[tuple[Path, int]] = [(root, 0) for root in roots]
     # Per-category min-heaps of (size_bytes, str_path, mtime)
@@ -906,7 +908,7 @@ def _scan_discovery_walk(
             continue
         try:
             entries = list(os.scandir(current))
-        except (PermissionError, OSError):
+        except PermissionError, OSError:
             continue
 
         dir_count += 1
@@ -942,7 +944,7 @@ def _scan_discovery_walk(
                 entry_tuple = (size, entry.path, mtime)
                 if len(heap) < top_n:
                     heapq.heappush(heap, entry_tuple)
-                else:
+                elif entry_tuple > heap[0]:
                     heapq.heapreplace(heap, entry_tuple)
 
     now = time.time()
@@ -977,17 +979,26 @@ def _format_discovery_rows(items: list[DiscoveryItem], term_width: int) -> list[
     SIZE_COL = 8
     DATE_COL = 12  # " YYYY-MM-DD "
     INDENT = 2
-    max_path_width = term_width - INDENT - SIZE_COL - DATE_COL
 
     rows = []
     for t in items:
+        stale_tag = f"[stale {_human_age(t.mtime)}]" if t.is_stale else ""
+        stale_plain = f" {stale_tag}" if stale_tag else ""
+        stale_str = f" [dim]{stale_tag.replace('[', '\\[')}[/dim]" if stale_tag else ""
+        max_path_width = term_width - INDENT - SIZE_COL - DATE_COL - len(stale_plain)
         path_str = _short_path(t.path)
         if len(path_str) > max_path_width:
-            path_str = "…" + path_str[-(max_path_width - 1):]
+            path_str = "…" + path_str[-(max_path_width - 1) :]
         plain_size = _human_size(t.size_bytes)
         date_str = time.strftime("%Y-%m-%d", time.localtime(t.mtime))
-        stale_str = f" [dim][stale {_human_age(t.mtime)}][/dim]" if t.is_stale else ""
-        padding = term_width - INDENT - len(path_str) - len(plain_size) - DATE_COL
+        padding = (
+            term_width
+            - INDENT
+            - len(path_str)
+            - len(plain_size)
+            - DATE_COL
+            - len(stale_plain)
+        )
         rows.append(
             f"  {path_str}{' ' * max(1, padding)}{_color_size(t.size_bytes)}  {date_str}{stale_str}"
         )
@@ -1042,16 +1053,22 @@ def _execute_discovery_cleanup(items: list[DiscoveryItem]) -> list[Path]:
             console.print(f"  [yellow]Skipping {display} (no longer exists)[/yellow]")
             continue
         if not stat.S_ISREG(st.st_mode):
-            console.print(f"  [yellow]Skipping {display} (no longer a regular file)[/yellow]")
+            console.print(
+                f"  [yellow]Skipping {display} (no longer a regular file)[/yellow]"
+            )
             continue
         if _allocated_size(st) != item.size_bytes or st.st_mtime != item.mtime:
-            console.print(f"  [yellow]Skipping {display} (file changed since scan)[/yellow]")
+            console.print(
+                f"  [yellow]Skipping {display} (file changed since scan)[/yellow]"
+            )
             continue
         console.print(f"  Removing {display} ({_human_size(item.size_bytes)})...")
         try:
             item.path.unlink()
         except OSError as e:
-            console.print(f"  [yellow]Warning: could not remove {display}: {e}[/yellow]")
+            console.print(
+                f"  [yellow]Warning: could not remove {display}: {e}[/yellow]"
+            )
             continue
         attempted.append(item.path)
     return attempted
@@ -1346,7 +1363,9 @@ def _interactive_select(
         )
         for t in sorted(incrementals, key=lambda t: t.size_bytes, reverse=True):
             choices.append(
-                _target_choice(t, f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})")
+                _target_choice(
+                    t, f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})"
+                )
             )
 
     if caches:
@@ -1360,7 +1379,9 @@ def _interactive_select(
         )
         for t in sorted(caches, key=lambda t: t.size_bytes, reverse=True):
             choices.append(
-                _target_choice(t, f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})")
+                _target_choice(
+                    t, f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})"
+                )
             )
 
     if rust_targets:
@@ -1374,7 +1395,9 @@ def _interactive_select(
         )
         for t in sorted(rust_targets, key=lambda t: t.size_bytes, reverse=True):
             choices.append(
-                _target_choice(t, f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})")
+                _target_choice(
+                    t, f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})"
+                )
             )
 
     if docker_targets:
@@ -1405,7 +1428,9 @@ def _interactive_select(
         )
         for d in sorted(discovery_with_size, key=lambda d: d.size_bytes, reverse=True):
             choices.append(
-                _target_choice(d, f"  {_short_path(d.path)} ({_human_size(d.size_bytes)})")
+                _target_choice(
+                    d, f"  {_short_path(d.path)} ({_human_size(d.size_bytes)})"
+                )
             )
 
     selected_raw = inquirer.checkbox(
@@ -1604,7 +1629,9 @@ def main() -> None:
     )
 
     targets, discovery_items = _scan(
-        dev_dir, args.workers, cache=cache,
+        dev_dir,
+        args.workers,
+        cache=cache,
         skip_discover=args.skip_discover,
         scan_dirs=scan_dirs,
         discover_top_n=args.discover_top,
@@ -1623,7 +1650,9 @@ def main() -> None:
         if not args.skip_discover and discovery_items:
             _print_discovery_report(discovery_items, console.width)
             console.print()
-            console.print("[dim]Discovered items require manual review — use interactive mode to select for deletion.[/dim]")
+            console.print(
+                "[dim]Discovered items require manual review — use interactive mode to select for deletion.[/dim]"
+            )
         _run_fix(targets, skip_confirm=args.yes, cache=cache)
 
     elif args.command == "interactive":
