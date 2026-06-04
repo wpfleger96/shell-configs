@@ -12,11 +12,14 @@ import pytest
 from shell_configs.agents import (
     Agent,
     AgentInstallConfig,
+    get_agent_install_method,
     get_agent_version,
     install_agent,
     is_agent_installed,
     load_agents,
+    uninstall_agent,
 )
+from shell_configs.agents_registry import DEPRECATED_AGENTS, DeprecatedAgentSpec
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -29,6 +32,7 @@ def _make_agent(
     description: str = "Claude Code",
     check_path: str | None = None,
     install_cmd: str | None = None,
+    uninstall_cmd: str | None = None,
     macos: AgentInstallConfig | None = None,
     linux: AgentInstallConfig | None = None,
 ) -> Agent:
@@ -38,6 +42,7 @@ def _make_agent(
         description=description,
         check_path=check_path,
         install_cmd=install_cmd,
+        uninstall_cmd=uninstall_cmd,
         macos=macos,
         linux=linux,
     )
@@ -440,3 +445,227 @@ class TestAgentsComponent:
             AgentsComponent().apply(self._make_ctx(dry_run=True), plan)
 
         mock_install.assert_called_once_with(agent, dry_run=True)
+
+    def test_plan_includes_deprecated_agents(self, tmp_path, monkeypatch):
+        from shell_configs.cli.components.agents import AgentsComponent
+
+        manifest = tmp_path / "agents.yaml"
+        manifest.write_text(
+            "agents:\n"
+            "  - name: good\n"
+            "    command: good\n"
+            "    description: OK\n"
+        )
+
+        deprecated = (DeprecatedAgentSpec(agent_id="old-tool", command_name="old-tool"),)
+
+        with (
+            patch("shell_configs.agents.get_config_dir", return_value=tmp_path),
+            patch("shell_configs.agents.is_agent_installed", return_value=True),
+            patch("shell_configs.agents_registry.DEPRECATED_AGENTS", deprecated),
+            patch("shutil.which", return_value="/usr/bin/old-tool"),
+            patch("shell_configs.agent_manifest.AgentManifest") as MockManifest,
+        ):
+            mock_instance = MockManifest.return_value
+            mock_instance.is_new = True
+            plan = AgentsComponent().plan(self._make_ctx())
+
+        assert len(plan.deprecated_installed) == 1
+        assert plan.deprecated_installed[0].agent_id == "old-tool"
+
+    def test_plan_skips_orphans_on_first_run(self, tmp_path):
+        from shell_configs.cli.components.agents import AgentsComponent
+
+        manifest = tmp_path / "agents.yaml"
+        manifest.write_text(
+            "agents:\n"
+            "  - name: good\n"
+            "    command: good\n"
+            "    description: OK\n"
+        )
+
+        with (
+            patch("shell_configs.agents.get_config_dir", return_value=tmp_path),
+            patch("shell_configs.agents.is_agent_installed", return_value=True),
+            patch(
+                "shell_configs.agent_manifest.get_default_agent_manifest_path",
+                return_value=tmp_path / "nonexistent.json",
+            ),
+        ):
+            plan = AgentsComponent().plan(self._make_ctx())
+
+        assert plan.orphaned == []
+
+    def test_uninstall_iterates_manifest(self, tmp_path):
+        from shell_configs.cli.components.agents import AgentsComponent
+
+        manifest_path = tmp_path / "installed_agents.json"
+        import json
+
+        manifest_data = {
+            "version": 1,
+            "agents": {
+                "test-agent": {
+                    "command_name": "test-cmd",
+                    "install_method": "script",
+                    "package": None,
+                    "installed_at": "2026-01-01T00:00:00+00:00",
+                }
+            },
+        }
+        manifest_path.write_text(json.dumps(manifest_data))
+
+        with (
+            patch(
+                "shell_configs.agent_manifest.get_default_agent_manifest_path",
+                return_value=manifest_path,
+            ),
+            patch("shell_configs.agents.is_agent_installed", return_value=False),
+        ):
+            AgentsComponent().uninstall(self._make_ctx())
+
+        # Manifest should be updated (entry removed since agent wasn't installed)
+        reloaded = json.loads(manifest_path.read_text())
+        assert "test-agent" not in reloaded["agents"]
+
+
+# ---------------------------------------------------------------------------
+# TestUninstallAgent
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestUninstallAgent:
+    def test_not_installed_returns_early(self):
+        with patch("shell_configs.agents.is_agent_installed", return_value=False):
+            ok, msg = uninstall_agent(_make_agent())
+        assert ok
+        assert "not installed" in msg
+
+    def test_npm_uninstall(self, monkeypatch):
+        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: p.value == "macos")
+        agent = _make_agent(
+            name="gemini-cli",
+            command="gemini",
+            macos=AgentInstallConfig(method="npm", package="@google/gemini-cli"),
+        )
+        with (
+            patch("shell_configs.agents.is_agent_installed", return_value=True),
+            patch("shell_configs.agents.shutil.which", return_value="/usr/bin/npm"),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="", stderr=""
+            )
+            ok, msg = uninstall_agent(agent)
+        assert ok
+        called_cmd = mock_run.call_args[0][0]
+        assert called_cmd == ["npm", "uninstall", "-g", "@google/gemini-cli"]
+
+    def test_script_uninstall(self, monkeypatch):
+        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: False)
+        agent = _make_agent(uninstall_cmd="rm -rf /tmp/test-agent")
+        with (
+            patch("shell_configs.agents.is_agent_installed", return_value=True),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="", stderr=""
+            )
+            ok, msg = uninstall_agent(agent)
+        assert ok
+        assert mock_run.call_args[1].get("shell") is True
+
+    def test_no_uninstall_method(self, monkeypatch):
+        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: False)
+        agent = _make_agent()  # no uninstall_cmd, no platform config
+        with patch("shell_configs.agents.is_agent_installed", return_value=True):
+            ok, msg = uninstall_agent(agent)
+        assert not ok
+        assert "No uninstall method" in msg
+
+    def test_dry_run_npm(self, monkeypatch):
+        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: p.value == "macos")
+        agent = _make_agent(
+            name="gemini-cli",
+            command="gemini",
+            macos=AgentInstallConfig(method="npm", package="@google/gemini-cli"),
+        )
+        with (
+            patch("shell_configs.agents.is_agent_installed", return_value=True),
+            patch("shell_configs.agents.shutil.which", return_value="/usr/bin/npm"),
+        ):
+            ok, msg = uninstall_agent(agent, dry_run=True)
+        assert ok
+        assert "Would" in msg
+
+    def test_npm_failure(self, monkeypatch):
+        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: p.value == "macos")
+        agent = _make_agent(
+            name="gemini-cli",
+            command="gemini",
+            macos=AgentInstallConfig(method="npm", package="@google/gemini-cli"),
+        )
+        with (
+            patch("shell_configs.agents.is_agent_installed", return_value=True),
+            patch("shell_configs.agents.shutil.which", return_value="/usr/bin/npm"),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=1, stdout="", stderr="permission denied"
+            )
+            ok, msg = uninstall_agent(agent)
+        assert not ok
+        assert "permission denied" in msg
+
+    def test_timeout(self, monkeypatch):
+        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: False)
+        agent = _make_agent(uninstall_cmd="sleep 999")
+        with (
+            patch("shell_configs.agents.is_agent_installed", return_value=True),
+            patch("subprocess.run", side_effect=subprocess.TimeoutExpired("cmd", 300)),
+        ):
+            ok, msg = uninstall_agent(agent)
+        assert not ok
+        assert "timed out" in msg
+
+
+# ---------------------------------------------------------------------------
+# TestDeprecatedAgentRegistry
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestDeprecatedAgentRegistry:
+    def test_is_tuple(self):
+        assert isinstance(DEPRECATED_AGENTS, tuple)
+
+    def test_starts_empty(self):
+        assert len(DEPRECATED_AGENTS) == 0
+
+    def test_spec_is_frozen(self):
+        spec = DeprecatedAgentSpec(agent_id="test", command_name="test-cmd")
+        with pytest.raises(AttributeError):
+            spec.agent_id = "changed"
+
+
+# ---------------------------------------------------------------------------
+# TestGetAgentInstallMethod
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestGetAgentInstallMethod:
+    def test_npm_on_macos(self, monkeypatch):
+        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: p.value == "macos")
+        agent = _make_agent(macos=AgentInstallConfig(method="npm", package="@google/gemini-cli"))
+        method, pkg = get_agent_install_method(agent)
+        assert method == "npm"
+        assert pkg == "@google/gemini-cli"
+
+    def test_script_fallback(self, monkeypatch):
+        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: False)
+        agent = _make_agent(install_cmd="curl | bash")
+        method, pkg = get_agent_install_method(agent)
+        assert method == "script"
+        assert pkg is None

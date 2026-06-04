@@ -49,4 +49,8 @@ DIFF_COMPONENTS = INSTALL_COMPONENTS
 UNINSTALL_COMPONENTS: list[Component] = [
     ConfigsComponent(),
     ScriptsComponent(),
+    AgentsComponent(),
+    ExtensionsComponent(),
+    GhExtensionsComponent(),
+    CompletionsComponent(),
 ]

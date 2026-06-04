@@ -44,3 +44,25 @@ class CompletionsComponent(Component):
             )
 
         console.print()
+
+    def uninstall(self, ctx: Context) -> None:
+        from shell_configs.completions import (
+            detect_shell,
+            find_config_file,
+            uninstall_completion,
+        )
+        from shell_configs.display import print_success, print_warning
+
+        detected_shell = detect_shell()
+        if not detected_shell:
+            return
+
+        config_path = find_config_file(detected_shell)
+        if not config_path:
+            return
+
+        success, msg = uninstall_completion(config_path)
+        if success:
+            print_success(msg)
+        else:
+            print_warning(msg)
