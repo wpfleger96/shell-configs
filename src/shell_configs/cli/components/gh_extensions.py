@@ -151,3 +151,30 @@ class GhExtensionsComponent(Component):
 
         self.display_plan(plan)
         return True
+
+    def uninstall(self, ctx: Context) -> None:
+        from shell_configs.bootstrap import is_command_available
+        from shell_configs.display import print_success, print_warning
+        from shell_configs.gh_extensions import (
+            _remove_extension,
+            command_name,
+            list_installed,
+            load_extensions,
+        )
+
+        if not is_command_available("gh"):
+            print_warning("gh CLI not available, skipping extension removal")
+            return
+
+        desired = load_extensions()
+        installed = list_installed()
+        desired_repos = {ext.repo for ext in desired}
+        desired_cmd_names = {command_name(ext.repo) for ext in desired}
+
+        for key in sorted(installed):
+            if key in desired_repos or key in desired_cmd_names:
+                cmd = command_name(key) if "/" in key else key
+                if _remove_extension(cmd):
+                    print_success(f"Removed gh extension: {cmd}")
+                else:
+                    print_warning(f"Failed to remove gh extension: {cmd}")

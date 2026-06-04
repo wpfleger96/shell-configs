@@ -96,17 +96,18 @@ def command_name(repo: str) -> str:
     return project.removeprefix("gh-")
 
 
-def _remove_extension(cmd_name: str) -> None:
-    """Remove an installed gh extension by command name, ignoring errors."""
+def _remove_extension(cmd_name: str) -> bool:
+    """Remove an installed gh extension by command name."""
     try:
-        subprocess.run(
+        result = subprocess.run(
             ["gh", "extension", "remove", cmd_name],
             capture_output=True,
             text=True,
             timeout=30,
         )
+        return result.returncode == 0
     except FileNotFoundError, subprocess.TimeoutExpired:
-        pass
+        return False
 
 
 def _get_extensions_dir() -> Path:

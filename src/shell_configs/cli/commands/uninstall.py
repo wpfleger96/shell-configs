@@ -39,7 +39,7 @@ def uninstall(shells: list[str] | None, yes: bool) -> None:
     if not yes:
         shell_names = ", ".join([s.display_name for s in selected_shells])
         if not click.confirm(
-            f"Remove managed sections from {shell_names} configurations?"
+            f"Remove all managed components ({shell_names} configs, agents, extensions, completions)?"
         ):
             print_info("Uninstallation cancelled")
             return

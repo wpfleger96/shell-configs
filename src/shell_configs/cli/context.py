@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from shell_configs.agents import Agent
+    from shell_configs.agents_registry import DeprecatedAgentSpec
     from shell_configs.config import ConfigReader
     from shell_configs.extensions import ExtensionDiff
     from shell_configs.gh_extensions import GhExtension
@@ -118,6 +119,8 @@ class LanguagesPlan(ComponentPlan):
 class AgentsPlan(ComponentPlan):
     all_agents: list[Agent] = field(default_factory=list)
     missing: list[Agent] = field(default_factory=list)
+    deprecated_installed: list[DeprecatedAgentSpec] = field(default_factory=list)
+    orphaned: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

@@ -109,3 +109,21 @@ class TestWindowsSpecific:
         result = run_cli(["completions", "status"])
         output = strip_ansi(result.stdout + result.stderr)
         assert "powershell" in output.lower()
+
+
+@pytest.mark.e2e
+class TestUninstall:
+    def test_uninstall_help(self, run_cli):
+        result = run_cli(["uninstall", "--help"])
+        output = strip_ansi(result.stdout + result.stderr)
+        assert result.returncode == 0
+        assert "--yes" in output or "-y" in output
+
+    def test_uninstall_runs_in_clean_home(self, run_cli):
+        result = run_cli(["uninstall", "-y"])
+        assert result.returncode == 0
+
+    def test_uninstall_is_idempotent(self, run_cli):
+        run_cli(["uninstall", "-y"])
+        result = run_cli(["uninstall", "-y"])
+        assert result.returncode == 0

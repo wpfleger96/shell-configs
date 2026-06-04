@@ -223,3 +223,34 @@ class ExtensionsComponent(Component):
         p = self.plan(ctx)
         self.display_plan(p)
         return any(d.missing or d.extra or d.ignored for d in p.per_shell.values())
+
+    def uninstall(self, ctx: Context) -> None:
+        from shell_configs.cli.helpers import _get_extension_shells
+        from shell_configs.display import print_success, print_warning
+        from shell_configs.extensions import ExtensionManager
+
+        ext_manager = ExtensionManager()
+        ide_shells = _get_extension_shells(ctx.registry)
+
+        for shell in ide_shells:
+            invoker = shell.get_extension_invoker()
+            cli_cmd = shell.get_extension_cli()
+            if invoker is None and cli_cmd is None:
+                continue
+
+            desired = ext_manager.load_desired_extensions(
+                shell.name,
+                shell.get_extension_list_paths(),
+                profile=ctx.profile,
+            )
+            if not desired:
+                continue
+
+            results = ext_manager.uninstall_extensions(
+                cli_cmd, extensions=desired, invoker=invoker
+            )
+            for r in results:
+                if r.success:
+                    print_success(r.message)
+                else:
+                    print_warning(r.message)
