@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.51.0](https://github.com/wpfleger96/shell-configs/compare/v0.50.0...v0.51.0) (2026-06-04)
+
+
+### Features
+
+* add registry-driven uninstall lifecycle for managed components ([#67](https://github.com/wpfleger96/shell-configs/issues/67)) ([4de4607](https://github.com/wpfleger96/shell-configs/commit/4de4607bfc45dead8c5b4e4e51ea4c751b0dfd19))
+* **disk-cleanup:** add generic large-file discovery mode ([#69](https://github.com/wpfleger96/shell-configs/issues/69)) ([d3a3296](https://github.com/wpfleger96/shell-configs/commit/d3a32964699cb8c2384507b8f806e5fdfa0d941f))
+
 ## [0.50.0](https://github.com/wpfleger96/shell-configs/compare/v0.49.1...v0.50.0) (2026-06-03)
 
 
