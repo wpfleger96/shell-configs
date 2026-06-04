@@ -1597,7 +1597,8 @@ class TestExecuteDiscoveryCleanup:
 
         assert result == []
         captured = capsys.readouterr()
-        assert "no longer exists" in captured.out
+        out = " ".join(captured.out.split())
+        assert "no longer exists" in out
 
     def test_skips_when_mtime_changed(self, tmp_path, capsys):
         f = tmp_path / "changed_mtime.zip"
@@ -1612,7 +1613,8 @@ class TestExecuteDiscoveryCleanup:
         assert f.exists()
         assert result == []
         captured = capsys.readouterr()
-        assert "file changed since scan" in captured.out
+        out = " ".join(captured.out.split())
+        assert "file changed since scan" in out
 
     def test_skips_when_size_changed(self, tmp_path, capsys):
         f = tmp_path / "grown.zip"
@@ -1629,4 +1631,5 @@ class TestExecuteDiscoveryCleanup:
         assert f.exists()
         assert result == []
         captured = capsys.readouterr()
-        assert "file changed since scan" in captured.out
+        out = " ".join(captured.out.split())
+        assert "file changed since scan" in out
