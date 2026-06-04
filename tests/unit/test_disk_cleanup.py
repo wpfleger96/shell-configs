@@ -1564,7 +1564,7 @@ class TestScanDiscoveryWalkTopN:
 
 @pytest.mark.unit
 class TestExecuteDiscoveryCleanup:
-    def _make_item(self, path: Path) -> object:
+    def _make_item(self, path: Path) -> Any:
         st = path.lstat()
         return mod.DiscoveryItem(
             path=path,
