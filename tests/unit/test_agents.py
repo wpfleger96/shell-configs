@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -18,6 +19,7 @@ from shell_configs.agents import (
     is_agent_installed,
     load_agents,
     uninstall_agent,
+    uninstall_agent_by_manifest_entry,
 )
 from shell_configs.agents_registry import DEPRECATED_AGENTS, DeprecatedAgentSpec
 
@@ -124,6 +126,19 @@ class TestLoadAgents:
         manifest = tmp_path / "agents.yaml"
         manifest.write_text("agents: []\n")
         assert load_agents(manifest) == []
+
+    def test_uninstall_cmd_parsed(self, tmp_path):
+        manifest = tmp_path / "agents.yaml"
+        manifest.write_text(
+            "agents:\n"
+            "  - name: custom-agent\n"
+            "    command: custom-agent\n"
+            "    description: Custom Agent\n"
+            '    uninstall_cmd: "rm -rf /tmp/agent"\n'
+        )
+        with patch("shell_configs.agents.get_config_dir", return_value=tmp_path):
+            agents = load_agents()
+        assert agents[0].uninstall_cmd == "rm -rf /tmp/agent"
 
 
 # ---------------------------------------------------------------------------
@@ -528,6 +543,219 @@ class TestAgentsComponent:
         reloaded = json.loads(manifest_path.read_text())
         assert "test-agent" not in reloaded["agents"]
 
+    def test_apply_removes_orphaned_agents(self, tmp_path):
+        import json
+
+        from shell_configs.cli.components.agents import AgentsComponent
+        from shell_configs.cli.context import AgentsPlan
+
+        manifest_path = tmp_path / "installed_agents.json"
+        manifest_data = {
+            "version": 1,
+            "agents": {
+                "old-agent": {
+                    "command_name": "old-cmd",
+                    "install_method": "npm",
+                    "package": "@scope/old-agent",
+                    "installed_at": "2026-01-01T00:00:00+00:00",
+                }
+            },
+        }
+        manifest_path.write_text(json.dumps(manifest_data))
+
+        plan = AgentsPlan(has_changes=True, all_agents=[], missing=[], orphaned=["old-agent"])
+
+        with (
+            patch(
+                "shell_configs.agent_manifest.get_default_agent_manifest_path",
+                return_value=manifest_path,
+            ),
+            patch(
+                "shell_configs.agents.uninstall_agent_by_manifest_entry",
+                return_value=(True, "Uninstalled"),
+            ),
+        ):
+            AgentsComponent().apply(self._make_ctx(), plan)
+
+        reloaded = json.loads(manifest_path.read_text())
+        assert "old-agent" not in reloaded["agents"]
+
+    def test_apply_handles_orphan_removal_failure(self, tmp_path):
+        import json
+
+        from shell_configs.cli.components.agents import AgentsComponent
+        from shell_configs.cli.context import AgentsPlan
+
+        manifest_path = tmp_path / "installed_agents.json"
+        manifest_data = {
+            "version": 1,
+            "agents": {
+                "old-agent": {
+                    "command_name": "old-cmd",
+                    "install_method": "npm",
+                    "package": "@scope/old-agent",
+                    "installed_at": "2026-01-01T00:00:00+00:00",
+                }
+            },
+        }
+        manifest_path.write_text(json.dumps(manifest_data))
+
+        plan = AgentsPlan(has_changes=True, all_agents=[], missing=[], orphaned=["old-agent"])
+
+        with (
+            patch(
+                "shell_configs.agent_manifest.get_default_agent_manifest_path",
+                return_value=manifest_path,
+            ),
+            patch(
+                "shell_configs.agents.uninstall_agent_by_manifest_entry",
+                return_value=(False, "error"),
+            ),
+        ):
+            AgentsComponent().apply(self._make_ctx(), plan)
+
+        reloaded = json.loads(manifest_path.read_text())
+        assert "old-agent" in reloaded["agents"]
+
+    def test_apply_removes_deprecated_agents(self, tmp_path):
+        import json
+
+        from shell_configs.cli.components.agents import AgentsComponent
+        from shell_configs.cli.context import AgentsPlan
+
+        manifest_path = tmp_path / "installed_agents.json"
+        manifest_path.write_text(json.dumps({"version": 1, "agents": {}}))
+
+        spec = DeprecatedAgentSpec(agent_id="old-tool", command_name="old-tool")
+        plan = AgentsPlan(
+            has_changes=True,
+            all_agents=[],
+            missing=[],
+            deprecated_installed=[spec],
+        )
+
+        with (
+            patch(
+                "shell_configs.agent_manifest.get_default_agent_manifest_path",
+                return_value=manifest_path,
+            ),
+            patch("shutil.which", return_value="/usr/bin/old-tool"),
+            patch(
+                "shell_configs.agents.uninstall_agent",
+                return_value=(True, "Removed"),
+            ) as mock_uninstall,
+        ):
+            AgentsComponent().apply(self._make_ctx(), plan)
+
+        mock_uninstall.assert_called_once()
+        _, kwargs = mock_uninstall.call_args
+        assert kwargs.get("dry_run") is False
+
+    def test_apply_passes_dry_run_to_orphan_uninstall(self, tmp_path):
+        import json
+
+        from shell_configs.cli.components.agents import AgentsComponent
+        from shell_configs.cli.context import AgentsPlan
+
+        manifest_path = tmp_path / "installed_agents.json"
+        manifest_data = {
+            "version": 1,
+            "agents": {
+                "old-agent": {
+                    "command_name": "old-cmd",
+                    "install_method": "npm",
+                    "package": "@scope/old-agent",
+                    "installed_at": "2026-01-01T00:00:00+00:00",
+                }
+            },
+        }
+        manifest_path.write_text(json.dumps(manifest_data))
+
+        plan = AgentsPlan(has_changes=True, all_agents=[], missing=[], orphaned=["old-agent"])
+
+        with (
+            patch(
+                "shell_configs.agent_manifest.get_default_agent_manifest_path",
+                return_value=manifest_path,
+            ),
+            patch(
+                "shell_configs.agents.uninstall_agent_by_manifest_entry",
+                return_value=(True, "Uninstalled"),
+            ) as mock_uninstall,
+        ):
+            AgentsComponent().apply(self._make_ctx(dry_run=True), plan)
+
+        _, kwargs = mock_uninstall.call_args
+        assert kwargs.get("dry_run") is True
+
+    def test_uninstall_retains_manifest_on_failure(self, tmp_path):
+        import json
+
+        from shell_configs.cli.components.agents import AgentsComponent
+
+        manifest_path = tmp_path / "installed_agents.json"
+        manifest_data = {
+            "version": 1,
+            "agents": {
+                "test-agent": {
+                    "command_name": "test-cmd",
+                    "install_method": "npm",
+                    "package": "@scope/test-agent",
+                    "installed_at": "2026-01-01T00:00:00+00:00",
+                }
+            },
+        }
+        manifest_path.write_text(json.dumps(manifest_data))
+
+        with (
+            patch(
+                "shell_configs.agent_manifest.get_default_agent_manifest_path",
+                return_value=manifest_path,
+            ),
+            patch(
+                "shell_configs.agents.uninstall_agent_by_manifest_entry",
+                return_value=(False, "error"),
+            ),
+        ):
+            AgentsComponent().uninstall(self._make_ctx())
+
+        reloaded = json.loads(manifest_path.read_text())
+        assert "test-agent" in reloaded["agents"]
+
+    def test_uninstall_removes_manifest_on_success(self, tmp_path):
+        import json
+
+        from shell_configs.cli.components.agents import AgentsComponent
+
+        manifest_path = tmp_path / "installed_agents.json"
+        manifest_data = {
+            "version": 1,
+            "agents": {
+                "test-agent": {
+                    "command_name": "test-cmd",
+                    "install_method": "npm",
+                    "package": "@scope/test-agent",
+                    "installed_at": "2026-01-01T00:00:00+00:00",
+                }
+            },
+        }
+        manifest_path.write_text(json.dumps(manifest_data))
+
+        with (
+            patch(
+                "shell_configs.agent_manifest.get_default_agent_manifest_path",
+                return_value=manifest_path,
+            ),
+            patch(
+                "shell_configs.agents.uninstall_agent_by_manifest_entry",
+                return_value=(True, "Removed"),
+            ),
+        ):
+            AgentsComponent().uninstall(self._make_ctx())
+
+        reloaded = json.loads(manifest_path.read_text())
+        assert "test-agent" not in reloaded["agents"]
+
 
 # ---------------------------------------------------------------------------
 # TestUninstallAgent
@@ -645,8 +873,8 @@ class TestDeprecatedAgentRegistry:
 
     def test_spec_is_frozen(self):
         spec = DeprecatedAgentSpec(agent_id="test", command_name="test-cmd")
-        with pytest.raises(AttributeError):
-            spec.agent_id = "changed"
+        with pytest.raises(FrozenInstanceError):
+            spec.agent_id = "changed"  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
@@ -669,3 +897,40 @@ class TestGetAgentInstallMethod:
         method, pkg = get_agent_install_method(agent)
         assert method == "script"
         assert pkg is None
+
+
+# ---------------------------------------------------------------------------
+# TestUninstallAgentByManifestEntry
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestUninstallAgentByManifestEntry:
+    def test_npm_uninstall(self):
+        with (
+            patch("shell_configs.agents.shutil.which", return_value="/usr/bin/cmd"),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            ok, msg = uninstall_agent_by_manifest_entry(
+                "test", "cmd", "npm", "@scope/pkg"
+            )
+        assert ok
+        assert mock_run.call_args[0][0] == ["npm", "uninstall", "-g", "@scope/pkg"]
+
+    def test_not_installed(self):
+        with patch("shell_configs.agents.shutil.which", return_value=None):
+            ok, msg = uninstall_agent_by_manifest_entry("test", "cmd", "npm", "pkg")
+        assert ok
+        assert "not installed" in msg
+
+    def test_script_no_reverse(self):
+        with patch("shell_configs.agents.shutil.which", return_value="/usr/bin/cmd"):
+            ok, msg = uninstall_agent_by_manifest_entry("test", "cmd", "script", None)
+        assert ok
+        assert "no reverse" in msg
+
+    def test_unknown_method(self):
+        with patch("shell_configs.agents.shutil.which", return_value="/usr/bin/cmd"):
+            ok, msg = uninstall_agent_by_manifest_entry("test", "cmd", "brew", None)
+        assert not ok

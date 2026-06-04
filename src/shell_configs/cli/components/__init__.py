@@ -52,5 +52,4 @@ UNINSTALL_COMPONENTS: list[Component] = [
     AgentsComponent(),
     ExtensionsComponent(),
     GhExtensionsComponent(),
-    CompletionsComponent(),
 ]

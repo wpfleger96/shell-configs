@@ -119,7 +119,7 @@ class TestGhExtensionsComponentUninstall:
             patch("shell_configs.gh_extensions.load_extensions", return_value=[mock_ext]),
             patch("shell_configs.gh_extensions.list_installed", return_value={"test": None, "other": None}),
             patch("shell_configs.gh_extensions.command_name", return_value="test"),
-            patch("shell_configs.gh_extensions._remove_extension") as mock_remove,
+            patch("shell_configs.gh_extensions._remove_extension", return_value=True) as mock_remove,
         ):
             GhExtensionsComponent().uninstall(ctx)
 
@@ -149,11 +149,38 @@ class TestGhExtensionsComponentUninstall:
             patch("shell_configs.gh_extensions.load_extensions", return_value=[mock_ext]),
             patch("shell_configs.gh_extensions.list_installed", return_value={"unrelated": None}),
             patch("shell_configs.gh_extensions.command_name", return_value="test"),
-            patch("shell_configs.gh_extensions._remove_extension") as mock_remove,
+            patch("shell_configs.gh_extensions._remove_extension", return_value=True) as mock_remove,
         ):
             GhExtensionsComponent().uninstall(ctx)
 
         mock_remove.assert_not_called()
+
+    def test_uninstall_matches_by_repo_key(self):
+        from shell_configs.cli.components.gh_extensions import GhExtensionsComponent
+
+        mock_ext = MagicMock()
+        mock_ext.repo = "owner/gh-test"
+
+        ctx = _make_ctx()
+        with (
+            patch("shell_configs.bootstrap.is_command_available", return_value=True),
+            patch("shell_configs.gh_extensions.load_extensions", return_value=[mock_ext]),
+            patch(
+                "shell_configs.gh_extensions.list_installed",
+                return_value={"owner/gh-test": None},
+            ),
+            patch(
+                "shell_configs.gh_extensions.command_name",
+                return_value="test",
+            ),
+            patch(
+                "shell_configs.gh_extensions._remove_extension",
+                return_value=True,
+            ) as mock_remove,
+        ):
+            GhExtensionsComponent().uninstall(ctx)
+
+        mock_remove.assert_called_once_with("test")
 
 
 @pytest.mark.unit

@@ -168,9 +168,13 @@ class GhExtensionsComponent(Component):
 
         desired = load_extensions()
         installed = list_installed()
+        desired_repos = {ext.repo for ext in desired}
         desired_cmd_names = {command_name(ext.repo) for ext in desired}
 
-        for cmd_name in sorted(installed):
-            if cmd_name in desired_cmd_names:
-                _remove_extension(cmd_name)
-                print_success(f"Removed gh extension: {cmd_name}")
+        for key in sorted(installed):
+            if key in desired_repos or key in desired_cmd_names:
+                cmd = command_name(key) if "/" in key else key
+                if _remove_extension(cmd):
+                    print_success(f"Removed gh extension: {cmd}")
+                else:
+                    print_warning(f"Failed to remove gh extension: {cmd}")

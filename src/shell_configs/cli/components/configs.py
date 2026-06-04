@@ -528,3 +528,18 @@ class ConfigsComponent(Component):
                 )
                 if result != OperationResult.NOT_FOUND:
                     print_operation_result(result, message)
+
+        # Remove shell completions (same RC files, must run sequentially)
+        from shell_configs.completions import (
+            detect_shell,
+            find_config_file,
+            uninstall_completion,
+        )
+
+        detected_shell = detect_shell()
+        if detected_shell:
+            config_path = find_config_file(detected_shell)
+            if config_path:
+                result_ok, msg = uninstall_completion(config_path)
+                if result_ok:
+                    print_operation_result(OperationResult.REMOVED, msg)

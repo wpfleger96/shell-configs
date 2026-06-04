@@ -83,7 +83,7 @@ def list_installed() -> dict[str, str | None]:
                     if cmd_name:
                         installed[cmd_name] = None
         return installed
-    except FileNotFoundError, subprocess.TimeoutExpired:
+    except (FileNotFoundError, subprocess.TimeoutExpired):
         return {}
 
 
@@ -96,17 +96,18 @@ def command_name(repo: str) -> str:
     return project.removeprefix("gh-")
 
 
-def _remove_extension(cmd_name: str) -> None:
-    """Remove an installed gh extension by command name, ignoring errors."""
+def _remove_extension(cmd_name: str) -> bool:
+    """Remove an installed gh extension by command name."""
     try:
-        subprocess.run(
+        result = subprocess.run(
             ["gh", "extension", "remove", cmd_name],
             capture_output=True,
             text=True,
             timeout=30,
         )
-    except FileNotFoundError, subprocess.TimeoutExpired:
-        pass
+        return result.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
 
 
 def _get_extensions_dir() -> Path:
@@ -120,7 +121,7 @@ def _get_extensions_dir() -> Path:
         )
         if result.returncode == 0 and result.stdout.strip():
             return Path(result.stdout.strip())
-    except FileNotFoundError, subprocess.TimeoutExpired:
+    except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
     return Path.home() / ".local" / "share" / "gh" / "extensions"
 
@@ -225,7 +226,7 @@ def install_extension(
         _remove_extension(cmd_name)
         try:
             retry = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        except FileNotFoundError, subprocess.TimeoutExpired:
+        except (FileNotFoundError, subprocess.TimeoutExpired):
             return (
                 False,
                 f"Failed to install {name}: retry failed after removing conflict",

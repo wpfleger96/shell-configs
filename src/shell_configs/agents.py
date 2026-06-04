@@ -123,23 +123,27 @@ def get_agent_version(agent: Agent) -> str | None:
     return None
 
 
+def _resolve_platform_config(agent: Agent) -> AgentInstallConfig | None:
+    if is_platform(Platform.MACOS) and agent.macos:
+        return agent.macos
+    if is_platform(Platform.WINDOWS) and agent.windows:
+        return agent.windows
+    if (is_platform(Platform.WSL) or is_platform(Platform.LINUX)) and agent.linux:
+        return agent.linux
+    return None
+
+
 def install_agent(agent: Agent, dry_run: bool = False) -> tuple[bool, str]:
     """Install an agent. Returns (success, message)."""
     if is_agent_installed(agent):
         return True, f"{agent.name} is already installed"
 
-    ok, msg = False, f"No install method configured for {agent.name} on this platform"
-
-    if is_platform(Platform.MACOS) and agent.macos:
-        ok, msg = _install_via_config(agent.name, agent.macos, dry_run)
-    elif is_platform(Platform.WINDOWS) and agent.windows:
-        ok, msg = _install_via_config(agent.name, agent.windows, dry_run)
-    elif (is_platform(Platform.WSL) or is_platform(Platform.LINUX)) and agent.linux:
-        ok, msg = _install_via_config(agent.name, agent.linux, dry_run)
-    elif agent.install_cmd:
-        ok, msg = _install_via_script(agent.name, agent.install_cmd, dry_run)
-
-    return ok, msg
+    config = _resolve_platform_config(agent)
+    if config:
+        return _install_via_config(agent.name, config, dry_run)
+    if agent.install_cmd:
+        return _install_via_script(agent.name, agent.install_cmd, dry_run)
+    return False, f"No install method configured for {agent.name} on this platform"
 
 
 def _install_via_config(
@@ -158,18 +162,31 @@ def uninstall_agent(agent: Agent, dry_run: bool = False) -> tuple[bool, str]:
     if not is_agent_installed(agent):
         return True, f"{agent.name} is not installed"
 
-    ok, msg = False, f"No uninstall method configured for {agent.name} on this platform"
+    config = _resolve_platform_config(agent)
+    if config:
+        return _uninstall_via_config(agent.name, config, dry_run)
+    if agent.uninstall_cmd:
+        return _uninstall_via_script(agent.name, agent.uninstall_cmd, dry_run)
+    return False, f"No uninstall method configured for {agent.name} on this platform"
 
-    if is_platform(Platform.MACOS) and agent.macos:
-        ok, msg = _uninstall_via_config(agent.name, agent.macos, dry_run)
-    elif is_platform(Platform.WINDOWS) and agent.windows:
-        ok, msg = _uninstall_via_config(agent.name, agent.windows, dry_run)
-    elif (is_platform(Platform.WSL) or is_platform(Platform.LINUX)) and agent.linux:
-        ok, msg = _uninstall_via_config(agent.name, agent.linux, dry_run)
-    elif agent.uninstall_cmd:
-        ok, msg = _uninstall_via_script(agent.name, agent.uninstall_cmd, dry_run)
 
-    return ok, msg
+def uninstall_agent_by_manifest_entry(
+    name: str,
+    command: str,
+    install_method: str,
+    package: str | None,
+    dry_run: bool = False,
+) -> tuple[bool, str]:
+    """Uninstall an agent using manifest-recorded install method."""
+    if not shutil.which(command):
+        return True, f"{name} is not installed"
+    if install_method == "npm":
+        return _uninstall_npm(name, package or name, dry_run)
+    if install_method == "winget":
+        return _uninstall_winget(name, package or name, dry_run)
+    if install_method == "script":
+        return True, f"{name} has no reverse uninstall script"
+    return False, f"Unknown install method: {install_method}"
 
 
 def _uninstall_via_config(
@@ -249,12 +266,9 @@ def _uninstall_via_script(name: str, uninstall_cmd: str, dry_run: bool) -> tuple
 
 def get_agent_install_method(agent: Agent) -> tuple[str, str | None]:
     """Return (install_method, package) for manifest recording."""
-    if is_platform(Platform.MACOS) and agent.macos:
-        return agent.macos.method, agent.macos.package or agent.name
-    if is_platform(Platform.WINDOWS) and agent.windows:
-        return agent.windows.method, agent.windows.package or agent.name
-    if (is_platform(Platform.WSL) or is_platform(Platform.LINUX)) and agent.linux:
-        return agent.linux.method, agent.linux.package or agent.name
+    config = _resolve_platform_config(agent)
+    if config:
+        return config.method, config.package or agent.name
     return "script", None
 
 

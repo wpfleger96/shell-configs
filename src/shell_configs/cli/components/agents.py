@@ -84,6 +84,7 @@ class AgentsComponent(Component):
             get_agent_install_method,
             install_agent,
             uninstall_agent,
+            uninstall_agent_by_manifest_entry,
         )
         from shell_configs.display import print_error, print_success, print_warning
 
@@ -107,18 +108,16 @@ class AgentsComponent(Component):
         for name in plan.orphaned:
             entry = manifest.agents.get(name)
             if entry:
-                orphan_agent = Agent(
-                    name=name,
-                    command=entry.command_name,
-                    description="",
+                ok, msg = uninstall_agent_by_manifest_entry(
+                    name, entry.command_name, entry.install_method, entry.package,
+                    dry_run=ctx.dry_run,
                 )
-                ok, msg = uninstall_agent(orphan_agent)
                 if ok:
                     print_success(f"Removed orphaned agent: {name}", indent=2)
+                    manifest.remove(name)
+                    manifest.save()
                 else:
                     print_warning(f"Could not remove orphaned agent {name}: {msg}", indent=2)
-                manifest.remove(name)
-                manifest.save()
 
         # Remove deprecated agents
         for spec in plan.deprecated_installed:
@@ -129,7 +128,7 @@ class AgentsComponent(Component):
                 command=spec.command_name,
                 description="",
             )
-            ok, msg = uninstall_agent(dep_agent)
+            ok, msg = uninstall_agent(dep_agent, dry_run=ctx.dry_run)
             if ok:
                 print_success(f"Removed deprecated agent: {spec.agent_id}", indent=2)
             else:
@@ -198,7 +197,11 @@ class AgentsComponent(Component):
             AgentManifest,
             get_default_agent_manifest_path,
         )
-        from shell_configs.agents import Agent, uninstall_agent
+        from shell_configs.agents import (
+            Agent,
+            uninstall_agent,
+            uninstall_agent_by_manifest_entry,
+        )
         from shell_configs.agents_registry import DEPRECATED_AGENTS
         from shell_configs.display import print_operation_result, print_warning
         from shell_configs.manager import OperationResult
@@ -208,12 +211,9 @@ class AgentsComponent(Component):
         if manifest.agents:
             for name in list(manifest.agents.keys()):
                 entry = manifest.agents[name]
-                agent = Agent(
-                    name=name,
-                    command=entry.command_name,
-                    description="",
+                ok, msg = uninstall_agent_by_manifest_entry(
+                    name, entry.command_name, entry.install_method, entry.package,
                 )
-                ok, msg = uninstall_agent(agent)
                 if ok:
                     print_operation_result(OperationResult.REMOVED, msg)
                     manifest.remove(name)

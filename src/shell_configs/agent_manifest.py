@@ -41,15 +41,19 @@ class AgentManifest:
             return
         try:
             data = json.loads(self.path.read_text())
-            for name, entry in data.get("agents", {}).items():
+        except json.JSONDecodeError as e:
+            logger.warning("Corrupt agent manifest at %s: %s", self.path, e)
+            return
+        for name, entry in data.get("agents", {}).items():
+            try:
                 self.agents[name] = AgentManifestEntry(
                     command_name=entry["command_name"],
                     install_method=entry["install_method"],
                     package=entry["package"],
                     installed_at=entry["installed_at"],
                 )
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.warning("Corrupt agent manifest at %s: %s", self.path, e)
+            except KeyError as e:
+                logger.warning("Skipping corrupt manifest entry %s: %s", name, e)
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
