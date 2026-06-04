@@ -1336,8 +1336,6 @@ class TestParseSizeArg:
         ],
     )
     def test_valid_inputs(self, s, expected):
-        import argparse as argparse_mod
-
         assert mod._parse_size_arg(s) == expected
 
     @pytest.mark.parametrize("s", ["", "abc", "M"])
