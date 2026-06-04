@@ -466,13 +466,12 @@ class TestAgentsComponent:
 
         manifest = tmp_path / "agents.yaml"
         manifest.write_text(
-            "agents:\n"
-            "  - name: good\n"
-            "    command: good\n"
-            "    description: OK\n"
+            "agents:\n  - name: good\n    command: good\n    description: OK\n"
         )
 
-        deprecated = (DeprecatedAgentSpec(agent_id="old-tool", command_name="old-tool"),)
+        deprecated = (
+            DeprecatedAgentSpec(agent_id="old-tool", command_name="old-tool"),
+        )
 
         with (
             patch("shell_configs.agents.get_config_dir", return_value=tmp_path),
@@ -493,10 +492,7 @@ class TestAgentsComponent:
 
         manifest = tmp_path / "agents.yaml"
         manifest.write_text(
-            "agents:\n"
-            "  - name: good\n"
-            "    command: good\n"
-            "    description: OK\n"
+            "agents:\n  - name: good\n    command: good\n    description: OK\n"
         )
 
         with (
@@ -563,7 +559,9 @@ class TestAgentsComponent:
         }
         manifest_path.write_text(json.dumps(manifest_data))
 
-        plan = AgentsPlan(has_changes=True, all_agents=[], missing=[], orphaned=["old-agent"])
+        plan = AgentsPlan(
+            has_changes=True, all_agents=[], missing=[], orphaned=["old-agent"]
+        )
 
         with (
             patch(
@@ -600,7 +598,9 @@ class TestAgentsComponent:
         }
         manifest_path.write_text(json.dumps(manifest_data))
 
-        plan = AgentsPlan(has_changes=True, all_agents=[], missing=[], orphaned=["old-agent"])
+        plan = AgentsPlan(
+            has_changes=True, all_agents=[], missing=[], orphaned=["old-agent"]
+        )
 
         with (
             patch(
@@ -671,7 +671,9 @@ class TestAgentsComponent:
         }
         manifest_path.write_text(json.dumps(manifest_data))
 
-        plan = AgentsPlan(has_changes=True, all_agents=[], missing=[], orphaned=["old-agent"])
+        plan = AgentsPlan(
+            has_changes=True, all_agents=[], missing=[], orphaned=["old-agent"]
+        )
 
         with (
             patch(
@@ -771,7 +773,9 @@ class TestUninstallAgent:
         assert "not installed" in msg
 
     def test_npm_uninstall(self, monkeypatch):
-        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: p.value == "macos")
+        monkeypatch.setattr(
+            "shell_configs.agents.is_platform", lambda p: p.value == "macos"
+        )
         agent = _make_agent(
             name="gemini-cli",
             command="gemini",
@@ -813,7 +817,9 @@ class TestUninstallAgent:
         assert "No uninstall method" in msg
 
     def test_dry_run_npm(self, monkeypatch):
-        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: p.value == "macos")
+        monkeypatch.setattr(
+            "shell_configs.agents.is_platform", lambda p: p.value == "macos"
+        )
         agent = _make_agent(
             name="gemini-cli",
             command="gemini",
@@ -828,7 +834,9 @@ class TestUninstallAgent:
         assert "Would" in msg
 
     def test_npm_failure(self, monkeypatch):
-        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: p.value == "macos")
+        monkeypatch.setattr(
+            "shell_configs.agents.is_platform", lambda p: p.value == "macos"
+        )
         agent = _make_agent(
             name="gemini-cli",
             command="gemini",
@@ -885,8 +893,12 @@ class TestDeprecatedAgentRegistry:
 @pytest.mark.unit
 class TestGetAgentInstallMethod:
     def test_npm_on_macos(self, monkeypatch):
-        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: p.value == "macos")
-        agent = _make_agent(macos=AgentInstallConfig(method="npm", package="@google/gemini-cli"))
+        monkeypatch.setattr(
+            "shell_configs.agents.is_platform", lambda p: p.value == "macos"
+        )
+        agent = _make_agent(
+            macos=AgentInstallConfig(method="npm", package="@google/gemini-cli")
+        )
         method, pkg = get_agent_install_method(agent)
         assert method == "npm"
         assert pkg == "@google/gemini-cli"

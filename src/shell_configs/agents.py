@@ -246,7 +246,9 @@ def _uninstall_winget(name: str, package: str, dry_run: bool) -> tuple[bool, str
         return False, f"Failed to uninstall {name}: winget timed out"
 
 
-def _uninstall_via_script(name: str, uninstall_cmd: str, dry_run: bool) -> tuple[bool, str]:
+def _uninstall_via_script(
+    name: str, uninstall_cmd: str, dry_run: bool
+) -> tuple[bool, str]:
     if dry_run:
         return True, f"Would uninstall {name} via: {uninstall_cmd}"
     try:

@@ -33,7 +33,10 @@ class TestExtensionsComponentUninstall:
 
         ctx = _make_ctx()
         with (
-            patch("shell_configs.cli.helpers._get_extension_shells", return_value=[mock_shell]),
+            patch(
+                "shell_configs.cli.helpers._get_extension_shells",
+                return_value=[mock_shell],
+            ),
             patch("shell_configs.extensions.ExtensionManager") as MockEM,
         ):
             mock_em = MockEM.return_value
@@ -52,7 +55,10 @@ class TestExtensionsComponentUninstall:
 
         ctx = _make_ctx()
         with (
-            patch("shell_configs.cli.helpers._get_extension_shells", return_value=[mock_shell]),
+            patch(
+                "shell_configs.cli.helpers._get_extension_shells",
+                return_value=[mock_shell],
+            ),
             patch("shell_configs.extensions.ExtensionManager") as MockEM,
         ):
             ExtensionsComponent().uninstall(ctx)
@@ -69,7 +75,10 @@ class TestExtensionsComponentUninstall:
 
         ctx = _make_ctx()
         with (
-            patch("shell_configs.cli.helpers._get_extension_shells", return_value=[mock_shell]),
+            patch(
+                "shell_configs.cli.helpers._get_extension_shells",
+                return_value=[mock_shell],
+            ),
             patch("shell_configs.extensions.ExtensionManager") as MockEM,
         ):
             mock_em = MockEM.return_value
@@ -93,7 +102,10 @@ class TestExtensionsComponentUninstall:
 
         ctx = _make_ctx()
         with (
-            patch("shell_configs.cli.helpers._get_extension_shells", return_value=[mock_shell]),
+            patch(
+                "shell_configs.cli.helpers._get_extension_shells",
+                return_value=[mock_shell],
+            ),
             patch("shell_configs.extensions.ExtensionManager") as MockEM,
             patch("shell_configs.display.print_warning") as mock_warn,
         ):
@@ -116,10 +128,17 @@ class TestGhExtensionsComponentUninstall:
         ctx = _make_ctx()
         with (
             patch("shell_configs.bootstrap.is_command_available", return_value=True),
-            patch("shell_configs.gh_extensions.load_extensions", return_value=[mock_ext]),
-            patch("shell_configs.gh_extensions.list_installed", return_value={"test": None, "other": None}),
+            patch(
+                "shell_configs.gh_extensions.load_extensions", return_value=[mock_ext]
+            ),
+            patch(
+                "shell_configs.gh_extensions.list_installed",
+                return_value={"test": None, "other": None},
+            ),
             patch("shell_configs.gh_extensions.command_name", return_value="test"),
-            patch("shell_configs.gh_extensions._remove_extension", return_value=True) as mock_remove,
+            patch(
+                "shell_configs.gh_extensions._remove_extension", return_value=True
+            ) as mock_remove,
         ):
             GhExtensionsComponent().uninstall(ctx)
 
@@ -146,10 +165,17 @@ class TestGhExtensionsComponentUninstall:
         ctx = _make_ctx()
         with (
             patch("shell_configs.bootstrap.is_command_available", return_value=True),
-            patch("shell_configs.gh_extensions.load_extensions", return_value=[mock_ext]),
-            patch("shell_configs.gh_extensions.list_installed", return_value={"unrelated": None}),
+            patch(
+                "shell_configs.gh_extensions.load_extensions", return_value=[mock_ext]
+            ),
+            patch(
+                "shell_configs.gh_extensions.list_installed",
+                return_value={"unrelated": None},
+            ),
             patch("shell_configs.gh_extensions.command_name", return_value="test"),
-            patch("shell_configs.gh_extensions._remove_extension", return_value=True) as mock_remove,
+            patch(
+                "shell_configs.gh_extensions._remove_extension", return_value=True
+            ) as mock_remove,
         ):
             GhExtensionsComponent().uninstall(ctx)
 
@@ -164,7 +190,9 @@ class TestGhExtensionsComponentUninstall:
         ctx = _make_ctx()
         with (
             patch("shell_configs.bootstrap.is_command_available", return_value=True),
-            patch("shell_configs.gh_extensions.load_extensions", return_value=[mock_ext]),
+            patch(
+                "shell_configs.gh_extensions.load_extensions", return_value=[mock_ext]
+            ),
             patch(
                 "shell_configs.gh_extensions.list_installed",
                 return_value={"owner/gh-test": None},
@@ -193,8 +221,14 @@ class TestCompletionsComponentUninstall:
         ctx = _make_ctx()
         with (
             patch("shell_configs.completions.detect_shell", return_value="zsh"),
-            patch("shell_configs.completions.find_config_file", return_value=Path("/tmp/.zshrc")),
-            patch("shell_configs.completions.uninstall_completion", return_value=(True, "Removed")) as mock_uninstall,
+            patch(
+                "shell_configs.completions.find_config_file",
+                return_value=Path("/tmp/.zshrc"),
+            ),
+            patch(
+                "shell_configs.completions.uninstall_completion",
+                return_value=(True, "Removed"),
+            ) as mock_uninstall,
         ):
             CompletionsComponent().uninstall(ctx)
 
@@ -233,8 +267,14 @@ class TestCompletionsComponentUninstall:
         ctx = _make_ctx()
         with (
             patch("shell_configs.completions.detect_shell", return_value="zsh"),
-            patch("shell_configs.completions.find_config_file", return_value=Path("/tmp/.zshrc")),
-            patch("shell_configs.completions.uninstall_completion", return_value=(False, "Nothing to remove")),
+            patch(
+                "shell_configs.completions.find_config_file",
+                return_value=Path("/tmp/.zshrc"),
+            ),
+            patch(
+                "shell_configs.completions.uninstall_completion",
+                return_value=(False, "Nothing to remove"),
+            ),
             patch("shell_configs.display.print_warning") as mock_warn,
         ):
             CompletionsComponent().uninstall(ctx)

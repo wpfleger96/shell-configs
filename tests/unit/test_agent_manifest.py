@@ -59,7 +59,9 @@ class TestAgentManifest:
     def test_record_install_upserts(self, tmp_path):
         path = tmp_path / "manifest.json"
         manifest = AgentManifest(path)
-        manifest.record_install("claude-code", "claude", "npm", "@anthropic-ai/claude-code")
+        manifest.record_install(
+            "claude-code", "claude", "npm", "@anthropic-ai/claude-code"
+        )
         manifest.record_install("claude-code", "claude", "brew", None)
         manifest.save()
 

@@ -109,7 +109,10 @@ class AgentsComponent(Component):
             entry = manifest.agents.get(name)
             if entry:
                 ok, msg = uninstall_agent_by_manifest_entry(
-                    name, entry.command_name, entry.install_method, entry.package,
+                    name,
+                    entry.command_name,
+                    entry.install_method,
+                    entry.package,
                     dry_run=ctx.dry_run,
                 )
                 if ok:
@@ -117,7 +120,9 @@ class AgentsComponent(Component):
                     manifest.remove(name)
                     manifest.save()
                 else:
-                    print_warning(f"Could not remove orphaned agent {name}: {msg}", indent=2)
+                    print_warning(
+                        f"Could not remove orphaned agent {name}: {msg}", indent=2
+                    )
 
         # Remove deprecated agents
         for spec in plan.deprecated_installed:
@@ -133,7 +138,8 @@ class AgentsComponent(Component):
                 print_success(f"Removed deprecated agent: {spec.agent_id}", indent=2)
             else:
                 print_warning(
-                    f"Could not remove deprecated agent {spec.agent_id}: {msg}", indent=2
+                    f"Could not remove deprecated agent {spec.agent_id}: {msg}",
+                    indent=2,
                 )
 
         return success
@@ -212,7 +218,10 @@ class AgentsComponent(Component):
             for name in list(manifest.agents.keys()):
                 entry = manifest.agents[name]
                 ok, msg = uninstall_agent_by_manifest_entry(
-                    name, entry.command_name, entry.install_method, entry.package,
+                    name,
+                    entry.command_name,
+                    entry.install_method,
+                    entry.package,
                 )
                 if ok:
                     print_operation_result(OperationResult.REMOVED, msg)
