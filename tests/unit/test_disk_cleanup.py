@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import types
 
 from collections.abc import Callable
@@ -1309,6 +1310,326 @@ class TestInteractiveSelect:
             ),
         ]
 
-        result = mod._interactive_select(targets)
+        selected_targets, selected_discovery = mod._interactive_select(targets)
+
+        assert selected_targets == []
+        assert selected_discovery == []
+
+
+# ---------------------------------------------------------------------------
+# _parse_size_arg
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestParseSizeArg:
+    @pytest.mark.parametrize(
+        "s,expected",
+        [
+            ("100M", 100 * 1024**2),
+            ("1G", 1 * 1024**3),
+            ("500K", 500 * 1024),
+            ("100m", 100 * 1024**2),
+            ("1024", 1024),
+            ("1.5G", int(1.5 * 1024**3)),
+            ("2T", 2 * 1024**4),
+        ],
+    )
+    def test_valid_inputs(self, s, expected):
+        assert mod._parse_size_arg(s) == expected
+
+    @pytest.mark.parametrize("s", ["", "abc", "M"])
+    def test_invalid_inputs_raise(self, s):
+        import argparse as argparse_mod
+
+        with pytest.raises(argparse_mod.ArgumentTypeError):
+            mod._parse_size_arg(s)
+
+
+# ---------------------------------------------------------------------------
+# _categorize_path
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestCategorizePath:
+    @pytest.mark.parametrize(
+        "filename,expected",
+        [
+            ("file.iso", "disk-images"),
+            ("file.mp4", "media"),
+            ("file.zip", "archives"),
+            ("file.sql", "database"),
+            ("file.log", "logs"),
+        ],
+    )
+    def test_curated_map_hits(self, filename, expected):
+        assert mod._categorize_path(Path(filename)) == expected
+
+    def test_compound_tar_gz_returns_archives(self):
+        assert mod._categorize_path(Path("backup.tar.gz")) == "archives"
+
+    def test_mimetypes_fallback_jpeg(self):
+        # .jpeg is not in the curated map but mimetypes knows image/jpeg
+        result = mod._categorize_path(Path("photo.jpeg"))
+        assert result == "image"
+
+    def test_unknown_extension_returns_other(self):
+        assert mod._categorize_path(Path("file.xyz123")) == "other"
+
+    def test_case_insensitive(self):
+        assert mod._categorize_path(Path("FILE.ISO")) == "disk-images"
+
+
+# ---------------------------------------------------------------------------
+# _allocated_size
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestAllocatedSize:
+    def test_uses_st_blocks_when_present(self):
+        st = types.SimpleNamespace(st_blocks=100, st_size=99999)
+        assert mod._allocated_size(st) == 100 * 512
+
+    def test_falls_back_to_st_size_without_st_blocks(self):
+        st = types.SimpleNamespace(st_size=12345)
+        assert mod._allocated_size(st) == 12345
+
+
+# ---------------------------------------------------------------------------
+# _human_age
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestHumanAge:
+    def _make_mtime(self, days_ago: int) -> float:
+        return time.time() - 86400 * days_ago
+
+    def test_three_days(self):
+        assert mod._human_age(self._make_mtime(3)) == "3d"
+
+    def test_forty_five_days(self):
+        assert mod._human_age(self._make_mtime(45)) == "45d"
+
+    def test_one_year(self):
+        assert mod._human_age(self._make_mtime(365)) == "1y"
+
+    def test_two_years(self):
+        assert mod._human_age(self._make_mtime(730)) == "2y"
+
+    def test_zero_days(self):
+        assert mod._human_age(self._make_mtime(0)) == "0d"
+
+
+# ---------------------------------------------------------------------------
+# _build_discovery_skip_paths
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestBuildDiscoverySkipPaths:
+    def test_includes_registry_paths(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(mod, "PLATFORM", "linux")
+        reg = frozenset([tmp_path / "a", tmp_path / "b"])
+        result = mod._build_discovery_skip_paths(reg, tmp_path / "dev")
+        assert tmp_path / "a" in result
+        assert tmp_path / "b" in result
+
+    def test_macos_includes_library(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(mod, "PLATFORM", "macos")
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        result = mod._build_discovery_skip_paths(frozenset(), tmp_path / "dev")
+        resolved_library = (tmp_path / "Library").resolve()
+        assert resolved_library in result
+
+    def test_dev_dir_not_in_result(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(mod, "PLATFORM", "linux")
+        dev_dir = tmp_path / "dev"
+        result = mod._build_discovery_skip_paths(frozenset(), dev_dir)
+        assert dev_dir not in result
+        assert dev_dir.resolve() not in result
+
+
+# ---------------------------------------------------------------------------
+# _scan_discovery_walk — staleness logic
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestScanDiscoveryWalkStaleness:
+    def _write_file(self, path: Path, size: int, mtime: float) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x" * size)
+        os.utime(path, (mtime, mtime))
+
+    def test_old_file_in_high_risk_dir_is_stale(self, tmp_path):
+        high_risk = tmp_path / "Downloads"
+        old_mtime = time.time() - 86400 * 100  # 100 days old
+        f = high_risk / "bigfile.iso"
+        self._write_file(f, 4096, old_mtime)
+
+        items = mod._scan_discovery_walk(
+            roots=[tmp_path],
+            min_size_bytes=1024,
+            top_n=10,
+            skip_paths=frozenset(),
+            high_risk_dirs=[high_risk],
+            age_threshold_days=30,
+        )
+
+        matches = [i for i in items if i.path == f]
+        assert len(matches) == 1
+        assert matches[0].is_stale is True
+
+    def test_new_file_in_high_risk_dir_is_not_stale(self, tmp_path):
+        high_risk = tmp_path / "Downloads"
+        new_mtime = time.time() - 86400 * 1  # 1 day old
+        f = high_risk / "newfile.iso"
+        self._write_file(f, 4096, new_mtime)
+
+        items = mod._scan_discovery_walk(
+            roots=[tmp_path],
+            min_size_bytes=1024,
+            top_n=10,
+            skip_paths=frozenset(),
+            high_risk_dirs=[high_risk],
+            age_threshold_days=30,
+        )
+
+        matches = [i for i in items if i.path == f]
+        assert len(matches) == 1
+        assert matches[0].is_stale is False
+
+    def test_old_file_outside_high_risk_dir_is_not_stale(self, tmp_path):
+        high_risk = tmp_path / "Downloads"
+        safe_dir = tmp_path / "Projects"
+        old_mtime = time.time() - 86400 * 100
+        f = safe_dir / "archive.zip"
+        self._write_file(f, 4096, old_mtime)
+
+        items = mod._scan_discovery_walk(
+            roots=[tmp_path],
+            min_size_bytes=1024,
+            top_n=10,
+            skip_paths=frozenset(),
+            high_risk_dirs=[high_risk],
+            age_threshold_days=30,
+        )
+
+        matches = [i for i in items if i.path == f]
+        assert len(matches) == 1
+        assert matches[0].is_stale is False
+
+
+# ---------------------------------------------------------------------------
+# _scan_discovery_walk — heap-based top-N
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestScanDiscoveryWalkTopN:
+    def test_returns_only_top_n_largest(self, tmp_path):
+        sizes = [2048, 3072, 4096, 5120, 6144]
+        for i, sz in enumerate(sizes):
+            f = tmp_path / f"file{i}.zip"
+            f.write_bytes(b"x" * sz)
+
+        items = mod._scan_discovery_walk(
+            roots=[tmp_path],
+            min_size_bytes=1024,
+            top_n=3,
+            skip_paths=frozenset(),
+            high_risk_dirs=[],
+            age_threshold_days=30,
+        )
+
+        # All files are .zip -> same category; only top 3 by size should appear
+        assert len(items) == 3
+        returned_sizes = sorted([i.size_bytes for i in items], reverse=True)
+        # The three largest allocated sizes should correspond to the three biggest files
+        assert returned_sizes[0] >= returned_sizes[1] >= returned_sizes[2]
+        # The smallest file (2048) must not appear
+        smallest_path = tmp_path / "file0.zip"
+        assert all(i.path != smallest_path for i in items)
+
+
+# ---------------------------------------------------------------------------
+# _execute_discovery_cleanup — pre-deletion revalidation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestExecuteDiscoveryCleanup:
+    def _make_item(self, path: Path) -> Any:
+        st = path.lstat()
+        return mod.DiscoveryItem(
+            path=path,
+            label=str(path),
+            category="archives",
+            size_bytes=mod._allocated_size(st),
+            mtime=st.st_mtime,
+        )
+
+    def test_deletes_existing_file(self, tmp_path, capsys):
+        f = tmp_path / "remove_me.zip"
+        f.write_bytes(b"x" * 2048)
+        item = self._make_item(f)
+
+        result = mod._execute_discovery_cleanup([item])
+
+        assert not f.exists()
+        assert f in result
+
+    def test_skips_nonexistent_path(self, tmp_path, capsys):
+        ghost = tmp_path / "ghost.zip"
+        # Construct item manually — file never exists
+        item = mod.DiscoveryItem(
+            path=ghost,
+            label=str(ghost),
+            category="archives",
+            size_bytes=1024,
+            mtime=time.time(),
+        )
+
+        result = mod._execute_discovery_cleanup([item])
 
         assert result == []
+        captured = capsys.readouterr()
+        out = " ".join(captured.out.split())
+        assert "no longer exists" in out
+
+    def test_skips_when_mtime_changed(self, tmp_path, capsys):
+        f = tmp_path / "changed_mtime.zip"
+        f.write_bytes(b"x" * 2048)
+        item = self._make_item(f)
+        # Advance mtime so it no longer matches the snapshot in item
+        new_mtime = time.time() + 100
+        os.utime(f, (new_mtime, new_mtime))
+
+        result = mod._execute_discovery_cleanup([item])
+
+        assert f.exists()
+        assert result == []
+        captured = capsys.readouterr()
+        out = " ".join(captured.out.split())
+        assert "file changed since scan" in out
+
+    def test_skips_when_size_changed(self, tmp_path, capsys):
+        f = tmp_path / "grown.zip"
+        f.write_bytes(b"x" * 2048)
+        item = self._make_item(f)
+        # Append bytes to change the allocated size
+        with f.open("ab") as fh:
+            fh.write(b"y" * 8192)
+        # Reset mtime to match the original snapshot so only size differs
+        os.utime(f, (item.mtime, item.mtime))
+
+        result = mod._execute_discovery_cleanup([item])
+
+        assert f.exists()
+        assert result == []
+        captured = capsys.readouterr()
+        out = " ".join(captured.out.split())
+        assert "file changed since scan" in out

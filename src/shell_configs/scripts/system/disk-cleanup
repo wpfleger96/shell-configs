@@ -6,9 +6,12 @@
 from __future__ import annotations
 
 import argparse
+import heapq
 import json
+import mimetypes
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -64,6 +67,16 @@ class ScanTarget:
     size_bytes: int = 0
 
 
+@dataclass
+class DiscoveryItem:
+    path: Path
+    label: str
+    category: str
+    size_bytes: int = 0
+    mtime: float = 0.0
+    is_stale: bool = False
+
+
 # ---------------------------------------------------------------------------
 # Platform target registry
 # ---------------------------------------------------------------------------
@@ -93,7 +106,7 @@ def _du_size_bytes(path: Path) -> int | None:
         )
         if result.returncode == 0:
             return int(result.stdout.split()[0]) * 1024
-    except (subprocess.TimeoutExpired, ValueError, IndexError, OSError):
+    except subprocess.TimeoutExpired, ValueError, IndexError, OSError:
         pass
     return None
 
@@ -136,7 +149,7 @@ class SizeCache:
                 and isinstance(v.get("size_bytes"), int)
                 and now - v.get("ts", 0) <= self._ttl
             }
-        except (OSError, json.JSONDecodeError, KeyError, TypeError, AttributeError):
+        except OSError, json.JSONDecodeError, KeyError, TypeError, AttributeError:
             self._data = {}
 
     def get(self, path: Path) -> int | None:
@@ -209,7 +222,7 @@ def _scan_dev_tree(
             continue
         try:
             entries = list(os.scandir(current))
-        except (PermissionError, OSError):
+        except PermissionError, OSError:
             continue
 
         if current.name == "target":
@@ -412,7 +425,7 @@ def _wsl_caches() -> list[ScanTarget]:
                         ),
                     ]
                 )
-    except (subprocess.TimeoutExpired, OSError):
+    except subprocess.TimeoutExpired, OSError:
         pass  # WSL path resolution failure is non-fatal
 
     return targets
@@ -467,7 +480,7 @@ def _docker_targets() -> list[ScanTarget]:
         )
         if result.returncode != 0:
             return []
-    except (subprocess.TimeoutExpired, OSError):
+    except subprocess.TimeoutExpired, OSError:
         return []
 
     # Sentinel target — no path, handled specially in report and fix
@@ -534,8 +547,17 @@ def _format_rows(items: list[ScanTarget], term_width: int) -> list[str]:
 
 
 def _scan(
-    dev_dir: Path, workers: int, cache: SizeCache | None = None
-) -> list[ScanTarget]:
+    dev_dir: Path,
+    workers: int,
+    cache: SizeCache | None = None,
+    *,
+    skip_discover: bool = False,
+    scan_dirs: list[Path] | None = None,
+    discover_top_n: int = 20,
+    discover_min_size: int = 100 * 1024 * 1024,
+    stale_days: int = 90,
+    high_risk_dirs: list[Path] | None = None,
+) -> tuple[list[ScanTarget], list[DiscoveryItem]]:
     from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 
     from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -604,6 +626,32 @@ def _scan(
                 builders_task, description="[green]Resolving platform caches"
             )
 
+            # Submit discovery walk concurrently with du size computation
+            discovery_future = None
+            if not skip_discover:
+                discovery_task = progress.add_task(
+                    "[cyan]Scanning for large files...", total=None
+                )
+                registry_paths = frozenset(t.path.resolve() for t in all_targets)
+                skip_paths = _build_discovery_skip_paths(registry_paths, dev_dir)
+
+                def _discovery_progress(n: int) -> None:
+                    progress.update(
+                        discovery_task,
+                        description=f"[cyan]Scanning for large files ({n} dirs)...",
+                    )
+
+                discovery_future = pool.submit(
+                    _scan_discovery_walk,
+                    scan_dirs or [Path.home()],
+                    discover_min_size,
+                    discover_top_n,
+                    skip_paths,
+                    high_risk_dirs or [Path.home() / "Downloads"],
+                    stale_days,
+                    _discovery_progress,
+                )
+
             # Update sizes task with total count now that all futures are submitted
             total_du = len(du_futures)
             total_sizes = cache_hits + total_du
@@ -644,7 +692,17 @@ def _scan(
 
             progress.update(sizes_task, description="[green]Computing sizes")
 
-    return all_targets
+            # Collect discovery results (walk likely done or nearly done by now)
+            if discovery_future is not None:
+                discovery_items = discovery_future.result()
+                progress.update(
+                    discovery_task,
+                    description="[green]Scanning for large files",
+                )
+            else:
+                discovery_items = []
+
+    return all_targets, discovery_items
 
 
 # ---------------------------------------------------------------------------
@@ -653,6 +711,367 @@ def _scan(
 
 
 _MIN_DISPLAY_BYTES = 1024 * 1024  # 1 MB
+
+# ---------------------------------------------------------------------------
+# Discovery file categorization
+# ---------------------------------------------------------------------------
+
+_EXTENSION_CATEGORIES: dict[str, str] = {
+    # disk images and VM formats
+    "iso": "disk-images",
+    "img": "disk-images",
+    "vmdk": "disk-images",
+    "vdi": "disk-images",
+    "vhd": "disk-images",
+    "vhdx": "disk-images",
+    "qcow2": "disk-images",
+    "dmg": "disk-images",
+    "ova": "disk-images",
+    "ovf": "disk-images",
+    "toast": "disk-images",
+    "nrg": "disk-images",
+    "box": "disk-images",
+    "vagrant": "disk-images",
+    # archives
+    "zip": "archives",
+    "tar": "archives",
+    "gz": "archives",
+    "bz2": "archives",
+    "xz": "archives",
+    "zst": "archives",
+    "7z": "archives",
+    "rar": "archives",
+    "tgz": "archives",
+    "tbz2": "archives",
+    "txz": "archives",
+    # video
+    "mp4": "media",
+    "mkv": "media",
+    "avi": "media",
+    "mov": "media",
+    "wmv": "media",
+    "flv": "media",
+    "webm": "media",
+    "m4v": "media",
+    # audio
+    "mp3": "audio",
+    "flac": "audio",
+    "wav": "audio",
+    "aac": "audio",
+    "ogg": "audio",
+    "m4a": "audio",
+    "wma": "audio",
+    # databases and dumps
+    "sql": "database",
+    "dump": "database",
+    "db": "database",
+    "sqlite": "database",
+    "sqlite3": "database",
+    "bak": "database",
+    # logs
+    "log": "logs",
+    "out": "logs",
+    "err": "logs",
+    # installers
+    "pkg": "installers",
+    "exe": "installers",
+    "msi": "installers",
+    "deb": "installers",
+    "rpm": "installers",
+    "appimage": "installers",
+    "apk": "installers",
+    # documents
+    "pdf": "documents",
+    "pptx": "documents",
+    "keynote": "documents",
+    "docx": "documents",
+    # core dumps
+    "dmp": "core-dumps",
+}
+
+
+def _categorize_path(p: Path) -> str:
+    # Check compound .tar.gz before single suffix
+    suffix = p.suffix.lower().lstrip(".")
+    if suffix == "gz" and p.stem.endswith(".tar"):
+        return "archives"
+    category = _EXTENSION_CATEGORIES.get(suffix)
+    if category is not None:
+        return category
+    mime, _ = mimetypes.guess_type(str(p))
+    if mime is not None:
+        return mime.split("/")[0]
+    return "other"
+
+
+def _human_age(mtime: float) -> str:
+    days = int((time.time() - mtime) / 86400)
+    if days >= 365:
+        return f"{days // 365}y"
+    return f"{days}d"
+
+
+def _parse_size_arg(s: str) -> int:
+    s = s.strip()
+    suffixes = {"k": 1, "m": 2, "g": 3, "t": 4}
+    lower = s.lower()
+    if lower and lower[-1] in suffixes:
+        exp = suffixes[lower[-1]]
+        num_part = lower[:-1]
+    else:
+        exp = 0
+        num_part = lower
+    try:
+        value = float(num_part)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Invalid size: {s!r}")
+    return int(value * (1024**exp))
+
+
+def _allocated_size(st: os.stat_result) -> int:
+    if hasattr(st, "st_blocks"):
+        return st.st_blocks * 512
+    return st.st_size
+
+
+def _build_discovery_skip_paths(
+    registry_paths: frozenset[Path], dev_dir: Path
+) -> frozenset[Path]:
+    home = Path.home()
+    paths: set[Path] = set(registry_paths)
+
+    platform_extras: list[Path] = []
+    if PLATFORM == "macos":
+        platform_extras = [
+            home / "Library",
+            home / "Pictures" / "Photos Library.photoslibrary",
+        ]
+    elif PLATFORM in ("linux", "wsl"):
+        platform_extras = [
+            home / ".config",
+            home / ".local" / "share",
+        ]
+    elif PLATFORM == "windows":
+        localappdata = os.environ.get("LOCALAPPDATA", "")
+        appdata = os.environ.get("APPDATA", "")
+        if localappdata:
+            platform_extras.append(Path(localappdata))
+        if appdata:
+            platform_extras.append(Path(appdata))
+
+    for p in platform_extras:
+        try:
+            resolved = p.resolve()
+            if resolved != Path(""):
+                paths.add(resolved)
+        except OSError:
+            pass
+
+    return frozenset(paths)
+
+
+# ---------------------------------------------------------------------------
+# Discovery scan
+# ---------------------------------------------------------------------------
+
+
+def _scan_discovery_walk(
+    roots: list[Path],
+    min_size_bytes: int,
+    top_n: int,
+    skip_paths: frozenset[Path],
+    high_risk_dirs: list[Path],
+    age_threshold_days: int,
+    progress_callback: Callable[[int], None] | None = None,
+    max_depth: int = 8,
+) -> list[DiscoveryItem]:
+    name_skip_set = frozenset(
+        {
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".Trash",
+            ".Spotlight-V100",
+            ".fseventsd",
+            ".TemporaryItems",
+        }
+    )
+
+    stack: list[tuple[Path, int]] = [(root, 0) for root in roots]
+    # Per-category min-heaps of (size_bytes, str_path, mtime)
+    heaps: dict[str, list[tuple[int, str, float]]] = {}
+    dir_count = 0
+
+    while stack:
+        current, depth = stack.pop()
+        if depth > max_depth:
+            continue
+        try:
+            entries = list(os.scandir(current))
+        except PermissionError, OSError:
+            continue
+
+        dir_count += 1
+        if progress_callback is not None and dir_count % 1000 == 0:
+            progress_callback(dir_count)
+
+        for entry in entries:
+            if entry.is_dir(follow_symlinks=False):
+                if entry.name in name_skip_set:
+                    continue
+                if entry.is_symlink():
+                    continue
+                try:
+                    resolved = Path(entry.path).resolve()
+                except OSError:
+                    continue
+                if resolved in skip_paths:
+                    continue
+                if os.path.ismount(entry.path):
+                    continue
+                stack.append((Path(entry.path), depth + 1))
+            elif entry.is_file(follow_symlinks=False) and not entry.is_symlink():
+                try:
+                    st = entry.stat(follow_symlinks=False)
+                except OSError:
+                    continue
+                size = _allocated_size(st)
+                if size < min_size_bytes:
+                    continue
+                category = _categorize_path(Path(entry.path))
+                mtime = st.st_mtime
+                heap = heaps.setdefault(category, [])
+                entry_tuple = (size, entry.path, mtime)
+                if len(heap) < top_n:
+                    heapq.heappush(heap, entry_tuple)
+                elif entry_tuple > heap[0]:
+                    heapq.heapreplace(heap, entry_tuple)
+
+    now = time.time()
+    age_threshold_secs = age_threshold_days * 86400
+    items: list[DiscoveryItem] = []
+    for category, heap in heaps.items():
+        for size_bytes, str_path, mtime in heap:
+            stale = (now - mtime > age_threshold_secs) and any(
+                Path(str_path).is_relative_to(d) for d in high_risk_dirs
+            )
+            items.append(
+                DiscoveryItem(
+                    path=Path(str_path),
+                    label=str_path,
+                    category=category,
+                    size_bytes=size_bytes,
+                    mtime=mtime,
+                    is_stale=stale,
+                )
+            )
+
+    items.sort(key=lambda item: item.size_bytes, reverse=True)
+    return items
+
+
+# ---------------------------------------------------------------------------
+# Discovery report
+# ---------------------------------------------------------------------------
+
+
+def _format_discovery_rows(items: list[DiscoveryItem], term_width: int) -> list[str]:
+    SIZE_COL = 8
+    DATE_COL = 12  # " YYYY-MM-DD "
+    INDENT = 2
+
+    rows = []
+    for t in items:
+        stale_tag = f"[stale {_human_age(t.mtime)}]" if t.is_stale else ""
+        stale_plain = f" {stale_tag}" if stale_tag else ""
+        stale_str = f" [dim]{stale_tag.replace('[', '\\[')}[/dim]" if stale_tag else ""
+        max_path_width = term_width - INDENT - SIZE_COL - DATE_COL - len(stale_plain)
+        path_str = _short_path(t.path)
+        if len(path_str) > max_path_width:
+            path_str = "…" + path_str[-(max_path_width - 1) :]
+        plain_size = _human_size(t.size_bytes)
+        date_str = time.strftime("%Y-%m-%d", time.localtime(t.mtime))
+        padding = (
+            term_width
+            - INDENT
+            - len(path_str)
+            - len(plain_size)
+            - DATE_COL
+            - len(stale_plain)
+        )
+        rows.append(
+            f"  {path_str}{' ' * max(1, padding)}{_color_size(t.size_bytes)}  {date_str}{stale_str}"
+        )
+    return rows
+
+
+def _print_discovery_report(items: list[DiscoveryItem], term_width: int) -> None:
+    visible = [t for t in items if t.size_bytes >= _MIN_DISPLAY_BYTES]
+    if not visible:
+        return
+
+    console.print("[bold]Large Files (outside known caches)[/bold]")
+
+    # Group by category
+    by_category: dict[str, list[DiscoveryItem]] = {}
+    for item in visible:
+        by_category.setdefault(item.category, []).append(item)
+
+    from InquirerPy.separator import Separator
+
+    # Sort categories by total bytes descending
+    sorted_categories = sorted(
+        by_category.items(),
+        key=lambda kv: sum(i.size_bytes for i in kv[1]),
+        reverse=True,
+    )
+
+    grand_total = 0
+    for category, cat_items in sorted_categories:
+        total_bytes = sum(i.size_bytes for i in cat_items)
+        grand_total += total_bytes
+        total_str = _human_size(total_bytes)
+        console.print(Separator(f"── {category} ({total_str}) ──"))
+        for line in _format_discovery_rows(cat_items, term_width):
+            console.print(line)
+
+    console.print(f"[bold]Total discovered: {_human_size(grand_total)}[/bold]")
+
+
+# ---------------------------------------------------------------------------
+# Discovery cleanup
+# ---------------------------------------------------------------------------
+
+
+def _execute_discovery_cleanup(items: list[DiscoveryItem]) -> list[Path]:
+    attempted: list[Path] = []
+    for item in items:
+        display = _short_path(item.path)
+        try:
+            st = item.path.lstat()
+        except OSError:
+            console.print(f"  [yellow]Skipping {display} (no longer exists)[/yellow]")
+            continue
+        if not stat.S_ISREG(st.st_mode):
+            console.print(
+                f"  [yellow]Skipping {display} (no longer a regular file)[/yellow]"
+            )
+            continue
+        if _allocated_size(st) != item.size_bytes or st.st_mtime != item.mtime:
+            console.print(
+                f"  [yellow]Skipping {display} (file changed since scan)[/yellow]"
+            )
+            continue
+        console.print(f"  Removing {display} ({_human_size(item.size_bytes)})...")
+        try:
+            item.path.unlink()
+        except OSError as e:
+            console.print(
+                f"  [yellow]Warning: could not remove {display}: {e}[/yellow]"
+            )
+            continue
+        attempted.append(item.path)
+    return attempted
 
 
 def _print_section(
@@ -881,9 +1300,13 @@ _SELECT_ALL_INCREMENTAL = "__select_all_incremental__"
 _SELECT_ALL_CACHE = "__select_all_cache__"
 _SELECT_ALL_TARGET = "__select_all_target__"
 _SELECT_ALL_DOCKER = "__select_all_docker__"
+_SELECT_ALL_DISCOVERY = "__select_all_discovery__"
 
 
-def _interactive_select(targets: list[ScanTarget]) -> list[ScanTarget]:
+def _interactive_select(
+    targets: list[ScanTarget],
+    discovery_items: list[DiscoveryItem] | None = None,
+) -> tuple[list[ScanTarget], list[DiscoveryItem]]:
     from InquirerPy import inquirer
     from InquirerPy.base.control import Choice
     from InquirerPy.separator import Separator
@@ -894,11 +1317,12 @@ def _interactive_select(targets: list[ScanTarget]) -> list[ScanTarget]:
     caches = [t for t in targets if t.category == "cache" and t.size_bytes > 0]
     rust_targets = [t for t in targets if t.category == "target" and t.size_bytes > 0]
     docker_targets = [t for t in targets if t.category == "docker" and t.size_bytes > 0]
+    discovery_with_size = [d for d in (discovery_items or []) if d.size_bytes > 0]
 
     all_with_size = [t for t in targets if t.size_bytes > 0]
-    if not all_with_size:
+    if not all_with_size and not discovery_with_size:
         console.print("[dim]No targets with size > 0 found.[/dim]")
-        return []
+        return [], []
 
     choices: list = []
     # InquirerPy internally calls dataclasses.asdict() on Choice objects, which
@@ -906,10 +1330,10 @@ def _interactive_select(targets: list[ScanTarget]) -> list[ScanTarget]:
     # Plain dicts are unhashable and can't be used as dict keys. To work around this,
     # we store integer indices as Choice.value and map them back to ScanTarget objects
     # via target_lookup. Strings (sentinel values) and ints survive asdict() unchanged.
-    target_lookup: dict[int, ScanTarget] = {}
+    target_lookup: dict[int, ScanTarget | DiscoveryItem] = {}
     _next_idx = 0
 
-    def _target_choice(t: ScanTarget, name: str) -> Choice:
+    def _target_choice(t: ScanTarget | DiscoveryItem, name: str) -> Choice:
         nonlocal _next_idx
         idx = _next_idx
         _next_idx += 1
@@ -925,6 +1349,7 @@ def _interactive_select(targets: list[ScanTarget]) -> list[ScanTarget]:
         _SELECT_ALL_CACHE: caches,
         _SELECT_ALL_TARGET: rust_targets,
         _SELECT_ALL_DOCKER: docker_targets,
+        _SELECT_ALL_DISCOVERY: discovery_with_size,
     }
 
     if incrementals:
@@ -938,7 +1363,9 @@ def _interactive_select(targets: list[ScanTarget]) -> list[ScanTarget]:
         )
         for t in sorted(incrementals, key=lambda t: t.size_bytes, reverse=True):
             choices.append(
-                _target_choice(t, f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})")
+                _target_choice(
+                    t, f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})"
+                )
             )
 
     if caches:
@@ -952,7 +1379,9 @@ def _interactive_select(targets: list[ScanTarget]) -> list[ScanTarget]:
         )
         for t in sorted(caches, key=lambda t: t.size_bytes, reverse=True):
             choices.append(
-                _target_choice(t, f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})")
+                _target_choice(
+                    t, f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})"
+                )
             )
 
     if rust_targets:
@@ -966,7 +1395,9 @@ def _interactive_select(targets: list[ScanTarget]) -> list[ScanTarget]:
         )
         for t in sorted(rust_targets, key=lambda t: t.size_bytes, reverse=True):
             choices.append(
-                _target_choice(t, f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})")
+                _target_choice(
+                    t, f"  {_short_path(t.path)} ({_human_size(t.size_bytes)})"
+                )
             )
 
     if docker_targets:
@@ -986,33 +1417,65 @@ def _interactive_select(targets: list[ScanTarget]) -> list[ScanTarget]:
             )
             choices.append(_target_choice(t, name))
 
+    if discovery_with_size:
+        total = _human_size(sum(d.size_bytes for d in discovery_with_size))
+        choices.append(Separator(f"── Discovered large files ({total}) ──"))
+        choices.append(
+            Choice(
+                value=_SELECT_ALL_DISCOVERY,
+                name=f"Select all discovered files ({total})",
+            )
+        )
+        for d in sorted(discovery_with_size, key=lambda d: d.size_bytes, reverse=True):
+            choices.append(
+                _target_choice(
+                    d, f"  {_short_path(d.path)} ({_human_size(d.size_bytes)})"
+                )
+            )
+
     selected_raw = inquirer.checkbox(
         message="Select items to clean (space to toggle, enter to confirm):",
         choices=choices,
     ).execute()
 
     if _SELECT_ALL in selected_raw:
-        return all_with_size
+        return all_with_size, []
 
-    result: list[ScanTarget] = []
+    result_targets: list[ScanTarget] = []
+    result_discovery: list[DiscoveryItem] = []
     for item in selected_raw:
         group = section_map.get(item)
         if group is not None:
-            result.extend(group)
+            for g in group:
+                if isinstance(g, DiscoveryItem):
+                    result_discovery.append(g)
+                else:
+                    result_targets.append(g)
         elif isinstance(item, int) and item in target_lookup:
-            result.append(target_lookup[item])
+            obj = target_lookup[item]
+            if isinstance(obj, DiscoveryItem):
+                result_discovery.append(obj)
+            else:
+                result_targets.append(obj)
 
     seen: set[int] = set()
-    deduped: list[ScanTarget] = []
-    for t in result:
+    deduped_targets: list[ScanTarget] = []
+    for t in result_targets:
         if id(t) not in seen:
             seen.add(id(t))
-            deduped.append(t)
-    return deduped
+            deduped_targets.append(t)
+    deduped_discovery: list[DiscoveryItem] = []
+    for d in result_discovery:
+        if id(d) not in seen:
+            seen.add(id(d))
+            deduped_discovery.append(d)
+    return deduped_targets, deduped_discovery
 
 
 def _run_fix_selected(
-    targets: list[ScanTarget], cache: SizeCache | None = None
+    targets: list[ScanTarget],
+    discovery_items: list[DiscoveryItem] | None = None,
+    cache: SizeCache | None = None,
 ) -> None:
     root = "C:\\" if sys.platform == "win32" else "/"
     before_free = shutil.disk_usage(root).free
@@ -1022,6 +1485,10 @@ def _run_fix_selected(
     console.print()
 
     attempted = _execute_cleanup(targets)
+
+    if discovery_items:
+        discovery_attempted = _execute_discovery_cleanup(discovery_items)
+        attempted.extend(discovery_attempted)
 
     if cache is not None and attempted:
         cache.invalidate(attempted)
@@ -1087,10 +1554,57 @@ def main() -> None:
         action="store_true",
         help="Bypass size cache and force fresh du scan",
     )
+    parser.add_argument(
+        "--skip-discover",
+        action="store_true",
+        help="Skip discovery scan (fast, known-caches-only mode)",
+    )
+    parser.add_argument(
+        "--scan-dir",
+        type=Path,
+        action="append",
+        dest="scan_dirs",
+        default=None,
+        metavar="PATH",
+        help="Root(s) to scan for large files (repeatable, default: ~/)",
+    )
+    parser.add_argument(
+        "--discover-top",
+        type=int,
+        default=20,
+        metavar="N",
+        help="Max items per category from discovery (default: 20)",
+    )
+    parser.add_argument(
+        "--discover-min-size",
+        type=_parse_size_arg,
+        default=100 * 1024 * 1024,
+        help="Min item size for discovery (e.g. 100M, 1G; default: 100M)",
+    )
+    parser.add_argument(
+        "--stale-days",
+        type=int,
+        default=90,
+        help="Days before an item is flagged as stale (default: 90)",
+    )
+    parser.add_argument(
+        "--high-risk-dir",
+        type=Path,
+        action="append",
+        dest="high_risk_dirs",
+        default=None,
+        metavar="PATH",
+        help="Directory flagged for staleness (repeatable, default: ~/Downloads)",
+    )
     args = parser.parse_args()
 
     if args.command == "interactive" and args.yes:
         parser.error("--yes cannot be used with interactive mode")
+
+    if args.discover_top is not None and args.discover_top <= 0:
+        parser.error("--discover-top must be positive")
+    if args.stale_days is not None and args.stale_days <= 0:
+        parser.error("--stale-days must be positive")
 
     if args.no_color:
         global console
@@ -1103,6 +1617,9 @@ def main() -> None:
     if not str(dev_dir).startswith(str(home) + os.sep):
         parser.error(f"--dev-dir must be under $HOME, got: {dev_dir}")
 
+    scan_dirs = args.scan_dirs or [Path.home()]
+    high_risk_dirs = args.high_risk_dirs or [Path.home() / "Downloads"]
+
     cache_dir = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
     cache_path = cache_dir / "disk-cleanup" / "sizes.json"
     cache = (
@@ -1111,18 +1628,42 @@ def main() -> None:
         else SizeCache(cache_path, args.cache_ttl)
     )
 
-    targets = _scan(dev_dir, args.workers, cache=cache)
+    targets, discovery_items = _scan(
+        dev_dir,
+        args.workers,
+        cache=cache,
+        skip_discover=args.skip_discover,
+        scan_dirs=scan_dirs,
+        discover_top_n=args.discover_top,
+        discover_min_size=args.discover_min_size,
+        stale_days=args.stale_days,
+        high_risk_dirs=high_risk_dirs,
+    )
 
     if args.command == "check":
         _print_report(targets)
+        if not args.skip_discover and discovery_items:
+            _print_discovery_report(discovery_items, console.width)
+
     elif args.command == "fix":
         _print_report(targets)
+        if not args.skip_discover and discovery_items:
+            _print_discovery_report(discovery_items, console.width)
+            console.print()
+            console.print(
+                "[dim]Discovered items require manual review — use interactive mode to select for deletion.[/dim]"
+            )
         _run_fix(targets, skip_confirm=args.yes, cache=cache)
+
     elif args.command == "interactive":
         _print_report(targets)
-        selected = _interactive_select(targets)
-        if selected:
-            _run_fix_selected(selected, cache=cache)
+        if not args.skip_discover and discovery_items:
+            _print_discovery_report(discovery_items, console.width)
+        selected_targets, selected_discovery = _interactive_select(
+            targets, discovery_items if not args.skip_discover else None
+        )
+        if selected_targets or selected_discovery:
+            _run_fix_selected(selected_targets, selected_discovery, cache=cache)
 
 
 if __name__ == "__main__":
