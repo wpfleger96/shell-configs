@@ -37,19 +37,83 @@ class ConfigsComponent(Component):
                 current_targets
             )
 
+        from shell_configs.cli.context import StateDbChange
+        from shell_configs.shells.state_db import (
+            read_state_db_value,
+            values_match,
+        )
+
+        state_db_changes: list[StateDbChange] = []
+        for shell in ctx.selected_shells:
+            for entry in shell.get_state_db_entries():
+                current = read_state_db_value(entry.db_path, entry.key)
+                is_synced = current is not None and values_match(current, entry.value)
+                if not is_synced:
+                    state_db_changes.append(
+                        StateDbChange(
+                            shell_name=shell.display_name,
+                            entry_name=entry.name,
+                            db_path=str(entry.db_path),
+                            key=entry.key,
+                            current_value=current,
+                            desired_value=entry.value,
+                        )
+                    )
+
         return ConfigsPlan(
-            has_changes=bool(diffs) or bool(orphaned_additional_files),
+            has_changes=bool(diffs)
+            or bool(orphaned_additional_files)
+            or bool(state_db_changes),
             diffs=diffs,
             orphaned_additional_files=orphaned_additional_files,
+            state_db_changes=state_db_changes,
         )
 
     def display_plan(self, plan: ComponentPlan) -> None:
+        from collections import defaultdict
+        from pathlib import Path
+
+        from shell_configs.cli.context import StateDbChange
         from shell_configs.cli.helpers import _render_diffs
         from shell_configs.display import console, print_section
 
         if not isinstance(plan, ConfigsPlan):
             raise TypeError(f"expected ConfigsPlan, got {type(plan).__name__}")
-        _render_diffs(plan.diffs)
+
+        state_db_by_shell: dict[str, list[StateDbChange]] = defaultdict(list)
+        for change in plan.state_db_changes:
+            state_db_by_shell[change.shell_name].append(change)
+
+        shell_order: list[str] = []
+        seen: set[str] = set()
+        for diff in plan.diffs:
+            if diff.shell_name not in seen:
+                shell_order.append(diff.shell_name)
+                seen.add(diff.shell_name)
+        for name in state_db_by_shell:
+            if name not in seen:
+                shell_order.append(name)
+                seen.add(name)
+
+        for shell_name in shell_order:
+            shell_diffs = [d for d in plan.diffs if d.shell_name == shell_name]
+            _render_diffs(shell_diffs)
+            for change in state_db_by_shell.get(shell_name, []):
+                home = str(Path.home())
+                path_display = change.db_path.replace(home, "~")
+                current_display = (
+                    change.current_value
+                    if change.current_value is not None
+                    else "(not set)"
+                )
+                console.print(
+                    f"\n[bold cyan]{change.shell_name}[/bold cyan]: "
+                    f"{path_display} ({change.entry_name})"
+                )
+                console.print(
+                    f"[red]{current_display}[/red] → [green]{change.desired_value}[/green]"
+                )
+
         if plan.orphaned_additional_files:
             print_section("Orphaned Additional Files")
             for path_str in plan.orphaned_additional_files:
@@ -255,6 +319,30 @@ class ConfigsComponent(Component):
                     print_diff(diff_text)
                 preferences_results[pref_file.name] = result
 
+        state_db_results: dict[str, OperationResult] = {}
+        if plan.state_db_changes:
+            from pathlib import Path as _Path
+
+            from shell_configs.shells.state_db import write_state_db_value
+
+            for change in plan.state_db_changes:
+                if ctx.dry_run:
+                    print_operation_result(
+                        OperationResult.UPDATED, f"Would update: {change.key}"
+                    )
+                    state_db_results[change.key] = OperationResult.UPDATED
+                else:
+                    result, message = write_state_db_value(
+                        _Path(change.db_path), change.key, change.desired_value
+                    )
+                    print_operation_result(result, message)
+                    if result == OperationResult.ERROR and "locked" in message.lower():
+                        print_warning(
+                            "Close the editor and re-run 'shell-configs install' to apply",
+                            indent=2,
+                        )
+                    state_db_results[change.key] = result
+
         if ctx.dry_run:
             print_hint("Use without --dry-run to apply changes.")
 
@@ -273,8 +361,16 @@ class ConfigsComponent(Component):
             for r in preferences_results.values()
             if r in [OperationResult.CREATED, OperationResult.UPDATED]
         )
+        state_db_success_count = sum(
+            1
+            for r in state_db_results.values()
+            if r in [OperationResult.CREATED, OperationResult.UPDATED]
+        )
         total_success = (
-            success_count + additional_success_count + preferences_success_count
+            success_count
+            + additional_success_count
+            + preferences_success_count
+            + state_db_success_count
         )
 
         if total_success > 0 and not ctx.dry_run:
@@ -450,6 +546,31 @@ class ConfigsComponent(Component):
                     has_shown_name = True
                 else:
                     add_additional_file_row(table, path_display, status_str)
+
+            from shell_configs.shells.state_db import (
+                read_state_db_value as _read_state_db_value,
+            )
+            from shell_configs.shells.state_db import (
+                values_match as _state_db_values_match,
+            )
+
+            state_db_entries = shell.get_state_db_entries()
+            for i, entry in enumerate(state_db_entries):
+                exists = entry.db_path.exists()
+                current = (
+                    _read_state_db_value(entry.db_path, entry.key) if exists else None
+                )
+                synced = current is not None and _state_db_values_match(
+                    current, entry.value
+                )
+                status_str = get_status_indicator(synced, exists or current is not None)
+                path_display = str(entry.db_path).replace(home, "~")
+                label = f"{path_display} ({entry.name})"
+                if i == 0 and not has_shown_name:
+                    add_status_row(table, shell.display_name, label, status_str)
+                    has_shown_name = True
+                else:
+                    add_additional_file_row(table, label, status_str)
 
         console.print(table)
 
