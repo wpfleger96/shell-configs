@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.52.0](https://github.com/wpfleger96/shell-configs/compare/v0.51.0...v0.52.0) (2026-06-05)
+
+
+### Features
+
+* add SQLite state DB support for VS Code/Cursor trusted domains ([#70](https://github.com/wpfleger96/shell-configs/issues/70)) ([c456a0d](https://github.com/wpfleger96/shell-configs/commit/c456a0dd7b35d02089254a074e7675cac99e44d8))
+
 ## [0.51.0](https://github.com/wpfleger96/shell-configs/compare/v0.50.0...v0.51.0) (2026-06-04)
 
 
