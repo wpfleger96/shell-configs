@@ -57,9 +57,22 @@ class FileDiff:
 
 
 @dataclass
+class StateDbChange:
+    """A state database entry that needs to be created or updated."""
+
+    shell_name: str
+    entry_name: str
+    db_path: str
+    key: str
+    current_value: str | None
+    desired_value: str
+
+
+@dataclass
 class ConfigsPlan(ComponentPlan):
     diffs: list[FileDiff] = field(default_factory=list)
     orphaned_additional_files: list[str] = field(default_factory=list)
+    state_db_changes: list[StateDbChange] = field(default_factory=list)
 
 
 @dataclass

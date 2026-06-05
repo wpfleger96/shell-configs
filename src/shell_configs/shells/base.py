@@ -48,6 +48,16 @@ class PreferencesFile:
     app_name: str | None = None
 
 
+@dataclass
+class StateDbEntry:
+    """Represents a key-value entry in an application's internal state database."""
+
+    name: str
+    db_path: Path
+    key: str
+    value: str
+
+
 def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     """Recursively merge two dicts; override wins on key conflicts.
 
@@ -318,6 +328,14 @@ class Shell(ABC):
 
         Returns:
             List of PreferencesFile objects
+        """
+        return []
+
+    def get_state_db_entries(self) -> list[StateDbEntry]:
+        """Get state database entries to manage for this shell.
+
+        Returns:
+            List of StateDbEntry objects
         """
         return []
 

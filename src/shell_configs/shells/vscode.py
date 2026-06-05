@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from shell_configs.config import get_config_dir
 from shell_configs.platform import Platform, is_platform
-from shell_configs.shells.base import AdditionalFile, ConfigFile, Shell
+from shell_configs.shells.base import AdditionalFile, ConfigFile, Shell, StateDbEntry
 from shell_configs.shells.utils import (
     get_windows_appdata_roaming,
     get_windows_programs,
@@ -105,6 +105,19 @@ class VSCodeShell(Shell):
                 name="keybindings.json",
                 source_path=editor_dir / "keybindings.json",
                 target_path=vscode_dir / "keybindings.json",
+            ),
+        ]
+
+    def get_state_db_entries(self) -> list[StateDbEntry]:
+        vscode_dir = self._get_vscode_user_dir()
+        if vscode_dir is None:
+            return []
+        return [
+            StateDbEntry(
+                name="Link protection trusted domains",
+                db_path=vscode_dir / "globalStorage" / "state.vscdb",
+                key="http.linkProtectionTrustedDomains",
+                value='["*"]',
             ),
         ]
 
