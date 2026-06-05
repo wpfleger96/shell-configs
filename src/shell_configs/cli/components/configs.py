@@ -70,28 +70,48 @@ class ConfigsComponent(Component):
         )
 
     def display_plan(self, plan: ComponentPlan) -> None:
+        from collections import defaultdict
+
+        from shell_configs.cli.context import StateDbChange
         from shell_configs.cli.helpers import _render_diffs
         from shell_configs.display import console, print_section
 
         if not isinstance(plan, ConfigsPlan):
             raise TypeError(f"expected ConfigsPlan, got {type(plan).__name__}")
-        _render_diffs(plan.diffs)
-        if plan.orphaned_additional_files:
-            print_section("Orphaned Additional Files")
-            for path_str in plan.orphaned_additional_files:
-                console.print(f"  {path_str}: [red]orphaned (source removed)[/red]")
-        if plan.state_db_changes:
-            print_section("State Database Changes")
-            for change in plan.state_db_changes:
+
+        state_db_by_shell: dict[str, list[StateDbChange]] = defaultdict(list)
+        for change in plan.state_db_changes:
+            state_db_by_shell[change.shell_name].append(change)
+
+        shell_order: list[str] = []
+        seen: set[str] = set()
+        for diff in plan.diffs:
+            if diff.shell_name not in seen:
+                shell_order.append(diff.shell_name)
+                seen.add(diff.shell_name)
+        for name in state_db_by_shell:
+            if name not in seen:
+                shell_order.append(name)
+                seen.add(name)
+
+        for shell_name in shell_order:
+            shell_diffs = [d for d in plan.diffs if d.shell_name == shell_name]
+            _render_diffs(shell_diffs)
+            for change in state_db_by_shell.get(shell_name, []):
                 current_display = (
                     change.current_value
                     if change.current_value is not None
                     else "(not set)"
                 )
                 console.print(
-                    f"  [bold]{change.shell_name}[/bold] {change.entry_name}: "
+                    f"  {change.entry_name}: "
                     f"[red]{current_display}[/red] → [green]{change.desired_value}[/green]"
                 )
+
+        if plan.orphaned_additional_files:
+            print_section("Orphaned Additional Files")
+            for path_str in plan.orphaned_additional_files:
+                console.print(f"  {path_str}: [red]orphaned (source removed)[/red]")
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
         if not isinstance(plan, ConfigsPlan):
