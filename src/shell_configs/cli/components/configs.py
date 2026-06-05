@@ -71,6 +71,7 @@ class ConfigsComponent(Component):
 
     def display_plan(self, plan: ComponentPlan) -> None:
         from collections import defaultdict
+        from pathlib import Path
 
         from shell_configs.cli.context import StateDbChange
         from shell_configs.cli.helpers import _render_diffs
@@ -98,13 +99,18 @@ class ConfigsComponent(Component):
             shell_diffs = [d for d in plan.diffs if d.shell_name == shell_name]
             _render_diffs(shell_diffs)
             for change in state_db_by_shell.get(shell_name, []):
+                home = str(Path.home())
+                path_display = change.db_path.replace(home, "~")
                 current_display = (
                     change.current_value
                     if change.current_value is not None
                     else "(not set)"
                 )
                 console.print(
-                    f"  {change.entry_name}: "
+                    f"\n[bold cyan]{change.shell_name}[/bold cyan]: "
+                    f"{path_display} ({change.entry_name})"
+                )
+                console.print(
                     f"[red]{current_display}[/red] → [green]{change.desired_value}[/green]"
                 )
 
