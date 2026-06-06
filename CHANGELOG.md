@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.52.1](https://github.com/wpfleger96/shell-configs/compare/v0.52.0...v0.52.1) (2026-06-06)
+
+
+### Bug Fixes
+
+* **sublime:** disable hardware acceleration to fix macOS lag ([#72](https://github.com/wpfleger96/shell-configs/issues/72)) ([48ad00f](https://github.com/wpfleger96/shell-configs/commit/48ad00fcbaf4dbc11c348619d105007e4262ec6b))
+
 ## [0.52.0](https://github.com/wpfleger96/shell-configs/compare/v0.51.0...v0.52.0) (2026-06-05)
 
 
