@@ -1,6 +1,7 @@
 {
     "color_scheme": "Monokai.sublime-color-scheme",
     "default_line_ending": "unix",
+    "hardware_acceleration": "none",
     "file_exclude_patterns": [
         ".DS_Store",
         "Thumbs.db"
