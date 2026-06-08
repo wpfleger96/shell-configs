@@ -48,6 +48,24 @@ read_device_name() {
     fi
 }
 
+wsl_ensure_mount() {
+    local letter="$1"
+    local mount_point="/mnt/$letter"
+    local drive_label="${letter^^}:"
+
+    if mountpoint -q "$mount_point" 2>/dev/null; then
+        return 0
+    fi
+
+    echo -e "${YELLOW}Windows drive ${drive_label} is not mounted at ${mount_point}${NC}" >&2
+    read -rp "Mount it? (requires sudo) [y/N] " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        return 1
+    fi
+
+    sudo mkdir -p "$mount_point" && sudo mount -t drvfs "${drive_label}" "$mount_point"
+}
+
 discover_sd_card() {
     local candidates=()
 
@@ -57,6 +75,26 @@ discover_sd_card() {
                 candidates+=("$drive")
             fi
         done
+
+        if [[ ${#candidates[@]} -eq 0 ]]; then
+            local removable_letters
+            removable_letters=$(powershell.exe -NoProfile -Command \
+                '(Get-Volume | Where-Object { $_.DriveType -eq "Removable" -and $_.DriveLetter -and (Test-Path "$($_.DriveLetter):\STR.edf") }).DriveLetter -join ","' \
+                2>/dev/null | tr -d '\r')
+
+            if [[ -n "$removable_letters" ]]; then
+                IFS=',' read -ra letters <<< "$removable_letters"
+                for letter in "${letters[@]}"; do
+                    local lower="${letter,,}"
+                    [[ -f "/mnt/$lower/STR.edf" ]] && continue
+                    if wsl_ensure_mount "$lower"; then
+                        if [[ -f "/mnt/$lower/STR.edf" ]]; then
+                            candidates+=("/mnt/$lower")
+                        fi
+                    fi
+                done
+            fi
+        fi
     else
         for vol in /Volumes/*; do
             if [[ -f "$vol/STR.edf" ]]; then
@@ -298,6 +336,10 @@ main() {
 
     if [[ -z "$SOURCE" ]]; then
         SOURCE=$(discover_sd_card) || { echo -e "${RED}No SD card source provided${NC}" >&2; exit 1; }
+    fi
+
+    if [[ "$PLATFORM" == "wsl" && "$SOURCE" =~ ^/mnt/([a-z])/?$ ]]; then
+        wsl_ensure_mount "${BASH_REMATCH[1]}" || true
     fi
 
     if [[ ! -f "$SOURCE/STR.edf" ]]; then
