@@ -79,7 +79,7 @@ discover_sd_card() {
         if [[ ${#candidates[@]} -eq 0 ]]; then
             local removable_letters
             removable_letters=$(powershell.exe -NoProfile -Command \
-                '(Get-Volume | Where-Object { $_.DriveType -eq "Removable" -and $_.DriveLetter }).DriveLetter -join ","' \
+                '(Get-Volume | Where-Object { $_.DriveType -eq "Removable" -and $_.DriveLetter -and (Test-Path "$($_.DriveLetter):\STR.edf") }).DriveLetter -join ","' \
                 2>/dev/null | tr -d '\r')
 
             if [[ -n "$removable_letters" ]]; then
