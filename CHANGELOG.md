@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [0.52.2](https://github.com/wpfleger96/shell-configs/compare/v0.52.1...v0.52.2) (2026-06-09)
+
+
+### Bug Fixes
+
+* **backup-resmed:** mount removable WSL drives before SD card scan ([#75](https://github.com/wpfleger96/shell-configs/issues/75)) ([175de47](https://github.com/wpfleger96/shell-configs/commit/175de477a383bf16723b28da561b3b12afb03927))
+* **disk-cleanup:** speed up large file discovery scan ([#76](https://github.com/wpfleger96/shell-configs/issues/76)) ([3e62cc2](https://github.com/wpfleger96/shell-configs/commit/3e62cc2e07a144d4422bdbc2f7044b0fe4bc9661))
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#56](https://github.com/wpfleger96/shell-configs/issues/56)) ([d46ab04](https://github.com/wpfleger96/shell-configs/commit/d46ab049af9ebbe972ac3a84617e216413dc4751))
+
 ## [0.52.1](https://github.com/wpfleger96/shell-configs/compare/v0.52.0...v0.52.1) (2026-06-06)
 
 
