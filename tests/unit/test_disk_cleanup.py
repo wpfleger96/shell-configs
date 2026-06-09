@@ -1444,12 +1444,11 @@ class TestBuildDiscoverySkipPaths:
         resolved_library = (tmp_path / "Library").resolve()
         assert resolved_library in result
 
-    def test_dev_dir_not_in_result(self, tmp_path, monkeypatch):
+    def test_dev_dir_in_result(self, tmp_path, monkeypatch):
         monkeypatch.setattr(mod, "PLATFORM", "linux")
         dev_dir = tmp_path / "dev"
         result = mod._build_discovery_skip_paths(frozenset(), dev_dir)
-        assert dev_dir not in result
-        assert dev_dir.resolve() not in result
+        assert dev_dir.resolve() in result
 
 
 # ---------------------------------------------------------------------------
