@@ -890,6 +890,28 @@ _DISCOVERY_SKIP_NAMES = frozenset(
 )
 
 
+def _push_file_entry(
+    entry: os.DirEntry,
+    heaps: dict[str, list[tuple[int, str, float]]],
+    min_size_bytes: int,
+    top_n: int,
+) -> None:
+    try:
+        st = entry.stat(follow_symlinks=False)
+    except OSError:
+        return
+    size = _allocated_size(st)
+    if size < min_size_bytes:
+        return
+    category = _categorize_path(Path(entry.path))
+    heap = heaps.setdefault(category, [])
+    entry_tuple = (size, entry.path, st.st_mtime)
+    if len(heap) < top_n:
+        heapq.heappush(heap, entry_tuple)
+    elif entry_tuple > heap[0]:
+        heapq.heapreplace(heap, entry_tuple)
+
+
 def _discovery_walk_subtree(
     root: Path,
     start_depth: int,
@@ -923,32 +945,20 @@ def _discovery_walk_subtree(
             progress_callback(total)
 
         for entry in entries:
+            entry_path = Path(entry.path)
             if entry.is_dir(follow_symlinks=False):
                 if entry.name in _DISCOVERY_SKIP_NAMES:
                     continue
                 if entry.is_symlink():
                     continue
-                if Path(entry.path) in skip_paths:
+                # No resolve() needed: scan roots are pre-resolved and symlinks are skipped
+                if entry_path in skip_paths:
                     continue
                 if os.path.ismount(entry.path):
                     continue
-                stack.append((Path(entry.path), depth + 1))
+                stack.append((entry_path, depth + 1))
             elif entry.is_file(follow_symlinks=False) and not entry.is_symlink():
-                try:
-                    st = entry.stat(follow_symlinks=False)
-                except OSError:
-                    continue
-                size = _allocated_size(st)
-                if size < min_size_bytes:
-                    continue
-                category = _categorize_path(Path(entry.path))
-                mtime = st.st_mtime
-                heap = heaps.setdefault(category, [])
-                entry_tuple = (size, entry.path, mtime)
-                if len(heap) < top_n:
-                    heapq.heappush(heap, entry_tuple)
-                elif entry_tuple > heap[0]:
-                    heapq.heapreplace(heap, entry_tuple)
+                _push_file_entry(entry, heaps, min_size_bytes, top_n)
 
     with counter_lock:
         dir_counter[0] += local_count
@@ -1009,20 +1019,7 @@ def _scan_discovery_walk(
         # Process files directly under each scan root (not lost by fan-out)
         for entry in entries:
             if entry.is_file(follow_symlinks=False) and not entry.is_symlink():
-                try:
-                    st = entry.stat(follow_symlinks=False)
-                except OSError:
-                    continue
-                size = _allocated_size(st)
-                if size < min_size_bytes:
-                    continue
-                category = _categorize_path(Path(entry.path))
-                heap = root_heaps.setdefault(category, [])
-                entry_tuple = (size, entry.path, st.st_mtime)
-                if len(heap) < top_n:
-                    heapq.heappush(heap, entry_tuple)
-                elif entry_tuple > heap[0]:
-                    heapq.heapreplace(heap, entry_tuple)
+                _push_file_entry(entry, root_heaps, min_size_bytes, top_n)
             elif entry.is_dir(follow_symlinks=False) and not entry.is_symlink():
                 if entry.name in _DISCOVERY_SKIP_NAMES:
                     continue
