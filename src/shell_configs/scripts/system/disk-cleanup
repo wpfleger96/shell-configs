@@ -15,6 +15,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 from collections.abc import Callable, Generator
@@ -839,6 +840,7 @@ def _build_discovery_skip_paths(
 ) -> frozenset[Path]:
     home = Path.home()
     paths: set[Path] = set(registry_paths)
+    paths.add(dev_dir.resolve())
 
     platform_extras: list[Path] = []
     if PLATFORM == "macos":
@@ -875,6 +877,110 @@ def _build_discovery_skip_paths(
 # ---------------------------------------------------------------------------
 
 
+_DISCOVERY_SKIP_NAMES = frozenset(
+    {
+        ".git",
+        "node_modules",
+        "__pycache__",
+        ".Trash",
+        ".Spotlight-V100",
+        ".fseventsd",
+        ".TemporaryItems",
+    }
+)
+
+
+def _push_file_entry(
+    entry: os.DirEntry,
+    heaps: dict[str, list[tuple[int, str, float]]],
+    min_size_bytes: int,
+    top_n: int,
+) -> None:
+    try:
+        st = entry.stat(follow_symlinks=False)
+    except OSError:
+        return
+    size = _allocated_size(st)
+    if size < min_size_bytes:
+        return
+    category = _categorize_path(Path(entry.path))
+    heap = heaps.setdefault(category, [])
+    entry_tuple = (size, entry.path, st.st_mtime)
+    if len(heap) < top_n:
+        heapq.heappush(heap, entry_tuple)
+    elif entry_tuple > heap[0]:
+        heapq.heapreplace(heap, entry_tuple)
+
+
+def _discovery_walk_subtree(
+    root: Path,
+    start_depth: int,
+    min_size_bytes: int,
+    top_n: int,
+    skip_paths: frozenset[Path],
+    max_depth: int,
+    dir_counter: list[int],
+    counter_lock: threading.Lock,
+    progress_callback: Callable[[int], None] | None,
+) -> dict[str, list[tuple[int, str, float]]]:
+    heaps: dict[str, list[tuple[int, str, float]]] = {}
+    stack: list[tuple[Path, int]] = [(root, start_depth)]
+    local_count = 0
+
+    while stack:
+        current, depth = stack.pop()
+        if depth > max_depth:
+            continue
+        try:
+            entries = list(os.scandir(current))
+        except (PermissionError, OSError):
+            continue
+
+        local_count += 1
+        if progress_callback is not None and local_count % 1000 == 0:
+            with counter_lock:
+                dir_counter[0] += local_count
+                total = dir_counter[0]
+                local_count = 0
+            progress_callback(total)
+
+        for entry in entries:
+            entry_path = Path(entry.path)
+            if entry.is_dir(follow_symlinks=False):
+                if entry.name in _DISCOVERY_SKIP_NAMES:
+                    continue
+                if entry.is_symlink():
+                    continue
+                # No resolve() needed: scan roots are pre-resolved and symlinks are skipped
+                if entry_path in skip_paths:
+                    continue
+                if os.path.ismount(entry.path):
+                    continue
+                stack.append((entry_path, depth + 1))
+            elif entry.is_file(follow_symlinks=False) and not entry.is_symlink():
+                _push_file_entry(entry, heaps, min_size_bytes, top_n)
+
+    with counter_lock:
+        dir_counter[0] += local_count
+
+    return heaps
+
+
+def _merge_heaps(
+    all_heaps: list[dict[str, list[tuple[int, str, float]]]], top_n: int
+) -> dict[str, list[tuple[int, str, float]]]:
+    merged: dict[str, list[tuple[int, str, float]]] = {}
+    for heaps in all_heaps:
+        for category, heap in heaps.items():
+            dest = merged.setdefault(category, [])
+            for entry in heap:
+                if len(dest) < top_n:
+                    heapq.heappush(dest, entry)
+                elif entry > dest[0]:
+                    heapq.heapreplace(dest, entry)
+    return merged
+
+
 def _scan_discovery_walk(
     roots: list[Path],
     min_size_bytes: int,
@@ -885,72 +991,71 @@ def _scan_discovery_walk(
     progress_callback: Callable[[int], None] | None = None,
     max_depth: int = 8,
 ) -> list[DiscoveryItem]:
-    name_skip_set = frozenset(
-        {
-            ".git",
-            "node_modules",
-            "__pycache__",
-            ".Trash",
-            ".Spotlight-V100",
-            ".fseventsd",
-            ".TemporaryItems",
-        }
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    dir_counter: list[int] = [0]
+    counter_lock = threading.Lock()
+
+    walk_args = dict(
+        min_size_bytes=min_size_bytes,
+        top_n=top_n,
+        skip_paths=skip_paths,
+        max_depth=max_depth,
+        dir_counter=dir_counter,
+        counter_lock=counter_lock,
+        progress_callback=progress_callback,
     )
 
-    stack: list[tuple[Path, int]] = [(root, 0) for root in roots]
-    # Per-category min-heaps of (size_bytes, str_path, mtime)
-    heaps: dict[str, list[tuple[int, str, float]]] = {}
-    dir_count = 0
+    subtree_roots: list[tuple[Path, int]] = []
+    root_heaps: dict[str, list[tuple[int, str, float]]] = {}
 
-    while stack:
-        current, depth = stack.pop()
-        if depth > max_depth:
-            continue
+    for root in roots:
+        resolved_root = root.resolve()
         try:
-            entries = list(os.scandir(current))
-        except PermissionError, OSError:
+            entries = list(os.scandir(resolved_root))
+        except (PermissionError, OSError):
             continue
 
-        dir_count += 1
-        if progress_callback is not None and dir_count % 1000 == 0:
-            progress_callback(dir_count)
-
+        # Process files directly under each scan root (not lost by fan-out)
         for entry in entries:
-            if entry.is_dir(follow_symlinks=False):
-                if entry.name in name_skip_set:
+            if entry.is_file(follow_symlinks=False) and not entry.is_symlink():
+                _push_file_entry(entry, root_heaps, min_size_bytes, top_n)
+            elif entry.is_dir(follow_symlinks=False) and not entry.is_symlink():
+                if entry.name in _DISCOVERY_SKIP_NAMES:
                     continue
-                if entry.is_symlink():
-                    continue
-                try:
-                    resolved = Path(entry.path).resolve()
-                except OSError:
-                    continue
-                if resolved in skip_paths:
+                p = Path(entry.path)
+                if p in skip_paths:
                     continue
                 if os.path.ismount(entry.path):
                     continue
-                stack.append((Path(entry.path), depth + 1))
-            elif entry.is_file(follow_symlinks=False) and not entry.is_symlink():
+                subtree_roots.append((p, 1))
+
+    workers = min(len(subtree_roots), os.cpu_count() or 4, 16)
+    all_heaps = [root_heaps] if root_heaps else []
+
+    if workers <= 1:
+        for subtree_root, depth in subtree_roots:
+            h = _discovery_walk_subtree(subtree_root, depth, **walk_args)
+            all_heaps.append(h)
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(_discovery_walk_subtree, sr, d, **walk_args): sr
+                for sr, d in subtree_roots
+            }
+            for future in as_completed(futures):
                 try:
-                    st = entry.stat(follow_symlinks=False)
-                except OSError:
+                    h = future.result()
+                except Exception:
                     continue
-                size = _allocated_size(st)
-                if size < min_size_bytes:
-                    continue
-                category = _categorize_path(Path(entry.path))
-                mtime = st.st_mtime
-                heap = heaps.setdefault(category, [])
-                entry_tuple = (size, entry.path, mtime)
-                if len(heap) < top_n:
-                    heapq.heappush(heap, entry_tuple)
-                elif entry_tuple > heap[0]:
-                    heapq.heapreplace(heap, entry_tuple)
+                all_heaps.append(h)
+
+    merged = _merge_heaps(all_heaps, top_n)
 
     now = time.time()
     age_threshold_secs = age_threshold_days * 86400
     items: list[DiscoveryItem] = []
-    for category, heap in heaps.items():
+    for category, heap in merged.items():
         for size_bytes, str_path, mtime in heap:
             stale = (now - mtime > age_threshold_secs) and any(
                 Path(str_path).is_relative_to(d) for d in high_risk_dirs
