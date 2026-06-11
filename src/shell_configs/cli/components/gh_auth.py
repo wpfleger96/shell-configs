@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import sys
 
-from shell_configs.cli.context import Component, ComponentPlan, Context, GhAuthPlan
+from shell_configs.cli.context import (
+    Component,
+    ComponentPlan,
+    Context,
+    GhAuthPlan,
+    expect_plan,
+)
 
 
 class GhAuthComponent(Component):
     label = "gh-auth"
     display_name = "GitHub CLI Auth"
+    apply_stage = "post"
 
     def plan(self, ctx: Context) -> GhAuthPlan:
         from shell_configs.bootstrap import is_command_available
@@ -34,8 +41,7 @@ class GhAuthComponent(Component):
         return GhAuthPlan(has_changes=True, auth_ok=True, missing_scopes=missing)
 
     def display_plan(self, plan: ComponentPlan) -> None:
-        if not isinstance(plan, GhAuthPlan):
-            raise TypeError(f"expected GhAuthPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, GhAuthPlan)
         if not plan.has_changes:
             return
 
@@ -61,8 +67,7 @@ class GhAuthComponent(Component):
             print_warning(f"{scope} (missing)", indent=2)
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        if not isinstance(plan, GhAuthPlan):
-            raise TypeError(f"expected GhAuthPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, GhAuthPlan)
         if not plan.has_changes:
             return True
 

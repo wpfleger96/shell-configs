@@ -8,21 +8,17 @@ import click
 
 from shell_configs.cli.helpers import (
     build_context,
-    parse_shell_filter,
     run_components_parallel,
 )
+from shell_configs.cli.options import profile_option, shells_option, yes_option
 
 
 @click.command()
-@click.option(
-    "--shells",
-    callback=parse_shell_filter,
-    help="Comma-separated list of shells to install (e.g., bash,zsh,git)",
-)
+@shells_option("Comma-separated list of shells to install (e.g., bash,zsh,git)")
 @click.option(
     "--dry-run", is_flag=True, help="Show what would be done without doing it"
 )
-@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
+@yes_option
 @click.option(
     "--force", is_flag=True, help="Force apply all components even if already in sync"
 )
@@ -32,7 +28,7 @@ from shell_configs.cli.helpers import (
     hidden=True,
     help="Override config directory path (for setup command)",
 )
-@click.option("--profile", "profile_name", default=None, help="Profile to use")
+@profile_option
 def install(
     shells: list[str] | None,
     dry_run: bool,
@@ -80,45 +76,15 @@ def install(
     if ctx.dry_run:
         return
 
-    from shell_configs.cli.components.agents import AgentsComponent
-    from shell_configs.cli.components.gh_auth import GhAuthComponent
-    from shell_configs.cli.components.gh_extensions import GhExtensionsComponent
-    from shell_configs.cli.components.languages import LanguagesComponent
-    from shell_configs.cli.components.packages import RequiredPackagesComponent
-    from shell_configs.cli.components.signing import SigningComponent
+    def _apply_sequential(stage: str) -> None:
+        for comp in INSTALL_COMPONENTS:
+            if comp.apply_stage == stage and (plans[comp].has_changes or force):
+                comp.apply(ctx, plans[comp])
 
-    gh_auth_comp = None
-    signing_comp = None
-    gh_ext_comp = None
-    required_pkg = None
-    languages_comp = None
-    agents_comp = None
-    parallel_comps = []
-    for comp in INSTALL_COMPONENTS:
-        if isinstance(comp, RequiredPackagesComponent):
-            required_pkg = comp
-        elif isinstance(comp, LanguagesComponent):
-            languages_comp = comp
-        elif isinstance(comp, AgentsComponent):
-            agents_comp = comp
-        elif isinstance(comp, GhAuthComponent):
-            gh_auth_comp = comp
-        elif isinstance(comp, SigningComponent):
-            signing_comp = comp
-        elif isinstance(comp, GhExtensionsComponent):
-            gh_ext_comp = comp
-        else:
-            parallel_comps.append(comp)
+    # Pre-stage components install tools the rest depend on.
+    _apply_sequential("pre")
 
-    if required_pkg and (plans[required_pkg].has_changes or force):
-        required_pkg.apply(ctx, plans[required_pkg])
-
-    if languages_comp and (plans[languages_comp].has_changes or force):
-        languages_comp.apply(ctx, plans[languages_comp])
-
-    if agents_comp and (plans[agents_comp].has_changes or force):
-        agents_comp.apply(ctx, plans[agents_comp])
-
+    parallel_comps = [c for c in INSTALL_COMPONENTS if c.apply_stage == "parallel"]
     parallel_plans = {
         c: plans[c] for c in parallel_comps if plans[c].has_changes or force
     }
@@ -128,9 +94,4 @@ def install(
         )
 
     # gh auth state is mutated by these components; run sequentially to avoid races
-    if gh_auth_comp and (plans[gh_auth_comp].has_changes or force):
-        gh_auth_comp.apply(ctx, plans[gh_auth_comp])
-    if signing_comp and (plans[signing_comp].has_changes or force):
-        signing_comp.apply(ctx, plans[signing_comp])
-    if gh_ext_comp and (plans[gh_ext_comp].has_changes or force):
-        gh_ext_comp.apply(ctx, plans[gh_ext_comp])
+    _apply_sequential("post")

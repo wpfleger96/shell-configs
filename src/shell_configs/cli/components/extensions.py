@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from shell_configs.cli.context import Component, ComponentPlan, Context, ExtensionsPlan
+from shell_configs.cli.context import (
+    Component,
+    ComponentPlan,
+    Context,
+    ExtensionsPlan,
+    expect_plan,
+)
 
 
 class ExtensionsComponent(Component):
@@ -13,35 +19,13 @@ class ExtensionsComponent(Component):
 
     def plan(self, ctx: Context) -> ExtensionsPlan:
         from shell_configs.cli.helpers import _get_extension_shells
-        from shell_configs.extensions import ExtensionManager
+        from shell_configs.extensions import compute_extension_states
 
-        ext_manager = ExtensionManager()
-        ide_shells = _get_extension_shells(ctx.registry)
-        per_shell: dict[str, Any] = {}
-        ignored_per_shell: dict[str, frozenset[str]] = {}
-
-        for shell in ide_shells:
-            invoker = shell.get_extension_invoker()
-            cli_cmd = shell.get_extension_cli()
-            if invoker is None and cli_cmd is None:
-                continue
-
-            desired = ext_manager.load_desired_extensions(
-                shell.name,
-                shell.get_extension_list_paths(),
-                profile=ctx.profile,
-            )
-            installed = ext_manager.get_installed_extensions(
-                cli_cmd,
-                invoker=invoker,
-                extensions_json_path=shell.get_extensions_json_path(),
-            )
-            if installed is None:
-                continue
-
-            diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
-            per_shell[shell.name] = diff
-            ignored_per_shell[shell.name] = diff.ignored
+        states = compute_extension_states(
+            _get_extension_shells(ctx.registry), ctx.profile
+        )
+        per_shell: dict[str, Any] = {st.shell.name: st.diff for st in states}
+        ignored_per_shell = {st.shell.name: st.diff.ignored for st in states}
 
         has_changes = any(d.missing for d in per_shell.values())
         return ExtensionsPlan(
@@ -51,8 +35,7 @@ class ExtensionsComponent(Component):
         )
 
     def display_plan(self, plan: ComponentPlan) -> None:
-        if not isinstance(plan, ExtensionsPlan):
-            raise TypeError(f"expected ExtensionsPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, ExtensionsPlan)
         from shell_configs.display import (
             console,
             print_add,
@@ -90,8 +73,7 @@ class ExtensionsComponent(Component):
                     print_add(ext_id, indent=6)
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        if not isinstance(plan, ExtensionsPlan):
-            raise TypeError(f"expected ExtensionsPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, ExtensionsPlan)
         if ctx.dry_run:
             return True
 
@@ -161,11 +143,6 @@ class ExtensionsComponent(Component):
 
         return True
 
-    def install(self, ctx: Context) -> bool:
-        p = self.plan(ctx)
-        self.display_plan(p)
-        return self.apply(ctx, p)
-
     def status(self, ctx: Context) -> None:
         from shell_configs.cli.helpers import _get_extension_shells
         from shell_configs.display import (
@@ -174,29 +151,13 @@ class ExtensionsComponent(Component):
             print_success,
             print_warning,
         )
-        from shell_configs.extensions import ExtensionManager
+        from shell_configs.extensions import compute_extension_states
 
-        ext_manager = ExtensionManager()
-        ide_shells = _get_extension_shells(ctx.registry)
-        for shell in ide_shells:
-            invoker = shell.get_extension_invoker()
-            cli_cmd = shell.get_extension_cli()
-            if invoker is None and cli_cmd is None:
-                continue
-
-            ext_desired = ext_manager.load_desired_extensions(
-                shell.name, shell.get_extension_list_paths(), profile=ctx.profile
-            )
-            ext_installed = ext_manager.get_installed_extensions(
-                cli_cmd,
-                invoker=invoker,
-                extensions_json_path=shell.get_extensions_json_path(),
-            )
-            if ext_installed is None:
-                continue
-            ext_diff = ext_manager.compute_diff(
-                ext_desired, ext_installed, shell_name=shell.name
-            )
+        states = compute_extension_states(
+            _get_extension_shells(ctx.registry), ctx.profile
+        )
+        for st in states:
+            shell, ext_desired, ext_diff = st.shell, st.desired, st.diff
 
             if not ext_diff.missing and not ext_diff.extra:
                 print_success(
@@ -218,11 +179,6 @@ class ExtensionsComponent(Component):
                 print_hint("Run 'shell-configs extensions diff' for details", indent=2)
 
         console.print()
-
-    def diff(self, ctx: Context) -> bool:
-        p = self.plan(ctx)
-        self.display_plan(p)
-        return any(d.missing or d.extra or d.ignored for d in p.per_shell.values())
 
     def uninstall(self, ctx: Context) -> None:
         from shell_configs.cli.helpers import _get_extension_shells

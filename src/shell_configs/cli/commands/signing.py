@@ -6,6 +6,8 @@ import sys
 
 import click
 
+from shell_configs.cli.options import yes_option
+
 
 @click.command()
 @click.option(
@@ -14,7 +16,7 @@ import click
     help="Run full SSH key lifecycle (generate, auth, upload, sign)",
 )
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed key information")
-@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
+@yes_option
 @click.option(
     "--cleanup",
     is_flag=True,

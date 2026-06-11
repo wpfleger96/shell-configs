@@ -12,7 +12,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from shell_configs.profiles.profile import Profile
+    from shell_configs.shells.base import Shell
 
 logger = logging.getLogger(__name__)
 
@@ -440,3 +443,57 @@ class ExtensionManager:
                 )
 
         return results
+
+
+@dataclass(frozen=True)
+class ShellExtensionState:
+    """Resolved extension state for one extension-capable IDE shell."""
+
+    shell: Shell
+    invoker: ExtensionInvoker | None
+    cli_cmd: str | None
+    desired: set[str]
+    installed: set[str]
+    diff: ExtensionDiff
+
+
+def compute_extension_states(
+    shells: Iterable[Shell],
+    profile: Profile | None,
+) -> list[ShellExtensionState]:
+    """Compute desired/installed/diff for each shell.
+
+    Skips shells with neither an extension invoker nor a CLI, and shells
+    whose installed extensions cannot be determined.
+    """
+    manager = ExtensionManager()
+    states: list[ShellExtensionState] = []
+    for shell in shells:
+        invoker = shell.get_extension_invoker()
+        cli_cmd = shell.get_extension_cli()
+        if invoker is None and cli_cmd is None:
+            continue
+
+        desired = manager.load_desired_extensions(
+            shell.name, shell.get_extension_list_paths(), profile=profile
+        )
+        installed = manager.get_installed_extensions(
+            cli_cmd,
+            invoker=invoker,
+            extensions_json_path=shell.get_extensions_json_path(),
+        )
+        if installed is None:
+            continue
+
+        diff = manager.compute_diff(desired, installed, shell_name=shell.name)
+        states.append(
+            ShellExtensionState(
+                shell=shell,
+                invoker=invoker,
+                cli_cmd=cli_cmd,
+                desired=desired,
+                installed=installed,
+                diff=diff,
+            )
+        )
+    return states

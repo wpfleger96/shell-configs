@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
-from shell_configs.cli.context import Component, ComponentPlan, Context, SigningPlan
+from shell_configs.cli.context import (
+    Component,
+    ComponentPlan,
+    Context,
+    SigningPlan,
+    expect_plan,
+)
 
 
 class SigningComponent(Component):
     label = "signing"
     display_name = "SSH Key Lifecycle"
+    apply_stage = "post"
 
     def plan(self, ctx: Context) -> SigningPlan:
         from shell_configs.bootstrap import is_command_available
@@ -22,8 +29,7 @@ class SigningComponent(Component):
         return SigningPlan(has_changes=bool(failed), results=results, failed=failed)
 
     def display_plan(self, plan: ComponentPlan) -> None:
-        if not isinstance(plan, SigningPlan):
-            raise TypeError(f"expected SigningPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, SigningPlan)
         if not plan.has_changes:
             return
 
@@ -46,8 +52,7 @@ class SigningComponent(Component):
             print_warning(r.message, indent=2)
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        if not isinstance(plan, SigningPlan):
-            raise TypeError(f"expected SigningPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, SigningPlan)
         if not plan.has_changes:
             return True
 
@@ -55,38 +60,6 @@ class SigningComponent(Component):
 
         results = setup_signing(auto_fix=True, interactive=False)
         return all(r.success or r.skipped for r in results)
-
-    def install(self, ctx: Context) -> bool:
-        if ctx.dry_run:
-            return True
-
-        import click
-
-        from shell_configs.display import (
-            console,
-            print_error,
-            print_progress,
-            print_success,
-            print_warning,
-        )
-        from shell_configs.signing import setup_signing
-
-        console.print()
-        print_progress("Validating SSH key lifecycle...")
-
-        auto_fix = ctx.yes or click.confirm(
-            "Set up SSH key lifecycle (generate, auth, sign)?", default=True
-        )
-        signing_results = setup_signing(auto_fix=auto_fix, interactive=False)
-        for r in signing_results:
-            if r.skipped:
-                print_warning(r.message)
-            elif r.success:
-                print_success(r.message)
-            else:
-                print_error(r.message)
-
-        return True
 
     def status(self, ctx: Context) -> None:
         from shell_configs.display import console, print_success, print_warning
@@ -100,8 +73,3 @@ class SigningComponent(Component):
                 print_warning(r.message, indent=2)
 
         console.print()
-
-    def diff(self, ctx: Context) -> bool:
-        plan = self.plan(ctx)
-        self.display_plan(plan)
-        return plan.has_changes

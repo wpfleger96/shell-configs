@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 if TYPE_CHECKING:
     from shell_configs.agents import Agent
@@ -136,6 +136,13 @@ class AgentsPlan(ComponentPlan):
     orphaned: list[str] = field(default_factory=list)
 
 
+def expect_plan[P: ComponentPlan](plan: ComponentPlan, cls: type[P]) -> P:
+    """Narrow a ComponentPlan to the concrete type a component expects."""
+    if not isinstance(plan, cls):
+        raise TypeError(f"expected {cls.__name__}, got {type(plan).__name__}")
+    return plan
+
+
 # ---------------------------------------------------------------------------
 # Component base class
 # ---------------------------------------------------------------------------
@@ -144,6 +151,11 @@ class AgentsPlan(ComponentPlan):
 class Component:
     label: str = ""  # machine slug for progress spinners and error messages
     display_name: str = ""  # human-readable title for section headers
+    # When the install command applies this component: "pre" components run
+    # sequentially first (later components depend on the tools they install),
+    # "post" components run sequentially last (they mutate shared gh auth
+    # state), everything else applies in parallel.
+    apply_stage: ClassVar[Literal["pre", "parallel", "post"]] = "parallel"
 
     def plan(self, ctx: Context) -> ComponentPlan:
         """Compute what needs to change (read-only, no prompts, no writes)."""
@@ -159,12 +171,5 @@ class Component:
     def status(self, ctx: Context) -> None:
         """Display current status (read-only)."""
 
-    # Legacy methods — kept for backward compatibility during migration
-    def install(self, ctx: Context) -> bool:
-        return True
-
-    def diff(self, ctx: Context) -> bool:
-        return False
-
     def uninstall(self, ctx: Context) -> None:
-        pass
+        """Remove everything this component installed (used by the uninstall command)."""

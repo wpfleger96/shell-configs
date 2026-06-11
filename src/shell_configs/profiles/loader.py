@@ -1,5 +1,6 @@
 """Profile loading and inheritance resolution."""
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,32 @@ from shell_configs.profiles.profile import (
     ProfileNotFoundError,
 )
 from shell_configs.shells.base import deep_merge as _deep_merge
+
+
+def _merge_add_remove(
+    parent: dict[str, list[str]],
+    child: dict[str, list[str]],
+    normalize: Callable[[str], str] = str,
+) -> dict[str, list[str]]:
+    """Merge {"add": [...], "remove": [...]} dicts; removes win over adds."""
+    add = list(
+        dict.fromkeys(
+            normalize(x) for x in parent.get("add", []) + child.get("add", [])
+        )
+    )
+    remove = list(
+        dict.fromkeys(
+            normalize(x) for x in parent.get("remove", []) + child.get("remove", [])
+        )
+    )
+    add = [x for x in add if x not in set(remove)]
+
+    merged: dict[str, list[str]] = {}
+    if add:
+        merged["add"] = add
+    if remove:
+        merged["remove"] = remove
+    return merged
 
 
 class ProfileLoader:
@@ -130,41 +157,16 @@ class ProfileLoader:
             else:
                 merged_shell[shell_name] = content
 
-        parent_add = parent.packages.get("add", [])
-        child_add = child.packages.get("add", [])
-        parent_remove = parent.packages.get("remove", [])
-        child_remove = child.packages.get("remove", [])
-
-        merged_add = list(dict.fromkeys(parent_add + child_add))
-        merged_remove = list(dict.fromkeys(parent_remove + child_remove))
-        merged_add = [p for p in merged_add if p not in set(merged_remove)]
-
-        merged_packages: dict[str, list[str]] = {}
-        if merged_add:
-            merged_packages["add"] = merged_add
-        if merged_remove:
-            merged_packages["remove"] = merged_remove
+        merged_packages = _merge_add_remove(parent.packages, child.packages)
 
         merged_extensions: dict[str, dict[str, list[str]]] = {}
         all_shell_names = set(parent.extensions) | set(child.extensions)
         for shell_name in all_shell_names:
-            p_ext = parent.extensions.get(shell_name, {})
-            c_ext = child.extensions.get(shell_name, {})
-
-            p_add = [e.lower() for e in p_ext.get("add", [])]
-            c_add = [e.lower() for e in c_ext.get("add", [])]
-            p_rm = [e.lower() for e in p_ext.get("remove", [])]
-            c_rm = [e.lower() for e in c_ext.get("remove", [])]
-
-            ext_add = list(dict.fromkeys(p_add + c_add))
-            ext_rm = list(dict.fromkeys(p_rm + c_rm))
-            ext_add = [e for e in ext_add if e not in set(ext_rm)]
-
-            shell_ext: dict[str, list[str]] = {}
-            if ext_add:
-                shell_ext["add"] = ext_add
-            if ext_rm:
-                shell_ext["remove"] = ext_rm
+            shell_ext = _merge_add_remove(
+                parent.extensions.get(shell_name, {}),
+                child.extensions.get(shell_name, {}),
+                normalize=str.lower,
+            )
             if shell_ext:
                 merged_extensions[shell_name] = shell_ext
 

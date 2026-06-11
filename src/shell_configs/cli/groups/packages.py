@@ -6,7 +6,8 @@ import sys
 
 import click
 
-from shell_configs.config import ConfigReader
+from shell_configs.cli.helpers import load_profile_context
+from shell_configs.cli.options import dry_run_option, profile_option, yes_option
 
 
 @click.group()
@@ -16,9 +17,9 @@ def packages() -> None:
 
 
 @packages.command(name="install")
-@click.option("--dry-run", is_flag=True, help="Show what would be installed")
-@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
-@click.option("--profile", "profile_name", default=None, help="Profile to use")
+@dry_run_option("Show what would be installed")
+@yes_option
+@profile_option
 def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None:
     """Install required system packages."""
     from shell_configs.display import (
@@ -38,11 +39,8 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
         sort_packages_for_install,
     )
     from shell_configs.platform import detect_platform
-    from shell_configs.profiles import ProfileLoader, resolve_active_profile
 
-    config_reader = ConfigReader()
-    profile_loader = ProfileLoader(config_reader.config_dir)
-    active_profile = resolve_active_profile(profile_name, profile_loader)
+    _, _, active_profile = load_profile_context(profile_name)
 
     platform_name = detect_platform().display_name
     print_label("Platform", platform_name)
@@ -127,7 +125,7 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
 
 
 @packages.command(name="status")
-@click.option("--profile", "profile_name", default=None, help="Profile to use")
+@profile_option
 def packages_status(profile_name: str | None) -> None:
     """Show status of required packages."""
     from shell_configs.display import (
@@ -140,11 +138,8 @@ def packages_status(profile_name: str | None) -> None:
     )
     from shell_configs.packages import get_package_manager, load_packages_for_profile
     from shell_configs.platform import detect_platform
-    from shell_configs.profiles import ProfileLoader, resolve_active_profile
 
-    config_reader = ConfigReader()
-    profile_loader = ProfileLoader(config_reader.config_dir)
-    active_profile = resolve_active_profile(profile_name, profile_loader)
+    _, _, active_profile = load_profile_context(profile_name)
 
     platform_name = detect_platform().display_name
     print_label("Platform", platform_name)
@@ -194,9 +189,9 @@ def packages_status(profile_name: str | None) -> None:
 
 
 @packages.command(name="uninstall")
-@click.option("--dry-run", is_flag=True, help="Show what would be uninstalled")
-@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
-@click.option("--profile", "profile_name", default=None, help="Profile to use")
+@dry_run_option("Show what would be uninstalled")
+@yes_option
+@profile_option
 def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> None:
     """Uninstall managed system packages."""
     from shell_configs.display import (
@@ -215,11 +210,8 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
         sort_packages_for_uninstall,
     )
     from shell_configs.platform import detect_platform
-    from shell_configs.profiles import ProfileLoader, resolve_active_profile
 
-    config_reader = ConfigReader()
-    profile_loader = ProfileLoader(config_reader.config_dir)
-    active_profile = resolve_active_profile(profile_name, profile_loader)
+    _, _, active_profile = load_profile_context(profile_name)
 
     platform_name = detect_platform().display_name
     print_label("Platform", platform_name)

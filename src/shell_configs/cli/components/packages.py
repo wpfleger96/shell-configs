@@ -8,12 +8,14 @@ from shell_configs.cli.context import (
     Context,
     OptionalPackagesPlan,
     RequiredPackagesPlan,
+    expect_plan,
 )
 
 
 class RequiredPackagesComponent(Component):
     label = "required-packages"
     display_name = "Required Packages"
+    apply_stage = "pre"
 
     def plan(self, ctx: Context) -> RequiredPackagesPlan:
         from shell_configs.packages import (
@@ -35,8 +37,7 @@ class RequiredPackagesComponent(Component):
         return RequiredPackagesPlan(has_changes=bool(missing), missing=missing)
 
     def display_plan(self, plan: ComponentPlan) -> None:
-        if not isinstance(plan, RequiredPackagesPlan):
-            raise TypeError(f"expected RequiredPackagesPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, RequiredPackagesPlan)
         if not plan.has_changes:
             return
 
@@ -48,8 +49,7 @@ class RequiredPackagesComponent(Component):
             console.print(f"  {pkg.name}")
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        if not isinstance(plan, RequiredPackagesPlan):
-            raise TypeError(f"expected RequiredPackagesPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, RequiredPackagesPlan)
         if not plan.missing:
             return True
 
@@ -79,14 +79,6 @@ class RequiredPackagesComponent(Component):
 
         return True
 
-    def install(self, ctx: Context) -> bool:
-        if ctx.dry_run:
-            return True
-
-        plan = self.plan(ctx)
-        self.display_plan(plan)
-        return self.apply(ctx, plan)
-
 
 class OptionalPackagesComponent(Component):
     label = "optional-packages"
@@ -113,8 +105,7 @@ class OptionalPackagesComponent(Component):
         )
 
     def display_plan(self, plan: ComponentPlan) -> None:
-        if not isinstance(plan, OptionalPackagesPlan):
-            raise TypeError(f"expected OptionalPackagesPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, OptionalPackagesPlan)
         if not plan.has_changes:
             return
 
@@ -130,8 +121,7 @@ class OptionalPackagesComponent(Component):
             print_error(pkg.name, indent=2)
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        if not isinstance(plan, OptionalPackagesPlan):
-            raise TypeError(f"expected OptionalPackagesPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, OptionalPackagesPlan)
         if not plan.missing:
             return True
 
@@ -162,30 +152,6 @@ class OptionalPackagesComponent(Component):
             print_error(f"Error installing packages: {e}")
 
         return True
-
-    def install(self, ctx: Context) -> bool:
-        if ctx.dry_run:
-            return True
-
-        import click
-
-        from shell_configs.display import console, print_done, print_hint
-
-        plan = self.plan(ctx)
-
-        if not plan.has_changes:
-            console.print()
-            print_done(f"All {len(plan.total)} packages already installed")
-            return True
-
-        self.display_plan(plan)
-
-        if ctx.yes or click.confirm("Install missing packages?", default=True):
-            console.print()
-            return self.apply(ctx, plan)
-        else:
-            print_hint("Run 'shell-configs packages install' to install later.")
-            return True
 
     def status(self, ctx: Context) -> None:
         from shell_configs.display import (
@@ -221,15 +187,3 @@ class OptionalPackagesComponent(Component):
             print_hint("Run 'shell-configs packages status' for details", indent=2)
 
         console.print()
-
-    def diff(self, ctx: Context) -> bool:
-        from shell_configs.display import print_error, print_section
-
-        plan = self.plan(ctx)
-        if not plan.has_changes:
-            return False
-
-        print_section(self.display_name)
-        for pkg in plan.missing:
-            print_error(f"{pkg.name} (not installed)", indent=2)
-        return True

@@ -6,17 +6,13 @@ import sys
 
 import click
 
-from shell_configs.cli.helpers import parse_shell_filter
+from shell_configs.cli.options import dry_run_option, shells_option, yes_option
 
 
 @click.command()
-@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
-@click.option("--dry-run", is_flag=True, help="Show what would be done")
-@click.option(
-    "--shells",
-    callback=parse_shell_filter,
-    help="Comma-separated shells to install",
-)
+@yes_option
+@dry_run_option("Show what would be done")
+@shells_option("Comma-separated shells to install")
 @click.option("--skip-completions", is_flag=True, help="Skip shell completion setup")
 @click.option("--skip-packages", is_flag=True, help="Skip package installation")
 @click.option("--skip-scripts", is_flag=True, help="Skip utility script installation")
