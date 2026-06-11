@@ -393,6 +393,7 @@ def _resolve_key_path(
     auto_fix: bool,
     interactive: bool,
     results: list[StepResult],
+    gh_authed: bool = True,
 ) -> Path | None:
     """Resolve which SSH key to manage.
 
@@ -405,7 +406,7 @@ def _resolve_key_path(
         return key_path
 
     local_keys = find_local_ssh_keys()
-    github_fps = get_github_key_fingerprints()
+    github_fps = get_github_key_fingerprints() if gh_authed else set()
 
     if github_fps:
         matched = discover_managed_key(local_keys, github_fps)
@@ -502,6 +503,7 @@ def setup_signing(
     if not auto_fix:
         return _validate_all_steps(key_path)
 
+    gh_authed = False
     if dry_run:
         results.append(
             StepResult("gh_auth", True, "Would ensure GitHub CLI is authenticated")
@@ -511,6 +513,7 @@ def setup_signing(
         results.append(
             StepResult("gh_auth", ok, msg, skipped=not ok and not interactive)
         )
+        gh_authed = ok
         if not ok and interactive:
             return results
 
@@ -552,7 +555,13 @@ def setup_signing(
             )
             key_path = DEFAULT_GENERATION_PATH
     else:
-        key_path = _resolve_key_path(key_path, auto_fix, interactive, results)
+        key_path = _resolve_key_path(
+            key_path,
+            auto_fix,
+            interactive,
+            results,
+            gh_authed=gh_authed,
+        )
         if key_path is None:
             return results
 
@@ -645,7 +654,11 @@ def _validate_all_steps(key_path: Path | None) -> list[StepResult]:
         gh_has_scopes = False
 
     key_path = _resolve_key_path(
-        key_path, auto_fix=False, interactive=False, results=results
+        key_path,
+        auto_fix=False,
+        interactive=False,
+        results=results,
+        gh_authed=gh_authed,
     )
     if key_path is None:
         return results
