@@ -1618,9 +1618,9 @@ def main() -> None:
     parser.add_argument(
         "command",
         nargs="?",
-        default="check",
+        default="interactive",
         choices=["check", "fix", "interactive"],
-        help="check (default), fix (all tiers), or interactive (select items to clean)",
+        help="interactive (default), check, or fix (all tiers)",
     )
     parser.add_argument(
         "-y",
