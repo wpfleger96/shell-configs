@@ -259,7 +259,7 @@ class TestInstallLanguage:
 
     def test_brew_install_on_macos(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.languages.is_platform",
+            "shell_configs.installers.is_platform",
             lambda p: p.value == "macos",
         )
         lang = _make_lang(
@@ -284,7 +284,7 @@ class TestInstallLanguage:
 
     def test_apt_install_on_linux(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.languages.is_platform",
+            "shell_configs.installers.is_platform",
             lambda p: p.value == "linux",
         )
         lang = _make_lang(
@@ -305,7 +305,7 @@ class TestInstallLanguage:
 
     def test_script_install_fallback(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.languages.is_platform",
+            "shell_configs.installers.is_platform",
             lambda p: False,
         )
         lang = _make_lang(install_cmd="curl https://sh.rustup.rs | sh -s -- -y")
@@ -322,7 +322,7 @@ class TestInstallLanguage:
 
     def test_dry_run_brew(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.languages.is_platform",
+            "shell_configs.installers.is_platform",
             lambda p: p.value == "macos",
         )
         lang = _make_lang(macos=LanguageInstallConfig(method="brew", package="go"))
@@ -339,7 +339,7 @@ class TestInstallLanguage:
 
     def test_no_install_method_returns_error(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.languages.is_platform",
+            "shell_configs.installers.is_platform",
             lambda p: False,
         )
         lang = _make_lang()  # no macos, linux, or install_cmd
@@ -350,7 +350,7 @@ class TestInstallLanguage:
 
     def test_apt_unavailable_returns_error(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.languages.is_platform",
+            "shell_configs.installers.is_platform",
             lambda p: p.value == "linux",
         )
         lang = _make_lang(linux=LanguageInstallConfig(method="apt", package="golang"))

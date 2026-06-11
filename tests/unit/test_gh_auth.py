@@ -85,7 +85,7 @@ class TestGetCurrentGhScopes:
         from shell_configs.gh_auth import get_current_gh_scopes
 
         monkeypatch.setattr(
-            "shell_configs.signing._run",
+            "shell_configs.fsio.run_quiet",
             lambda *a, **kw: _make_result(
                 0,
                 stdout="  - Token scopes: 'admin:public_key', 'workflow'\n",
@@ -100,7 +100,7 @@ class TestGetCurrentGhScopes:
         from shell_configs.gh_auth import get_current_gh_scopes
 
         monkeypatch.setattr(
-            "shell_configs.signing._run",
+            "shell_configs.fsio.run_quiet",
             lambda *a, **kw: _make_result(
                 0,
                 stdout="",
@@ -116,7 +116,7 @@ class TestGetCurrentGhScopes:
         from shell_configs.gh_auth import get_current_gh_scopes
 
         monkeypatch.setattr(
-            "shell_configs.signing._run",
+            "shell_configs.fsio.run_quiet",
             lambda *a, **kw: _make_result(1, stderr="not logged in"),
         )
 
@@ -130,7 +130,7 @@ class TestGetCurrentGhScopes:
         from shell_configs.gh_auth import get_current_gh_scopes
 
         monkeypatch.setattr(
-            "shell_configs.signing._run",
+            "shell_configs.fsio.run_quiet",
             lambda *a, **kw: _make_result(0, stdout="Logged in\n"),
         )
 

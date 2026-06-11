@@ -7,18 +7,24 @@ import subprocess
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import yaml
 
 from shell_configs.config import get_config_dir
-from shell_configs.platform import Platform, is_platform
+from shell_configs.installers import (
+    PlatformInstallConfig,
+    install_via_config,
+    parse_platform_configs,
+    resolve_platform_config,
+    run_script,
+    uninstall_npm,
+    uninstall_via_config,
+    uninstall_winget,
+)
 
+AgentInstallConfig = PlatformInstallConfig
 
-@dataclass(frozen=True)
-class AgentInstallConfig:
-    method: str  # "npm"
-    package: str | None = None
+_AGENT_METHODS = frozenset({"npm", "winget"})
 
 
 @dataclass(frozen=True)
@@ -55,29 +61,7 @@ def load_agents(manifest_path: Path | None = None) -> list[Agent]:
         if not name or not command:
             continue
 
-        macos_cfg: AgentInstallConfig | None = None
-        linux_cfg: AgentInstallConfig | None = None
-
-        if isinstance(entry.get("macos"), dict):
-            m: dict[str, Any] = entry["macos"]
-            macos_cfg = AgentInstallConfig(
-                method=m.get("method", ""),
-                package=m.get("package") or None,
-            )
-        if isinstance(entry.get("linux"), dict):
-            li: dict[str, Any] = entry["linux"]
-            linux_cfg = AgentInstallConfig(
-                method=li.get("method", ""),
-                package=li.get("package") or None,
-            )
-
-        windows_cfg: AgentInstallConfig | None = None
-        if isinstance(entry.get("windows"), dict):
-            w: dict[str, Any] = entry["windows"]
-            windows_cfg = AgentInstallConfig(
-                method=w.get("method", ""),
-                package=w.get("package") or None,
-            )
+        macos_cfg, linux_cfg, windows_cfg = parse_platform_configs(entry)
 
         result.append(
             Agent(
@@ -124,13 +108,9 @@ def get_agent_version(agent: Agent) -> str | None:
 
 
 def _resolve_platform_config(agent: Agent) -> AgentInstallConfig | None:
-    if is_platform(Platform.MACOS) and agent.macos:
-        return agent.macos
-    if is_platform(Platform.WINDOWS) and agent.windows:
-        return agent.windows
-    if (is_platform(Platform.WSL) or is_platform(Platform.LINUX)) and agent.linux:
-        return agent.linux
-    return None
+    return resolve_platform_config(
+        macos=agent.macos, linux=agent.linux, windows=agent.windows
+    )
 
 
 def install_agent(agent: Agent, dry_run: bool = False) -> tuple[bool, str]:
@@ -140,21 +120,10 @@ def install_agent(agent: Agent, dry_run: bool = False) -> tuple[bool, str]:
 
     config = _resolve_platform_config(agent)
     if config:
-        return _install_via_config(agent.name, config, dry_run)
+        return install_via_config(agent.name, config, dry_run, methods=_AGENT_METHODS)
     if agent.install_cmd:
-        return _install_via_script(agent.name, agent.install_cmd, dry_run)
+        return run_script(agent.name, agent.install_cmd, dry_run)
     return False, f"No install method configured for {agent.name} on this platform"
-
-
-def _install_via_config(
-    name: str, config: AgentInstallConfig, dry_run: bool
-) -> tuple[bool, str]:
-    pkg = config.package or name
-    if config.method == "npm":
-        return _install_npm(name, pkg, dry_run)
-    if config.method == "winget":
-        return _install_winget(name, pkg, dry_run)
-    return False, f"Unknown install method: {config.method}"
 
 
 def uninstall_agent(agent: Agent, dry_run: bool = False) -> tuple[bool, str]:
@@ -164,9 +133,9 @@ def uninstall_agent(agent: Agent, dry_run: bool = False) -> tuple[bool, str]:
 
     config = _resolve_platform_config(agent)
     if config:
-        return _uninstall_via_config(agent.name, config, dry_run)
+        return uninstall_via_config(agent.name, config, dry_run, methods=_AGENT_METHODS)
     if agent.uninstall_cmd:
-        return _uninstall_via_script(agent.name, agent.uninstall_cmd, dry_run)
+        return run_script(agent.name, agent.uninstall_cmd, dry_run, verb="uninstall")
     return False, f"No uninstall method configured for {agent.name} on this platform"
 
 
@@ -181,89 +150,12 @@ def uninstall_agent_by_manifest_entry(
     if not shutil.which(command):
         return True, f"{name} is not installed"
     if install_method == "npm":
-        return _uninstall_npm(name, package or name, dry_run)
+        return uninstall_npm(name, package or name, dry_run)
     if install_method == "winget":
-        return _uninstall_winget(name, package or name, dry_run)
+        return uninstall_winget(name, package or name, dry_run)
     if install_method == "script":
         return True, f"{name} has no reverse uninstall script"
     return False, f"Unknown install method: {install_method}"
-
-
-def _uninstall_via_config(
-    name: str, config: AgentInstallConfig, dry_run: bool
-) -> tuple[bool, str]:
-    pkg = config.package or name
-    if config.method == "npm":
-        return _uninstall_npm(name, pkg, dry_run)
-    if config.method == "winget":
-        return _uninstall_winget(name, pkg, dry_run)
-    return False, f"Unknown install method: {config.method}"
-
-
-def _uninstall_npm(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
-    if not shutil.which("npm"):
-        return (
-            False,
-            "npm is not available — install Node.js first, then re-run",
-        )
-    if dry_run:
-        return True, f"Would uninstall {package} via npm uninstall -g"
-    try:
-        result = subprocess.run(
-            ["npm", "uninstall", "-g", package],
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        if result.returncode == 0:
-            return True, f"Uninstalled {name} via npm"
-        return False, f"Failed to uninstall {name}: {result.stderr.strip()}"
-    except subprocess.TimeoutExpired:
-        return False, f"Failed to uninstall {name}: npm timed out"
-
-
-def _uninstall_winget(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
-    if not shutil.which("winget"):
-        return False, "winget is not available"
-    if dry_run:
-        return True, f"Would uninstall {package} via winget"
-    try:
-        result = subprocess.run(
-            [
-                "winget",
-                "uninstall",
-                package,
-                "--silent",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        if result.returncode == 0:
-            return True, f"Uninstalled {name} via winget"
-        return False, f"Failed to uninstall {name}: {result.stderr.strip()}"
-    except subprocess.TimeoutExpired:
-        return False, f"Failed to uninstall {name}: winget timed out"
-
-
-def _uninstall_via_script(
-    name: str, uninstall_cmd: str, dry_run: bool
-) -> tuple[bool, str]:
-    if dry_run:
-        return True, f"Would uninstall {name} via: {uninstall_cmd}"
-    try:
-        result = subprocess.run(
-            uninstall_cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        if result.returncode == 0:
-            return True, f"Uninstalled {name}"
-        return False, f"Failed to uninstall {name}: {result.stderr.strip()}"
-    except subprocess.TimeoutExpired:
-        return False, f"Failed to uninstall {name}: uninstall script timed out"
 
 
 def get_agent_install_method(agent: Agent) -> tuple[str, str | None]:
@@ -272,69 +164,3 @@ def get_agent_install_method(agent: Agent) -> tuple[str, str | None]:
     if config:
         return config.method, config.package or agent.name
     return "script", None
-
-
-def _install_npm(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
-    if not shutil.which("npm"):
-        return (
-            False,
-            "npm is not available — install Node.js first, then re-run",
-        )
-    if dry_run:
-        return True, f"Would install {package} via npm install -g"
-    try:
-        result = subprocess.run(
-            ["npm", "install", "-g", package],
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        if result.returncode == 0:
-            return True, f"Installed {name} via npm"
-        return False, f"Failed to install {name}: {result.stderr.strip()}"
-    except subprocess.TimeoutExpired:
-        return False, f"Failed to install {name}: npm timed out"
-
-
-def _install_winget(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
-    if not shutil.which("winget"):
-        return False, "winget is not available"
-    if dry_run:
-        return True, f"Would install {package} via winget"
-    try:
-        result = subprocess.run(
-            [
-                "winget",
-                "install",
-                package,
-                "--accept-source-agreements",
-                "--accept-package-agreements",
-                "--silent",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        if result.returncode == 0:
-            return True, f"Installed {name} via winget"
-        return False, f"Failed to install {name}: {result.stderr.strip()}"
-    except subprocess.TimeoutExpired:
-        return False, f"Failed to install {name}: winget timed out"
-
-
-def _install_via_script(name: str, install_cmd: str, dry_run: bool) -> tuple[bool, str]:
-    if dry_run:
-        return True, f"Would install {name} via: {install_cmd}"
-    try:
-        result = subprocess.run(
-            install_cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        if result.returncode == 0:
-            return True, f"Installed {name}"
-        return False, f"Failed to install {name}: {result.stderr.strip()}"
-    except subprocess.TimeoutExpired:
-        return False, f"Failed to install {name}: install script timed out"

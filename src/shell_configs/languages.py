@@ -8,19 +8,21 @@ import subprocess
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import yaml
 
-from shell_configs.agents import _install_winget
 from shell_configs.config import get_config_dir
-from shell_configs.platform import Platform, is_platform
+from shell_configs.installers import (
+    PlatformInstallConfig,
+    install_via_config,
+    parse_platform_configs,
+    resolve_platform_config,
+    run_script,
+)
 
+LanguageInstallConfig = PlatformInstallConfig
 
-@dataclass(frozen=True)
-class LanguageInstallConfig:
-    method: str  # "brew" or "apt"
-    package: str | None = None
+_LANGUAGE_METHODS = frozenset({"brew", "apt", "winget"})
 
 
 @dataclass(frozen=True)
@@ -60,29 +62,7 @@ def load_languages(manifest_path: Path | None = None) -> list[Language]:
         if not name or not command:
             continue
 
-        macos_cfg: LanguageInstallConfig | None = None
-        linux_cfg: LanguageInstallConfig | None = None
-
-        if isinstance(entry.get("macos"), dict):
-            m: dict[str, Any] = entry["macos"]
-            macos_cfg = LanguageInstallConfig(
-                method=m.get("method", ""),
-                package=m.get("package") or None,
-            )
-        if isinstance(entry.get("linux"), dict):
-            li: dict[str, Any] = entry["linux"]
-            linux_cfg = LanguageInstallConfig(
-                method=li.get("method", ""),
-                package=li.get("package") or None,
-            )
-
-        windows_cfg: LanguageInstallConfig | None = None
-        if isinstance(entry.get("windows"), dict):
-            w: dict[str, Any] = entry["windows"]
-            windows_cfg = LanguageInstallConfig(
-                method=w.get("method", ""),
-                package=w.get("package") or None,
-            )
+        macos_cfg, linux_cfg, windows_cfg = parse_platform_configs(entry)
 
         result.append(
             Language(
@@ -164,84 +144,11 @@ def install_language(lang: Language, dry_run: bool = False) -> tuple[bool, str]:
     if is_language_installed(lang):
         return True, f"{lang.name} is already installed"
 
-    ok, msg = False, f"No install method configured for {lang.name} on this platform"
-
-    if is_platform(Platform.MACOS) and lang.macos:
-        ok, msg = _install_via_config(lang.name, lang.macos, dry_run)
-    elif is_platform(Platform.WINDOWS) and lang.windows:
-        ok, msg = _install_via_config(lang.name, lang.windows, dry_run)
-    elif (is_platform(Platform.WSL) or is_platform(Platform.LINUX)) and lang.linux:
-        ok, msg = _install_via_config(lang.name, lang.linux, dry_run)
-    elif lang.install_cmd:
-        ok, msg = _install_via_script(lang.name, lang.install_cmd, dry_run)
-
-    return ok, msg
-
-
-def _install_via_config(
-    name: str, config: LanguageInstallConfig, dry_run: bool
-) -> tuple[bool, str]:
-    pkg = config.package or name
-    if config.method == "brew":
-        return _install_brew(name, pkg, dry_run)
-    if config.method == "apt":
-        return _install_apt(name, pkg, dry_run)
-    if config.method == "winget":
-        return _install_winget(name, pkg, dry_run)
-    return False, f"Unknown install method: {config.method}"
-
-
-def _install_brew(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
-    if not shutil.which("brew"):
-        return False, "brew is not available"
-    if dry_run:
-        return True, f"Would install {package} via brew"
-    try:
-        result = subprocess.run(
-            ["brew", "install", package],
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        if result.returncode == 0:
-            return True, f"Installed {name} via brew"
-        return False, f"Failed to install {name}: {result.stderr.strip()}"
-    except subprocess.TimeoutExpired:
-        return False, f"Failed to install {name}: brew timed out"
-
-
-def _install_apt(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
-    if not shutil.which("apt"):
-        return False, "apt is not available"
-    if dry_run:
-        return True, f"Would install {package} via apt"
-    try:
-        result = subprocess.run(
-            ["sudo", "apt-get", "install", "-y", package],
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        if result.returncode == 0:
-            return True, f"Installed {name} via apt"
-        return False, f"Failed to install {name}: {result.stderr.strip()}"
-    except subprocess.TimeoutExpired:
-        return False, f"Failed to install {name}: apt timed out"
-
-
-def _install_via_script(name: str, install_cmd: str, dry_run: bool) -> tuple[bool, str]:
-    if dry_run:
-        return True, f"Would install {name} via: {install_cmd}"
-    try:
-        result = subprocess.run(
-            install_cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        if result.returncode == 0:
-            return True, f"Installed {name}"
-        return False, f"Failed to install {name}: {result.stderr.strip()}"
-    except subprocess.TimeoutExpired:
-        return False, f"Failed to install {name}: install script timed out"
+    config = resolve_platform_config(
+        macos=lang.macos, linux=lang.linux, windows=lang.windows
+    )
+    if config:
+        return install_via_config(lang.name, config, dry_run, methods=_LANGUAGE_METHODS)
+    if lang.install_cmd:
+        return run_script(lang.name, lang.install_cmd, dry_run)
+    return False, f"No install method configured for {lang.name} on this platform"

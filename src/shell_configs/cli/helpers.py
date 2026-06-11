@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import difflib
 import sys
 
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
@@ -13,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 import click
 
 from shell_configs.config import ConfigReader
+from shell_configs.fsio import unified_diff_text
 from shell_configs.shells.base import merge_json_with_profile
 
 if TYPE_CHECKING:
@@ -222,16 +222,14 @@ def _compute_diffs_for_shells(
             if section.content.strip() == repo_content.strip():
                 continue
 
-            installed_lines = section.content.splitlines(keepends=True)
-            repo_lines = repo_content.splitlines(keepends=True)
-            diff_text = "\n".join(
-                difflib.unified_diff(
-                    installed_lines,
-                    repo_lines,
+            diff_text = (
+                unified_diff_text(
+                    section.content,
+                    repo_content,
                     fromfile="Installed",
                     tofile="Repository",
-                    lineterm="",
                 )
+                or ""
             )
             diffs.append(
                 FileDiff(
@@ -360,16 +358,14 @@ def _compute_diffs_for_shells(
                         continue
                 installed_content = additional_file.target_path.read_text()
 
-            installed_lines = installed_content.splitlines(keepends=True)
-            repo_lines = repo_content.splitlines(keepends=True)
-            diff_text = "\n".join(
-                difflib.unified_diff(
-                    installed_lines,
-                    repo_lines,
+            diff_text = (
+                unified_diff_text(
+                    installed_content,
+                    repo_content,
                     fromfile="Installed",
                     tofile="Repository",
-                    lineterm="",
                 )
+                or ""
             )
             diffs.append(
                 FileDiff(

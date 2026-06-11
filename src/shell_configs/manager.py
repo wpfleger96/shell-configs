@@ -1,7 +1,6 @@
 """Manager for shell configuration sections."""
 
 import configparser
-import difflib
 import json
 import logging
 import os
@@ -15,6 +14,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+
+from shell_configs.fsio import atomic_write_text, unified_diff_text
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +91,6 @@ class AdditionalFileManifest:
             logger.warning("Corrupt additional file manifest at %s: %s", self.path, e)
 
     def save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "version": 1,
             "files": {
@@ -102,17 +102,7 @@ class AdditionalFileManifest:
                 for target, entry in sorted(self.files.items())
             },
         }
-        content = json.dumps(data, indent=2) + "\n"
-        fd, temp_path = tempfile.mkstemp(
-            dir=self.path.parent, prefix=".additional_files.", suffix=".tmp"
-        )
-        try:
-            with os.fdopen(fd, "w") as f:
-                f.write(content)
-            shutil.move(temp_path, self.path)
-        except BaseException:
-            Path(temp_path).unlink(missing_ok=True)
-            raise
+        atomic_write_text(self.path, json.dumps(data, indent=2) + "\n")
 
     def record_install(
         self, target_path: str, shell_name: str, owned_file: bool = True
@@ -333,6 +323,18 @@ class ConfigManager:
 
         return backup_path, removed_files
 
+    def backup_with_note(
+        self, config_file: Path, backup_dir: Path | None = None
+    ) -> str:
+        """Create a backup and return the message suffix describing it."""
+        backup_path, removed_files = self.create_backup(
+            config_file, backup_dir=backup_dir
+        )
+        note = f" (backup: {backup_path.name})"
+        if removed_files:
+            note += f"; removed {len(removed_files)} old backup(s)"
+        return note
+
     def find_backup_files(
         self, config_file: Path, backup_dir: Path | None = None
     ) -> list[Path]:
@@ -437,19 +439,10 @@ class ConfigManager:
 
             diff_text = None
             if existing_section:
-                old_lines = existing_section.content.splitlines(keepends=True)
-                new_content = self.strip_json_outer_brackets(final_content)
-                new_lines = new_content.splitlines(keepends=True)
-                diff_lines = difflib.unified_diff(
-                    old_lines,
-                    new_lines,
-                    fromfile="Previous",
-                    tofile="Updated",
-                    lineterm="",
+                diff_text = unified_diff_text(
+                    existing_section.content,
+                    self.strip_json_outer_brackets(final_content),
                 )
-                diff_text = "\n".join(diff_lines)
-                if not diff_text.strip():
-                    diff_text = None
 
             if config_file.exists():
                 if not os.access(config_file, os.W_OK):
@@ -458,10 +451,7 @@ class ConfigManager:
                         f"No write permission for {config_file}",
                         None,
                     )
-                backup_path, removed_files = self.create_backup(config_file)
-                backup_msg = f" (backup: {backup_path.name})"
-                if removed_files:
-                    backup_msg += f"; removed {len(removed_files)} old backup(s)"
+                backup_msg = self.backup_with_note(config_file)
             else:
                 backup_msg = ""
                 config_file.parent.mkdir(parents=True, exist_ok=True)
@@ -713,7 +703,7 @@ class ConfigManager:
                     f"Would remove managed section from {config_file}",
                 )
 
-            backup_path, removed_files = self.create_backup(config_file)
+            backup_msg = self.backup_with_note(config_file)
             lines = config_file.read_text().splitlines(keepends=True)
 
             new_lines = lines[: section.start_line] + lines[section.end_line + 1 :]
@@ -726,10 +716,6 @@ class ConfigManager:
 
             new_content = "".join(new_lines)
             self._atomic_write(config_file, new_content)
-
-            backup_msg = f" (backup: {backup_path.name})"
-            if removed_files:
-                backup_msg += f"; removed {len(removed_files)} old backup(s)"
 
             return (
                 OperationResult.REMOVED,
@@ -822,27 +808,11 @@ class ConfigManager:
 
             diff_text = None
             if target_path.exists():
-                old_lines = target_path.read_text().splitlines(keepends=True)
-                new_lines = content.splitlines(keepends=True)
-                diff_lines = difflib.unified_diff(
-                    old_lines,
-                    new_lines,
-                    fromfile="Previous",
-                    tofile="Updated",
-                    lineterm="",
-                )
-                diff_text = "\n".join(diff_lines)
-                if not diff_text.strip():
-                    diff_text = None
+                diff_text = unified_diff_text(target_path.read_text(), content)
 
             backup_msg = ""
             if target_path.exists():
-                backup_path, removed_files = self.create_backup(
-                    target_path, backup_dir=backup_dir
-                )
-                backup_msg = f" (backup: {backup_path.name})"
-                if removed_files:
-                    backup_msg += f"; removed {len(removed_files)} old backup(s)"
+                backup_msg = self.backup_with_note(target_path, backup_dir=backup_dir)
 
             self._atomic_write(target_path, content)
 
@@ -907,14 +877,8 @@ class ConfigManager:
                     f"Would remove {target_path}",
                 )
 
-            backup_path, removed_files = self.create_backup(
-                target_path, backup_dir=backup_dir
-            )
+            backup_msg = self.backup_with_note(target_path, backup_dir=backup_dir)
             target_path.unlink()
-
-            backup_msg = f" (backup: {backup_path.name})"
-            if removed_files:
-                backup_msg += f"; removed {len(removed_files)} old backup(s)"
 
             return (
                 OperationResult.REMOVED,
@@ -1075,16 +1039,7 @@ class ConfigManager:
                 ):
                     old_lines.append(f"{key}={installed.get(section, key)}\n")
                 new_lines.append(f"{key}={value}\n")
-            diff = "\n".join(
-                difflib.unified_diff(
-                    old_lines,
-                    new_lines,
-                    fromfile="Previous",
-                    tofile="Updated",
-                    lineterm="",
-                )
-            )
-            return diff if diff.strip() else None
+            return unified_diff_text(old_lines, new_lines)
         except Exception:
             return None
 
@@ -1153,16 +1108,7 @@ class ConfigManager:
                     old_lines.append(f"{key}={installed.get(section, key)}\n")
                 new_lines.append(f"{key}={value}\n")
 
-            diff_text_raw = "\n".join(
-                difflib.unified_diff(
-                    old_lines,
-                    new_lines,
-                    fromfile="Previous",
-                    tofile="Updated",
-                    lineterm="",
-                )
-            )
-            diff_text = diff_text_raw if diff_text_raw.strip() else None
+            diff_text = unified_diff_text(old_lines, new_lines)
 
             file_existed = config_file.exists()
             new_sidecar_data = [[s, k] for s, k, _ in managed_keys]
@@ -1195,10 +1141,7 @@ class ConfigManager:
 
             backup_msg = ""
             if file_existed:
-                backup_path, removed_files = self.create_backup(config_file)
-                backup_msg = f" (backup: {backup_path.name})"
-                if removed_files:
-                    backup_msg += f"; removed {len(removed_files)} old backup(s)"
+                backup_msg = self.backup_with_note(config_file)
 
             self._atomic_write(config_file, new_text)
             self._atomic_write(
@@ -1265,10 +1208,7 @@ class ConfigManager:
                 new_text = self._remove_ini_keys(text, keys)
                 remaining = self._parse_ini(new_text)
 
-                backup_path, removed_files = self.create_backup(config_file)
-                backup_msg = f" (backup: {backup_path.name})"
-                if removed_files:
-                    backup_msg += f"; removed {len(removed_files)} old backup(s)"
+                backup_msg = self.backup_with_note(config_file)
 
                 if remaining.sections():
                     self._atomic_write(config_file, new_text)
@@ -1449,10 +1389,7 @@ class ConfigManager:
 
                     target_guiconfigs.append(_copy.deepcopy(src_elem))
 
-            backup_path, removed_files = self.create_backup(config_file)
-            backup_msg = f" (backup: {backup_path.name})"
-            if removed_files:
-                backup_msg += f"; removed {len(removed_files)} old backup(s)"
+            backup_msg = self.backup_with_note(config_file)
 
             # ET.indent reformats the entire tree; Notepad++ uses 4-space indentation
             # natively so this is a no-op in practice.
@@ -1525,10 +1462,7 @@ class ConfigManager:
                     f"Would remove managed GUIConfig elements from {config_file}",
                 )
 
-            backup_path, removed_files = self.create_backup(config_file)
-            backup_msg = f" (backup: {backup_path.name})"
-            if removed_files:
-                backup_msg += f"; removed {len(removed_files)} old backup(s)"
+            backup_msg = self.backup_with_note(config_file)
 
             for elem in list(target_guiconfigs):
                 if elem.get("name") in managed_names:
@@ -1569,28 +1503,8 @@ class ConfigManager:
             return False
 
     def _atomic_write(self, file_path: Path, content: str) -> None:
-        """Write content to a file atomically.
-
-        Args:
-            file_path: Path to the file
-            content: Content to write
-        """
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-
-        fd, temp_path = tempfile.mkstemp(
-            dir=file_path.parent, prefix=f".{file_path.name}."
-        )
-        try:
-            with os.fdopen(fd, "w") as f:
-                f.write(content)
-
-            if file_path.exists():
-                shutil.copystat(file_path, temp_path)
-            shutil.move(temp_path, file_path)
-        except Exception:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
-            raise
+        """Write content to a file atomically, preserving existing permissions."""
+        atomic_write_text(file_path, content, preserve_stat=True)
 
     def _export_defaults_domain(self, domain: str) -> dict[str, object] | None:
         """Export a macOS defaults domain as a Python dict.

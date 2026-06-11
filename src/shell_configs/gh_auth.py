@@ -29,9 +29,11 @@ def load_desired_scopes(manifest_path: Path | None = None) -> list[str]:
 
 def get_current_gh_scopes() -> set[str]:
     """Parse current OAuth scopes from gh CLI auth status."""
-    from shell_configs.signing import _run
+    from shell_configs.fsio import run_quiet
 
-    result = _run(["gh", "auth", "status"], capture_output=True, text=True, timeout=30)
+    result = run_quiet(
+        ["gh", "auth", "status"], capture_output=True, text=True, timeout=30
+    )
     if result.returncode != 0:
         return set()
     output = f"{result.stdout}\n{result.stderr}"

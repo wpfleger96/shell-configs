@@ -202,7 +202,7 @@ class TestValidateAllStepsNoMutation:
                 "shell_configs.signing.get_github_key_fingerprints", return_value=set()
             ),
             patch(
-                "shell_configs.signing.get_key_fingerprint_from_pub",
+                "shell_configs.signing.get_key_fingerprint",
                 return_value="SHA256:test",
             ),
         ):
@@ -218,7 +218,7 @@ class TestValidateAllStepsNoMutation:
 class TestEnsureGhScopes:
     def test_returns_true_when_all_scopes_present(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.signing._run",
+            "shell_configs.fsio.run_quiet",
             lambda *a, **kw: subprocess.CompletedProcess(
                 a[0],
                 0,
@@ -238,7 +238,7 @@ class TestEnsureGhScopes:
 
     def test_returns_false_when_missing_scope_noninteractive(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.signing._run",
+            "shell_configs.fsio.run_quiet",
             lambda *a, **kw: subprocess.CompletedProcess(
                 a[0],
                 0,
@@ -258,7 +258,7 @@ class TestEnsureGhScopes:
 
     def test_parses_scopes_from_stderr_fallback(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.signing._run",
+            "shell_configs.fsio.run_quiet",
             lambda *a, **kw: subprocess.CompletedProcess(
                 a[0],
                 0,
@@ -276,7 +276,7 @@ class TestEnsureGhScopes:
 
     def test_returns_false_when_gh_auth_fails(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.signing._run",
+            "shell_configs.fsio.run_quiet",
             lambda *a, **kw: subprocess.CompletedProcess(
                 a[0], 1, stdout="", stderr="not logged in"
             ),
@@ -288,7 +288,7 @@ class TestEnsureGhScopes:
 
     def test_parses_scopes_when_split_across_streams(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.signing._run",
+            "shell_configs.fsio.run_quiet",
             lambda *a, **kw: subprocess.CompletedProcess(
                 a[0],
                 0,
