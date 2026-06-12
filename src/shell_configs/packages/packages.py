@@ -5,6 +5,8 @@ import shutil
 import subprocess
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -24,6 +26,32 @@ def _validate_package_name(name: str) -> str:
     if not _SAFE_NAME_RE.match(name):
         raise ValueError(f"Invalid package name: {name!r}")
     return name
+
+
+def _run_pkg_cmd(
+    cmd: list[str] | str,
+    *,
+    timeout: int,
+    success_msg: str,
+    failure_msg: str,
+    timeout_msg: str,
+) -> tuple[bool, str]:
+    """Run a package-manager command with the shared result/error handling."""
+    try:
+        result = subprocess.run(
+            cmd,
+            shell=isinstance(cmd, str),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return False, timeout_msg
+    except Exception as e:
+        return False, f"Unexpected error: {e}"
+    if result.returncode == 0:
+        return True, success_msg
+    return False, result.stderr.strip() or failure_msg
 
 
 def _is_pwsh_module_installed(name: str) -> bool:
@@ -54,27 +82,16 @@ def _install_pwsh_module(name: str, dry_run: bool) -> tuple[bool, str]:
     if dry_run:
         return True, f"Would install PowerShell module {name}"
 
-    try:
-        if _is_pwsh_module_installed(name):
-            return True, f"{name} is already installed"
+    if _is_pwsh_module_installed(name):
+        return True, f"{name} is already installed"
 
-        install_cmd = f"Install-Module -Name {name} -Force -Scope CurrentUser"
-        result = subprocess.run(
-            ["pwsh", "-Command", install_cmd],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-
-        if result.returncode == 0:
-            return True, f"Successfully installed {name}"
-
-        return False, result.stderr.strip() or "Installation failed"
-
-    except subprocess.TimeoutExpired:
-        return False, "Installation timed out"
-    except Exception as e:
-        return False, f"Unexpected error: {e}"
+    return _run_pkg_cmd(
+        ["pwsh", "-Command", f"Install-Module -Name {name} -Force -Scope CurrentUser"],
+        timeout=120,
+        success_msg=f"Successfully installed {name}",
+        failure_msg="Installation failed",
+        timeout_msg="Installation timed out",
+    )
 
 
 def _uninstall_pwsh_module(name: str, dry_run: bool) -> tuple[bool, str]:
@@ -89,27 +106,48 @@ def _uninstall_pwsh_module(name: str, dry_run: bool) -> tuple[bool, str]:
     if not _is_pwsh_module_installed(name):
         return True, f"{name} is not installed"
 
-    try:
-        uninstall_cmd = f"Uninstall-Module -Name {name} -Force -AllVersions"
-        result = subprocess.run(
-            ["pwsh", "-Command", uninstall_cmd],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-
-        if result.returncode == 0:
-            return True, f"Successfully uninstalled {name}"
-
-        return False, result.stderr.strip() or "Uninstall failed"
-
-    except subprocess.TimeoutExpired:
-        return False, "Uninstall timed out"
-    except Exception as e:
-        return False, f"Unexpected error: {e}"
+    return _run_pkg_cmd(
+        ["pwsh", "-Command", f"Uninstall-Module -Name {name} -Force -AllVersions"],
+        timeout=60,
+        success_msg=f"Successfully uninstalled {name}",
+        failure_msg="Uninstall failed",
+        timeout_msg="Uninstall timed out",
+    )
 
 
 CANNOT_AUTO_UNINSTALL = frozenset({"script"})
+
+
+@dataclass(frozen=True)
+class _LinuxMethod:
+    """Table entry for a simple which-check → run Linux install method."""
+
+    tool: str  # binary checked with shutil.which
+    label: str  # human label used in dry-run messages
+    install_cmd: Callable[[str], list[str]]
+    uninstall_cmd: Callable[[str], list[str]]
+
+
+_LINUX_METHODS: dict[str, _LinuxMethod] = {
+    "apt": _LinuxMethod(
+        tool="apt",
+        label="apt",
+        install_cmd=lambda n: ["sudo", "apt-get", "install", "-y", n],
+        uninstall_cmd=lambda n: ["sudo", "apt-get", "remove", "-y", n],
+    ),
+    "pip": _LinuxMethod(
+        tool="pip",
+        label="pip",
+        install_cmd=lambda n: ["pip", "install", "--user", n],
+        uninstall_cmd=lambda n: ["pip", "uninstall", "-y", n],
+    ),
+    "uv_tool": _LinuxMethod(
+        tool="uv",
+        label="uv tool",
+        install_cmd=lambda n: ["uv", "tool", "install", n],
+        uninstall_cmd=lambda n: ["uv", "tool", "uninstall", n],
+    ),
+}
 
 
 class AptRepo(BaseModel):
@@ -199,40 +237,32 @@ class HomebrewManager(PackageManager):
         """Check if brew command is available."""
         return shutil.which("brew") is not None
 
+    @staticmethod
+    def _list_brew(flag: str) -> set[str]:
+        """List installed brew formulae or casks (empty set on failure)."""
+        try:
+            result = subprocess.run(
+                ["brew", "list", flag, "-1"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                return set(result.stdout.strip().split("\n"))
+        except subprocess.TimeoutExpired, FileNotFoundError:
+            pass
+        return set()
+
     def _get_installed_formulae(self) -> set[str]:
         """Get all installed Homebrew formulae (cached)."""
         if self._installed_cache is None:
-            try:
-                result = subprocess.run(
-                    ["brew", "list", "--formula", "-1"],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                )
-                if result.returncode == 0:
-                    self._installed_cache = set(result.stdout.strip().split("\n"))
-                else:
-                    self._installed_cache = set()
-            except subprocess.TimeoutExpired, FileNotFoundError:
-                self._installed_cache = set()
+            self._installed_cache = self._list_brew("--formula")
         return self._installed_cache
 
     def _get_installed_casks(self) -> set[str]:
         """Get all installed Homebrew casks (cached)."""
         if self._cask_cache is None:
-            try:
-                result = subprocess.run(
-                    ["brew", "list", "--cask", "-1"],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                )
-                if result.returncode == 0:
-                    self._cask_cache = set(result.stdout.strip().split("\n"))
-                else:
-                    self._cask_cache = set()
-            except subprocess.TimeoutExpired, FileNotFoundError:
-                self._cask_cache = set()
+            self._cask_cache = self._list_brew("--cask")
         return self._cask_cache
 
     def is_installed(self, pkg: Package) -> bool:
@@ -307,39 +337,36 @@ class HomebrewManager(PackageManager):
             install_type = "cask" if config.cask else "formula"
             return True, f"Would install {name} ({install_type})"
 
-        try:
-            if config.tap:
+        if config.tap:
+            try:
                 tap_result = subprocess.run(
                     ["brew", "tap", config.tap],
                     capture_output=True,
                     timeout=60,
                 )
-                if tap_result.returncode != 0:
-                    return False, f"Failed to tap {config.tap}"
+            except subprocess.TimeoutExpired:
+                return False, "Installation timed out after 5 minutes"
+            except Exception as e:
+                return False, f"Unexpected error: {e}"
+            if tap_result.returncode != 0:
+                return False, f"Failed to tap {config.tap}"
 
-            cmd = ["brew", "install"]
-            if config.cask:
-                cmd.append("--cask")
-            cmd.append(name)
+        cmd = ["brew", "install"]
+        if config.cask:
+            cmd.append("--cask")
+        cmd.append(name)
 
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300,
-            )
-
-            if result.returncode == 0:
-                self._installed_cache = None
-                self._cask_cache = None
-                return True, f"Successfully installed {name}"
-
-            return False, result.stderr.strip() or "Installation failed"
-
-        except subprocess.TimeoutExpired:
-            return False, "Installation timed out after 5 minutes"
-        except Exception as e:
-            return False, f"Unexpected error: {e}"
+        ok, msg = _run_pkg_cmd(
+            cmd,
+            timeout=300,
+            success_msg=f"Successfully installed {name}",
+            failure_msg="Installation failed",
+            timeout_msg="Installation timed out after 5 minutes",
+        )
+        if ok:
+            self._installed_cache = None
+            self._cask_cache = None
+        return ok, msg
 
     def uninstall(self, pkg: Package, dry_run: bool = False) -> tuple[bool, str]:
         """Uninstall a package."""
@@ -372,37 +399,27 @@ class HomebrewManager(PackageManager):
             uninstall_type = "cask" if config.cask else "formula"
             return True, f"Would uninstall {name} ({uninstall_type})"
 
-        try:
-            cmd = ["brew", "uninstall"]
-            if config.cask:
-                cmd.append("--cask")
-            cmd.append(name)
+        cmd = ["brew", "uninstall"]
+        if config.cask:
+            cmd.append("--cask")
+        cmd.append(name)
 
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=60,
+        ok, msg = _run_pkg_cmd(
+            cmd,
+            timeout=60,
+            success_msg=f"Successfully uninstalled {name}",
+            failure_msg="Uninstall failed",
+            timeout_msg="Uninstall timed out",
+        )
+        if ok:
+            self._installed_cache = None
+            self._cask_cache = None
+        elif "required by" in msg and "--ignore-dependencies" in msg:
+            return (
+                False,
+                f"Cannot uninstall (required by other packages). Use: brew uninstall --ignore-dependencies {name}",
             )
-
-            if result.returncode == 0:
-                self._installed_cache = None
-                self._cask_cache = None
-                return True, f"Successfully uninstalled {name}"
-
-            error_msg = result.stderr.strip() or "Uninstall failed"
-            if "required by" in error_msg and "--ignore-dependencies" in error_msg:
-                return (
-                    False,
-                    f"Cannot uninstall (required by other packages). Use: brew uninstall --ignore-dependencies {name}",
-                )
-
-            return False, error_msg
-
-        except subprocess.TimeoutExpired:
-            return False, "Uninstall timed out"
-        except Exception as e:
-            return False, f"Unexpected error: {e}"
+        return ok, msg
 
 
 class LinuxInstaller(PackageManager):
@@ -460,12 +477,8 @@ class LinuxInstaller(PackageManager):
         if self.is_installed(pkg):
             return True, f"{pkg.name} is already installed"
 
-        if config.method == "apt":
-            return self._install_apt(pkg, config, dry_run)
-        elif config.method == "pip":
-            return self._install_pip(pkg, config, dry_run)
-        elif config.method == "uv_tool":
-            return self._install_uv_tool(pkg, config, dry_run)
+        if config.method in _LINUX_METHODS:
+            return self._run_method(config.method, pkg, config, dry_run, install=True)
         elif config.method == "script":
             return self._install_script(pkg, config, dry_run)
         elif config.method == "pwsh":
@@ -474,41 +487,52 @@ class LinuxInstaller(PackageManager):
 
         return False, f"Unknown method: {config.method}"
 
-    def _install_apt(
-        self, pkg: Package, config: InstallConfig, dry_run: bool
+    def _run_method(
+        self,
+        method: str,
+        pkg: Package,
+        config: InstallConfig,
+        dry_run: bool,
+        *,
+        install: bool,
     ) -> tuple[bool, str]:
-        """Install a package via apt."""
-        if not shutil.which("apt"):
-            return False, "apt is not available"
+        """Install or uninstall via one of the table-driven Linux methods."""
+        m = _LINUX_METHODS[method]
+        if not shutil.which(m.tool):
+            return False, f"{m.tool} is not available"
 
         name = config.package or pkg.name
+        verb = "install" if install else "uninstall"
 
         if dry_run:
-            msg = f"Would install {name} via apt"
-            if config.repo:
+            msg = f"Would {verb} {name} via {m.label}"
+            if install and method == "apt" and config.repo:
                 msg += f" (with {config.repo.name} repo)"
             return True, msg
 
-        try:
-            if config.repo:
+        if install and method == "apt" and config.repo:
+            try:
                 self._setup_apt_repo(config.repo)
+            except subprocess.TimeoutExpired:
+                return False, "Installation timed out after 5 minutes"
+            except Exception as e:
+                return False, f"Unexpected error: {e}"
 
-            result = subprocess.run(
-                ["sudo", "apt-get", "install", "-y", name],
-                capture_output=True,
-                text=True,
+        if install:
+            return _run_pkg_cmd(
+                m.install_cmd(name),
                 timeout=300,
+                success_msg=f"Successfully installed {name}",
+                failure_msg="Installation failed",
+                timeout_msg="Installation timed out after 5 minutes",
             )
-
-            if result.returncode == 0:
-                return True, f"Successfully installed {name}"
-
-            return False, result.stderr.strip() or "Installation failed"
-
-        except subprocess.TimeoutExpired:
-            return False, "Installation timed out after 5 minutes"
-        except Exception as e:
-            return False, f"Unexpected error: {e}"
+        return _run_pkg_cmd(
+            m.uninstall_cmd(name),
+            timeout=120,
+            success_msg=f"Successfully uninstalled {name}",
+            failure_msg="Uninstall failed",
+            timeout_msg="Uninstall timed out",
+        )
 
     def _setup_apt_repo(self, repo: AptRepo) -> None:
         """Setup a custom apt repository."""
@@ -538,66 +562,6 @@ class LinuxInstaller(PackageManager):
             timeout=120,
         )
 
-    def _install_pip(
-        self, pkg: Package, config: InstallConfig, dry_run: bool
-    ) -> tuple[bool, str]:
-        """Install a package via pip."""
-        if not shutil.which("pip"):
-            return False, "pip is not available"
-
-        name = config.package or pkg.name
-
-        if dry_run:
-            return True, f"Would install {name} via pip"
-
-        try:
-            result = subprocess.run(
-                ["pip", "install", "--user", name],
-                capture_output=True,
-                text=True,
-                timeout=300,
-            )
-
-            if result.returncode == 0:
-                return True, f"Successfully installed {name}"
-
-            return False, result.stderr.strip() or "Installation failed"
-
-        except subprocess.TimeoutExpired:
-            return False, "Installation timed out after 5 minutes"
-        except Exception as e:
-            return False, f"Unexpected error: {e}"
-
-    def _install_uv_tool(
-        self, pkg: Package, config: InstallConfig, dry_run: bool
-    ) -> tuple[bool, str]:
-        """Install a package via uv tool."""
-        if not shutil.which("uv"):
-            return False, "uv is not available"
-
-        name = config.package or pkg.name
-
-        if dry_run:
-            return True, f"Would install {name} via uv tool"
-
-        try:
-            result = subprocess.run(
-                ["uv", "tool", "install", name],
-                capture_output=True,
-                text=True,
-                timeout=300,
-            )
-
-            if result.returncode == 0:
-                return True, f"Successfully installed {name}"
-
-            return False, result.stderr.strip() or "Installation failed"
-
-        except subprocess.TimeoutExpired:
-            return False, "Installation timed out after 5 minutes"
-        except Exception as e:
-            return False, f"Unexpected error: {e}"
-
     def _install_script(
         self, pkg: Package, config: InstallConfig, dry_run: bool
     ) -> tuple[bool, str]:
@@ -608,24 +572,13 @@ class LinuxInstaller(PackageManager):
         if dry_run:
             return True, f"Would run: {config.install_cmd}"
 
-        try:
-            result = subprocess.run(
-                config.install_cmd,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=300,
-            )
-
-            if result.returncode == 0:
-                return True, f"Successfully installed {pkg.name}"
-
-            return False, result.stderr.strip() or "Installation failed"
-
-        except subprocess.TimeoutExpired:
-            return False, "Installation timed out after 5 minutes"
-        except Exception as e:
-            return False, f"Unexpected error: {e}"
+        return _run_pkg_cmd(
+            config.install_cmd,
+            timeout=300,
+            success_msg=f"Successfully installed {pkg.name}",
+            failure_msg="Installation failed",
+            timeout_msg="Installation timed out after 5 minutes",
+        )
 
     def uninstall(self, pkg: Package, dry_run: bool = False) -> tuple[bool, str]:
         """Uninstall a package on Linux."""
@@ -636,108 +589,14 @@ class LinuxInstaller(PackageManager):
         if not self.is_installed(pkg):
             return True, f"{pkg.name} is not installed"
 
-        if config.method == "apt":
-            return self._uninstall_apt(pkg, config, dry_run)
-        elif config.method == "pip":
-            return self._uninstall_pip(pkg, config, dry_run)
-        elif config.method == "uv_tool":
-            return self._uninstall_uv_tool(pkg, config, dry_run)
+        if config.method in _LINUX_METHODS:
+            return self._run_method(config.method, pkg, config, dry_run, install=False)
         elif config.method == "pwsh":
             return _uninstall_pwsh_module(config.package or pkg.name, dry_run)
         elif config.method in CANNOT_AUTO_UNINSTALL:
             return False, f"Cannot auto-uninstall {pkg.name} (method: {config.method})"
 
         return False, f"Unknown method: {config.method}"
-
-    def _uninstall_apt(
-        self, pkg: Package, config: InstallConfig, dry_run: bool
-    ) -> tuple[bool, str]:
-        """Uninstall a package via apt."""
-        if not shutil.which("apt"):
-            return False, "apt is not available"
-
-        name = config.package or pkg.name
-
-        if dry_run:
-            return True, f"Would uninstall {name} via apt"
-
-        try:
-            result = subprocess.run(
-                ["sudo", "apt-get", "remove", "-y", name],
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-
-            if result.returncode == 0:
-                return True, f"Successfully uninstalled {name}"
-
-            return False, result.stderr.strip() or "Uninstall failed"
-
-        except subprocess.TimeoutExpired:
-            return False, "Uninstall timed out"
-        except Exception as e:
-            return False, f"Unexpected error: {e}"
-
-    def _uninstall_pip(
-        self, pkg: Package, config: InstallConfig, dry_run: bool
-    ) -> tuple[bool, str]:
-        """Uninstall a package via pip."""
-        if not shutil.which("pip"):
-            return False, "pip is not available"
-
-        name = config.package or pkg.name
-
-        if dry_run:
-            return True, f"Would uninstall {name} via pip"
-
-        try:
-            result = subprocess.run(
-                ["pip", "uninstall", "-y", name],
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-
-            if result.returncode == 0:
-                return True, f"Successfully uninstalled {name}"
-
-            return False, result.stderr.strip() or "Uninstall failed"
-
-        except subprocess.TimeoutExpired:
-            return False, "Uninstall timed out"
-        except Exception as e:
-            return False, f"Unexpected error: {e}"
-
-    def _uninstall_uv_tool(
-        self, pkg: Package, config: InstallConfig, dry_run: bool
-    ) -> tuple[bool, str]:
-        """Uninstall a package via uv tool."""
-        if not shutil.which("uv"):
-            return False, "uv is not available"
-
-        name = config.package or pkg.name
-
-        if dry_run:
-            return True, f"Would uninstall {name} via uv tool"
-
-        try:
-            result = subprocess.run(
-                ["uv", "tool", "uninstall", name],
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-
-            if result.returncode == 0:
-                return True, f"Successfully uninstalled {name}"
-
-            return False, result.stderr.strip() or "Uninstall failed"
-
-        except subprocess.TimeoutExpired:
-            return False, "Uninstall timed out"
-        except Exception as e:
-            return False, f"Unexpected error: {e}"
 
 
 class WingetManager(PackageManager):
@@ -795,27 +654,20 @@ class WingetManager(PackageManager):
         if dry_run:
             return True, f"Would install {name} via winget"
 
-        try:
-            result = subprocess.run(
-                [
-                    "winget",
-                    "install",
-                    name,
-                    "--silent",
-                    "--accept-source-agreements",
-                    "--accept-package-agreements",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=300,
-            )
-            if result.returncode == 0:
-                return True, f"Successfully installed {name}"
-            return False, result.stderr.strip() or "Installation failed"
-        except subprocess.TimeoutExpired:
-            return False, "Installation timed out"
-        except Exception as e:
-            return False, f"Unexpected error: {e}"
+        return _run_pkg_cmd(
+            [
+                "winget",
+                "install",
+                name,
+                "--silent",
+                "--accept-source-agreements",
+                "--accept-package-agreements",
+            ],
+            timeout=300,
+            success_msg=f"Successfully installed {name}",
+            failure_msg="Installation failed",
+            timeout_msg="Installation timed out",
+        )
 
     def uninstall(self, pkg: Package, dry_run: bool = False) -> tuple[bool, str]:
         config = pkg.windows
@@ -835,20 +687,13 @@ class WingetManager(PackageManager):
         if dry_run:
             return True, f"Would uninstall {name} via winget"
 
-        try:
-            result = subprocess.run(
-                ["winget", "uninstall", name, "--silent"],
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-            if result.returncode == 0:
-                return True, f"Successfully uninstalled {name}"
-            return False, result.stderr.strip() or "Uninstall failed"
-        except subprocess.TimeoutExpired:
-            return False, "Uninstall timed out"
-        except Exception as e:
-            return False, f"Unexpected error: {e}"
+        return _run_pkg_cmd(
+            ["winget", "uninstall", name, "--silent"],
+            timeout=120,
+            success_msg=f"Successfully uninstalled {name}",
+            failure_msg="Uninstall failed",
+            timeout_msg="Uninstall timed out",
+        )
 
 
 def get_package_manager() -> PackageManager | None:
