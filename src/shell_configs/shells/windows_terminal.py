@@ -24,19 +24,7 @@ class WindowsTerminalShell(Shell):
         return "Windows Terminal"
 
     def _get_windows_terminal_settings_dir(self) -> Path | None:
-        if is_platform(Platform.WINDOWS):
-            import os
-
-            localappdata = os.environ.get("LOCALAPPDATA")
-            if not localappdata:
-                return None
-            return (
-                Path(localappdata)
-                / "Packages"
-                / "Microsoft.WindowsTerminal_8wekyb3d8bbwe"
-                / "LocalState"
-            )
-        if not is_platform(Platform.WSL):
+        if not (is_platform(Platform.WINDOWS) or is_platform(Platform.WSL)):
             return None
         appdata_local = get_windows_appdata_local()
         if appdata_local is None:
@@ -65,9 +53,3 @@ class WindowsTerminalShell(Shell):
                 target_merge=True,
             ),
         ]
-
-    def _get_validation_command(self, temp_file: Path) -> list[str]:
-        return self._noop_validation_command()
-
-    def _get_temp_suffix(self) -> str:
-        return ".json"

@@ -49,11 +49,5 @@ class PowerShellShell(Shell):
     def get_additional_files(self) -> list[AdditionalFile]:
         return []
 
-    def _get_validation_command(self, temp_file: Path) -> list[str]:
-        return self._noop_validation_command()
-
-    def _get_temp_suffix(self) -> str:
-        return ".ps1"
-
     def supports_shared_config(self) -> bool:
         return True

@@ -29,7 +29,7 @@ class TestCursorLocalShell:
 
     def test_returns_none_on_non_wsl(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.shells.cursor.is_platform",
+            "shell_configs.shells.editor.is_platform",
             lambda p: p == Platform.LINUX,
         )
         shell = CursorLocalShell()
@@ -37,7 +37,7 @@ class TestCursorLocalShell:
 
     def test_returns_invoker_on_wsl(self, monkeypatch, tmp_path):
         monkeypatch.setattr(
-            "shell_configs.shells.cursor.is_platform",
+            "shell_configs.shells.editor.is_platform",
             lambda p: p == Platform.WSL,
         )
         monkeypatch.setattr(
@@ -60,7 +60,7 @@ class TestCursorLocalShell:
 
     def test_returns_none_when_username_unavailable(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.shells.cursor.is_platform",
+            "shell_configs.shells.editor.is_platform",
             lambda p: p == Platform.WSL,
         )
         monkeypatch.setattr(
@@ -72,7 +72,7 @@ class TestCursorLocalShell:
 
     def test_returns_invoker_on_wsl_with_underscore_path(self, monkeypatch, tmp_path):
         monkeypatch.setattr(
-            "shell_configs.shells.cursor.is_platform",
+            "shell_configs.shells.editor.is_platform",
             lambda p: p == Platform.WSL,
         )
         monkeypatch.setattr(
@@ -97,7 +97,7 @@ class TestCursorLocalShell:
 
     def test_returns_none_when_cursor_cmd_not_found(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.shells.cursor.is_platform",
+            "shell_configs.shells.editor.is_platform",
             lambda p: p == Platform.WSL,
         )
         monkeypatch.setattr(
@@ -109,7 +109,7 @@ class TestCursorLocalShell:
 
     def test_extension_list_paths(self, monkeypatch, tmp_path):
         monkeypatch.setattr(
-            "shell_configs.shells.cursor.get_config_dir", lambda: tmp_path
+            "shell_configs.shells.editor.get_config_dir", lambda: tmp_path
         )
         shell = CursorLocalShell()
         paths = shell.get_extension_list_paths()

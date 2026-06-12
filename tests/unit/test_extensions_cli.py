@@ -20,10 +20,10 @@ def extension_config_dir(temp_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Pat
 
     monkeypatch.setattr("shell_configs.config.get_config_dir", lambda: config_dir)
     monkeypatch.setattr(
-        "shell_configs.shells.vscode.get_config_dir", lambda: config_dir
+        "shell_configs.shells.editor.get_config_dir", lambda: config_dir
     )
     monkeypatch.setattr(
-        "shell_configs.shells.cursor.get_config_dir", lambda: config_dir
+        "shell_configs.shells.editor.get_config_dir", lambda: config_dir
     )
 
     return config_dir
@@ -236,7 +236,7 @@ class TestExtensionsListCLI:
         (extension_config_dir / "cursor").mkdir(exist_ok=True)
         (extension_config_dir / "cursor" / "extensions.txt").write_text("")
         monkeypatch.setattr(
-            "shell_configs.shells.cursor.get_config_dir", lambda: extension_config_dir
+            "shell_configs.shells.editor.get_config_dir", lambda: extension_config_dir
         )
         monkeypatch.setattr(
             "shell_configs.extensions.ExtensionManager.get_installed_extensions",

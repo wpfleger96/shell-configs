@@ -275,7 +275,7 @@ class TestVSCodeShell:
         (config_dir / "editor").mkdir(parents=True)
         (config_dir / "vscode").mkdir(parents=True)
         monkeypatch.setattr(
-            "shell_configs.shells.vscode.get_config_dir", lambda: config_dir
+            "shell_configs.shells.editor.get_config_dir", lambda: config_dir
         )
 
         files = shell.get_additional_files()
@@ -289,7 +289,7 @@ class TestVSCodeShell:
         (config_dir / "editor").mkdir(parents=True)
         (config_dir / "vscode").mkdir(parents=True)
         monkeypatch.setattr(
-            "shell_configs.shells.vscode.get_config_dir", lambda: config_dir
+            "shell_configs.shells.editor.get_config_dir", lambda: config_dir
         )
 
         files = shell.get_additional_files()
@@ -365,7 +365,7 @@ class TestCursorShell:
         (config_dir / "editor").mkdir(parents=True)
         (config_dir / "cursor").mkdir(parents=True)
         monkeypatch.setattr(
-            "shell_configs.shells.cursor.get_config_dir", lambda: config_dir
+            "shell_configs.shells.editor.get_config_dir", lambda: config_dir
         )
 
         files = shell.get_additional_files()
@@ -379,7 +379,7 @@ class TestCursorShell:
         (config_dir / "editor").mkdir(parents=True)
         (config_dir / "cursor").mkdir(parents=True)
         monkeypatch.setattr(
-            "shell_configs.shells.cursor.get_config_dir", lambda: config_dir
+            "shell_configs.shells.editor.get_config_dir", lambda: config_dir
         )
 
         files = shell.get_additional_files()
