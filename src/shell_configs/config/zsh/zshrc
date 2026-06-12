@@ -74,6 +74,25 @@ _wt() {
 }
 compdef _wt wt
 
+# disk-cleanup completion (keep flags in sync with the script's argparse)
+_disk_cleanup() {
+    _arguments \
+        '1:command:((check\:"Report disk usage" fix\:"Clean all tiers" interactive\:"Select items to clean (default)"))' \
+        '(-y --yes)'{-y,--yes}'[Skip confirmation prompts]' \
+        '--dev-dir[Development directory to scan]:directory:_files -/' \
+        '--no-color[Disable colored output]' \
+        '--workers[Parallel thread count for size computation]:count:' \
+        '--cache-ttl[Cache TTL for du results in seconds]:seconds:' \
+        '--no-cache[Bypass size cache and force fresh du scan]' \
+        '--skip-discover[Skip discovery scan]' \
+        '*--scan-dir[Root to scan for large files (repeatable)]:directory:_files -/' \
+        '--discover-top[Max items per category from discovery]:count:' \
+        '--discover-min-size[Min item size for discovery (e.g. 100M, 1G)]:size:' \
+        '--stale-days[Days before an item is flagged as stale]:days:' \
+        '*--high-risk-dir[Directory flagged for staleness (repeatable)]:directory:_files -/'
+}
+compdef _disk_cleanup disk-cleanup
+
 ### Prompt ###
 if [ -f ~/.zsh/git-prompt.sh ]; then
     source ~/.zsh/git-prompt.sh

@@ -30,6 +30,29 @@ _wt_completion() {
 }
 complete -F _wt_completion wt
 
+# disk-cleanup completion (keep flags in sync with the script's argparse)
+_disk_cleanup_completion() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    case "$prev" in
+        --dev-dir|--scan-dir|--high-risk-dir)
+            COMPREPLY=($(compgen -d -- "$cur"))
+            return
+            ;;
+        --workers|--cache-ttl|--discover-top|--discover-min-size|--stale-days)
+            return
+            ;;
+    esac
+
+    if [[ "$cur" == -* ]]; then
+        COMPREPLY=($(compgen -W "-y --yes --dev-dir --no-color --workers --cache-ttl --no-cache --skip-discover --scan-dir --discover-top --discover-min-size --stale-days --high-risk-dir" -- "$cur"))
+    elif [[ ${COMP_CWORD} -eq 1 ]]; then
+        COMPREPLY=($(compgen -W "check fix interactive" -- "$cur"))
+    fi
+}
+complete -F _disk_cleanup_completion disk-cleanup
+
 ### Prompt ###
 if [ -f ~/.bash/git-prompt.sh ]; then
     source ~/.bash/git-prompt.sh
