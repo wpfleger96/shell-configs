@@ -16,8 +16,10 @@ DEST=""
 detect_platform() {
     if [[ -f /proc/version ]] && grep -qi "microsoft\|wsl" /proc/version 2>/dev/null; then
         echo "wsl"
-    else
+    elif [[ "$(uname -s)" == "Darwin" ]]; then
         echo "macos"
+    else
+        echo "linux"
     fi
 }
 
