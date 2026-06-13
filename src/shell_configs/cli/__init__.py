@@ -63,6 +63,7 @@ from shell_configs.cli.commands.uninstall import uninstall
 from shell_configs.cli.commands.upgrade import upgrade
 from shell_configs.cli.commands.validate import validate
 from shell_configs.cli.groups.completions import completions
+from shell_configs.cli.groups.configs import configs
 from shell_configs.cli.groups.extensions import extensions
 from shell_configs.cli.groups.packages import packages
 from shell_configs.cli.groups.profile import profile
@@ -82,6 +83,7 @@ cli.add_command(signing)
 cli.add_command(packages)
 cli.add_command(profile)
 cli.add_command(completions)
+cli.add_command(configs)
 cli.add_command(scripts)
 cli.add_command(extensions)
 
