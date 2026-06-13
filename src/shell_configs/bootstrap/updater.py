@@ -8,10 +8,10 @@ import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from .detection import is_command_available
 from .installer import (
     UV_NOT_FOUND_ERROR,
     get_tool_version,
-    is_command_available,
 )
 from .version import is_newer
 

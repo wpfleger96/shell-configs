@@ -2,13 +2,13 @@
 
 import os
 import re
-import shutil
 import subprocess
-import sys
 import tomllib
 
 from enum import Enum, auto
 from pathlib import Path
+
+from .detection import _uv_tool_site_packages_dir, is_command_available
 
 
 class ToolSource(Enum):
@@ -53,20 +53,7 @@ def get_tool_config_dir(package_name: str = "shell-configs") -> Path:
         Path to the config directory in the uv tools location
     """
 
-    data_home = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
-    python_version = f"python{sys.version_info.major}.{sys.version_info.minor}"
-
-    return (
-        Path(data_home)
-        / "uv"
-        / "tools"
-        / package_name
-        / "lib"
-        / python_version
-        / "site-packages"
-        / "shell_configs"
-        / "config"
-    )
+    return _uv_tool_site_packages_dir(package_name) / "config"
 
 
 def get_tool_scripts_dir(package_name: str = "shell-configs") -> Path:
@@ -74,20 +61,7 @@ def get_tool_scripts_dir(package_name: str = "shell-configs") -> Path:
 
     Mirrors get_tool_config_dir() but for the scripts payload.
     """
-    data_home = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
-    python_version = f"python{sys.version_info.major}.{sys.version_info.minor}"
-
-    return (
-        Path(data_home)
-        / "uv"
-        / "tools"
-        / package_name
-        / "lib"
-        / python_version
-        / "site-packages"
-        / "shell_configs"
-        / "scripts"
-    )
+    return _uv_tool_site_packages_dir(package_name) / "scripts"
 
 
 def get_tool_source(package_name: str) -> ToolSource | None:
@@ -126,18 +100,6 @@ def get_tool_source(package_name: str) -> ToolSource | None:
 
     except OSError, tomllib.TOMLDecodeError, KeyError, IndexError:
         return None
-
-
-def is_command_available(command: str) -> bool:
-    """Check if a command is available in PATH.
-
-    Args:
-        command: Command name to check
-
-    Returns:
-        True if command is available, False otherwise
-    """
-    return shutil.which(command) is not None
 
 
 def install_tool(

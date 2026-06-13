@@ -14,12 +14,12 @@ from .config import (
     load_auto_update_config,
     save_auto_update_config,
 )
+from .detection import is_command_available
 from .installer import (
     UV_NOT_FOUND_ERROR,
     get_tool_config_dir,
     get_tool_version,
     install_tool,
-    is_command_available,
     uninstall_tool,
 )
 from .updater import (
