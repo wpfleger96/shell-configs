@@ -7,13 +7,13 @@ duplicated across the agents and languages modules.
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from shell_configs.bootstrap import is_command_available
 from shell_configs.platform import Platform, is_platform
 
 NPM_MISSING_MSG = "npm is not available — install Node.js first, then re-run"
@@ -93,7 +93,7 @@ def _run_step(
 
 
 def install_npm(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
-    if not shutil.which("npm"):
+    if not is_command_available("npm"):
         return False, NPM_MISSING_MSG
     return _run_step(
         ["npm", "install", "-g", package],
@@ -106,7 +106,7 @@ def install_npm(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
 
 
 def uninstall_npm(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
-    if not shutil.which("npm"):
+    if not is_command_available("npm"):
         return False, NPM_MISSING_MSG
     return _run_step(
         ["npm", "uninstall", "-g", package],
@@ -119,7 +119,7 @@ def uninstall_npm(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
 
 
 def install_winget(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
-    if not shutil.which("winget"):
+    if not is_command_available("winget"):
         return False, "winget is not available"
     return _run_step(
         [
@@ -139,7 +139,7 @@ def install_winget(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
 
 
 def uninstall_winget(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
-    if not shutil.which("winget"):
+    if not is_command_available("winget"):
         return False, "winget is not available"
     return _run_step(
         ["winget", "uninstall", package, "--silent"],
@@ -152,7 +152,7 @@ def uninstall_winget(name: str, package: str, dry_run: bool) -> tuple[bool, str]
 
 
 def install_brew(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
-    if not shutil.which("brew"):
+    if not is_command_available("brew"):
         return False, "brew is not available"
     return _run_step(
         ["brew", "install", package],
@@ -165,7 +165,7 @@ def install_brew(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
 
 
 def install_apt(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
-    if not shutil.which("apt"):
+    if not is_command_available("apt"):
         return False, "apt is not available"
     return _run_step(
         ["sudo", "apt-get", "install", "-y", package],

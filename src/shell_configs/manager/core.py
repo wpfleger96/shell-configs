@@ -20,9 +20,21 @@ from pathlib import Path
 
 from shell_configs.fsio import atomic_write_text, unified_diff_text
 
-from .types import _MISSING, ManagedSection, OperationResult, _format_pref_value
+from .types import ManagedSection, OperationResult
 
 logger = logging.getLogger(__name__)
+
+
+_MISSING = object()
+
+
+def _format_pref_value(value: object) -> str:
+    """Format a preference value for display in diffs."""
+    if isinstance(value, dict):
+        return f"<dict with {len(value)} key(s)>"
+    if isinstance(value, str):
+        return f'"{value}"'
+    return str(value)
 
 
 class ConfigManager:

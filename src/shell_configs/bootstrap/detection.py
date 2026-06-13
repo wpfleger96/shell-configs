@@ -23,7 +23,23 @@ def is_command_available(command: str) -> bool:
     return shutil.which(command) is not None
 
 
-def _uv_tool_site_packages_dir(package_name: str) -> Path:
+def uv_tool_dir(package_name: str) -> Path:
+    """Root directory of a uv tool installation.
+
+    $XDG_DATA_HOME/uv/tools/{package} (the dir holding uv-receipt.toml). Owns the
+    XDG_DATA_HOME fallback shared by the path helpers and receipt lookup.
+
+    Args:
+        package_name: Name of the uv tool package
+
+    Returns:
+        Path to the tool's root directory in the uv tools location
+    """
+    data_home = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
+    return Path(data_home) / "uv" / "tools" / package_name
+
+
+def uv_tool_site_packages_dir(package_name: str) -> Path:
     """Compute the site-packages dir for a uv tool installation.
 
     Shared base path for a uv-installed tool's payload:
@@ -37,14 +53,10 @@ def _uv_tool_site_packages_dir(package_name: str) -> Path:
     Returns:
         Path to the shell_configs package inside the uv tools location
     """
-    data_home = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
     python_version = f"python{sys.version_info.major}.{sys.version_info.minor}"
 
     return (
-        Path(data_home)
-        / "uv"
-        / "tools"
-        / package_name
+        uv_tool_dir(package_name)
         / "lib"
         / python_version
         / "site-packages"

@@ -196,24 +196,27 @@ class TestIsLanguageInstalled:
 
     def test_check_path_missing_ignores_which(self, monkeypatch):
         monkeypatch.setattr(Path, "home", staticmethod(lambda: Path("/nonexistent")))
-        with patch("shell_configs.languages.shutil.which", return_value="/usr/bin/go"):
+        with patch(
+            "shell_configs.bootstrap.detection.shutil.which", return_value="/usr/bin/go"
+        ):
             lang = _make_lang(command="go", check_path="~/.go/bin/go")
             assert not is_language_installed(lang)
 
     def test_neither_check_path_nor_which(self, monkeypatch):
         monkeypatch.setattr(Path, "home", staticmethod(lambda: Path("/nonexistent")))
-        with patch("shell_configs.languages.shutil.which", return_value=None):
+        with patch("shell_configs.bootstrap.detection.shutil.which", return_value=None):
             lang = _make_lang(command="go", check_path="~/.nonexistent/go")
             assert not is_language_installed(lang)
 
     def test_no_check_path_uses_which(self):
         with patch(
-            "shell_configs.languages.shutil.which", return_value="/usr/local/bin/go"
+            "shell_configs.bootstrap.detection.shutil.which",
+            return_value="/usr/local/bin/go",
         ):
             assert is_language_installed(_make_lang(command="go"))
 
     def test_no_check_path_command_missing(self):
-        with patch("shell_configs.languages.shutil.which", return_value=None):
+        with patch("shell_configs.bootstrap.detection.shutil.which", return_value=None):
             assert not is_language_installed(_make_lang(command="go"))
 
     def test_glob_check_path_matches(self, tmp_path, monkeypatch):
@@ -268,7 +271,7 @@ class TestInstallLanguage:
         with (
             patch("shell_configs.languages.is_language_installed", return_value=False),
             patch(
-                "shell_configs.languages.shutil.which",
+                "shell_configs.bootstrap.detection.shutil.which",
                 return_value="/usr/local/bin/brew",
             ),
             patch("subprocess.run") as mock_run,
@@ -292,7 +295,10 @@ class TestInstallLanguage:
         )
         with (
             patch("shell_configs.languages.is_language_installed", return_value=False),
-            patch("shell_configs.languages.shutil.which", return_value="/usr/bin/apt"),
+            patch(
+                "shell_configs.bootstrap.detection.shutil.which",
+                return_value="/usr/bin/apt",
+            ),
             patch("subprocess.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(
@@ -329,7 +335,7 @@ class TestInstallLanguage:
         with (
             patch("shell_configs.languages.is_language_installed", return_value=False),
             patch(
-                "shell_configs.languages.shutil.which",
+                "shell_configs.bootstrap.detection.shutil.which",
                 return_value="/usr/local/bin/brew",
             ),
         ):
@@ -356,7 +362,7 @@ class TestInstallLanguage:
         lang = _make_lang(linux=LanguageInstallConfig(method="apt", package="golang"))
         with (
             patch("shell_configs.languages.is_language_installed", return_value=False),
-            patch("shell_configs.languages.shutil.which", return_value=None),
+            patch("shell_configs.bootstrap.detection.shutil.which", return_value=None),
         ):
             ok, msg = install_language(lang)
         assert not ok
@@ -373,7 +379,8 @@ class TestGetLanguageVersion:
     def test_returns_version_string(self):
         with (
             patch(
-                "shell_configs.languages.shutil.which", return_value="/usr/local/bin/go"
+                "shell_configs.bootstrap.detection.shutil.which",
+                return_value="/usr/local/bin/go",
             ),
             patch("subprocess.run") as mock_run,
         ):
@@ -387,7 +394,7 @@ class TestGetLanguageVersion:
         assert version == "go version go1.22.3 linux/amd64"
 
     def test_returns_none_when_command_not_found(self):
-        with patch("shell_configs.languages.shutil.which", return_value=None):
+        with patch("shell_configs.bootstrap.detection.shutil.which", return_value=None):
             assert get_language_version(_make_lang(command="go")) is None
 
 

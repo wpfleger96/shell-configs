@@ -179,7 +179,7 @@ class TestConfigManagerPreferences:
                     result.returncode = 0
                 return result
 
-            monkeypatch.setattr("shell_configs.manager.subprocess.run", fake_run)
+            monkeypatch.setattr("shell_configs.manager.core.subprocess.run", fake_run)
 
         return setup
 
@@ -417,7 +417,7 @@ class TestConfigManagerPreferences:
                 m.returncode = 0
             return m
 
-        monkeypatch.setattr("shell_configs.manager.subprocess.run", fake_run)
+        monkeypatch.setattr("shell_configs.manager.core.subprocess.run", fake_run)
 
         from shell_configs.manager import OperationResult
 

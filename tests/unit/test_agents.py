@@ -158,18 +158,22 @@ class TestIsAgentInstalled:
 
     def test_check_path_missing(self, monkeypatch):
         monkeypatch.setattr(Path, "home", staticmethod(lambda: Path("/nonexistent")))
-        with patch("shell_configs.agents.shutil.which", return_value="/usr/bin/claude"):
+        with patch(
+            "shell_configs.bootstrap.detection.shutil.which",
+            return_value="/usr/bin/claude",
+        ):
             agent = _make_agent(check_path="~/.local/bin/claude")
             assert not is_agent_installed(agent)
 
     def test_no_check_path_uses_which(self):
         with patch(
-            "shell_configs.agents.shutil.which", return_value="/usr/local/bin/claude"
+            "shell_configs.bootstrap.detection.shutil.which",
+            return_value="/usr/local/bin/claude",
         ):
             assert is_agent_installed(_make_agent())
 
     def test_no_check_path_command_missing(self):
-        with patch("shell_configs.agents.shutil.which", return_value=None):
+        with patch("shell_configs.bootstrap.detection.shutil.which", return_value=None):
             assert not is_agent_installed(_make_agent())
 
 
@@ -199,7 +203,7 @@ class TestInstallAgent:
         with (
             patch("shell_configs.agents.is_agent_installed", return_value=False),
             patch(
-                "shell_configs.agents.shutil.which",
+                "shell_configs.bootstrap.detection.shutil.which",
                 return_value="/usr/bin/npm",
             ),
             patch("subprocess.run") as mock_run,
@@ -294,7 +298,7 @@ class TestInstallAgent:
         with (
             patch("shell_configs.agents.is_agent_installed", return_value=False),
             patch(
-                "shell_configs.agents.shutil.which",
+                "shell_configs.bootstrap.detection.shutil.which",
                 return_value="/usr/bin/npm",
             ),
         ):
@@ -325,7 +329,7 @@ class TestInstallAgent:
         )
         with (
             patch("shell_configs.agents.is_agent_installed", return_value=False),
-            patch("shell_configs.agents.shutil.which", return_value=None),
+            patch("shell_configs.bootstrap.detection.shutil.which", return_value=None),
         ):
             ok, msg = install_agent(agent)
         assert not ok
@@ -343,7 +347,7 @@ class TestGetAgentVersion:
     def test_returns_version_string(self):
         with (
             patch(
-                "shell_configs.agents.shutil.which",
+                "shell_configs.bootstrap.detection.shutil.which",
                 return_value="/usr/local/bin/claude",
             ),
             patch("subprocess.run") as mock_run,
@@ -358,12 +362,15 @@ class TestGetAgentVersion:
         assert version == "claude-code 1.0.0"
 
     def test_returns_none_when_command_not_found(self):
-        with patch("shell_configs.agents.shutil.which", return_value=None):
+        with patch("shell_configs.bootstrap.detection.shutil.which", return_value=None):
             assert get_agent_version(_make_agent()) is None
 
     def test_version_flag_fallback(self):
         with (
-            patch("shell_configs.agents.shutil.which", return_value="/usr/bin/goose"),
+            patch(
+                "shell_configs.bootstrap.detection.shutil.which",
+                return_value="/usr/bin/goose",
+            ),
             patch("subprocess.run") as mock_run,
         ):
             mock_run.side_effect = [
@@ -783,7 +790,10 @@ class TestUninstallAgent:
         )
         with (
             patch("shell_configs.agents.is_agent_installed", return_value=True),
-            patch("shell_configs.agents.shutil.which", return_value="/usr/bin/npm"),
+            patch(
+                "shell_configs.bootstrap.detection.shutil.which",
+                return_value="/usr/bin/npm",
+            ),
             patch("subprocess.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(
@@ -827,7 +837,10 @@ class TestUninstallAgent:
         )
         with (
             patch("shell_configs.agents.is_agent_installed", return_value=True),
-            patch("shell_configs.agents.shutil.which", return_value="/usr/bin/npm"),
+            patch(
+                "shell_configs.bootstrap.detection.shutil.which",
+                return_value="/usr/bin/npm",
+            ),
         ):
             ok, msg = uninstall_agent(agent, dry_run=True)
         assert ok
@@ -844,7 +857,10 @@ class TestUninstallAgent:
         )
         with (
             patch("shell_configs.agents.is_agent_installed", return_value=True),
-            patch("shell_configs.agents.shutil.which", return_value="/usr/bin/npm"),
+            patch(
+                "shell_configs.bootstrap.detection.shutil.which",
+                return_value="/usr/bin/npm",
+            ),
             patch("subprocess.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(
@@ -920,7 +936,10 @@ class TestGetAgentInstallMethod:
 class TestUninstallAgentByManifestEntry:
     def test_npm_uninstall(self):
         with (
-            patch("shell_configs.agents.shutil.which", return_value="/usr/bin/cmd"),
+            patch(
+                "shell_configs.bootstrap.detection.shutil.which",
+                return_value="/usr/bin/cmd",
+            ),
             patch("subprocess.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -931,18 +950,24 @@ class TestUninstallAgentByManifestEntry:
         assert mock_run.call_args[0][0] == ["npm", "uninstall", "-g", "@scope/pkg"]
 
     def test_not_installed(self):
-        with patch("shell_configs.agents.shutil.which", return_value=None):
+        with patch("shell_configs.bootstrap.detection.shutil.which", return_value=None):
             ok, msg = uninstall_agent_by_manifest_entry("test", "cmd", "npm", "pkg")
         assert ok
         assert "not installed" in msg
 
     def test_script_no_reverse(self):
-        with patch("shell_configs.agents.shutil.which", return_value="/usr/bin/cmd"):
+        with patch(
+            "shell_configs.bootstrap.detection.shutil.which",
+            return_value="/usr/bin/cmd",
+        ):
             ok, msg = uninstall_agent_by_manifest_entry("test", "cmd", "script", None)
         assert ok
         assert "no reverse" in msg
 
     def test_unknown_method(self):
-        with patch("shell_configs.agents.shutil.which", return_value="/usr/bin/cmd"):
+        with patch(
+            "shell_configs.bootstrap.detection.shutil.which",
+            return_value="/usr/bin/cmd",
+        ):
             ok, msg = uninstall_agent_by_manifest_entry("test", "cmd", "brew", None)
         assert not ok

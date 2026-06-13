@@ -1,6 +1,5 @@
 """Tool installation utilities."""
 
-import os
 import re
 import subprocess
 import tomllib
@@ -8,7 +7,11 @@ import tomllib
 from enum import Enum, auto
 from pathlib import Path
 
-from .detection import _uv_tool_site_packages_dir, is_command_available
+from .detection import (
+    is_command_available,
+    uv_tool_dir,
+    uv_tool_site_packages_dir,
+)
 
 
 class ToolSource(Enum):
@@ -53,7 +56,7 @@ def get_tool_config_dir(package_name: str = "shell-configs") -> Path:
         Path to the config directory in the uv tools location
     """
 
-    return _uv_tool_site_packages_dir(package_name) / "config"
+    return uv_tool_site_packages_dir(package_name) / "config"
 
 
 def get_tool_scripts_dir(package_name: str = "shell-configs") -> Path:
@@ -61,7 +64,7 @@ def get_tool_scripts_dir(package_name: str = "shell-configs") -> Path:
 
     Mirrors get_tool_config_dir() but for the scripts payload.
     """
-    return _uv_tool_site_packages_dir(package_name) / "scripts"
+    return uv_tool_site_packages_dir(package_name) / "scripts"
 
 
 def get_tool_source(package_name: str) -> ToolSource | None:
@@ -75,8 +78,7 @@ def get_tool_source(package_name: str) -> ToolSource | None:
         ToolSource.GITHUB if installed from GitHub
         None if tool not installed or receipt file not found
     """
-    data_home = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
-    receipt_path = Path(data_home) / "uv" / "tools" / package_name / "uv-receipt.toml"
+    receipt_path = uv_tool_dir(package_name) / "uv-receipt.toml"
 
     if not receipt_path.exists():
         return None

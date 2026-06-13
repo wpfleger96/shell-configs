@@ -1,8 +1,8 @@
 """Shared types for the configuration manager.
 
-The result enum, dataclasses, the additional-files manifest, and the small
-free helpers used by ConfigManager. Kept dependency-light (no subprocess /
-plistlib) so they can be imported without pulling in the full manager.
+The result enum, dataclasses, and the additional-files manifest. Kept
+dependency-light (no subprocess / plistlib) so they can be imported without
+pulling in the full manager.
 """
 
 import json
@@ -15,18 +15,6 @@ from pathlib import Path
 from shell_configs.fsio import atomic_write_text
 
 logger = logging.getLogger(__name__)
-
-
-_MISSING = object()
-
-
-def _format_pref_value(value: object) -> str:
-    """Format a preference value for display in diffs."""
-    if isinstance(value, dict):
-        return f"<dict with {len(value)} key(s)>"
-    if isinstance(value, str):
-        return f'"{value}"'
-    return str(value)
 
 
 class OperationResult(Enum):
