@@ -52,8 +52,9 @@ pre-commit: sync type-check lint-python lint-shell-check format-python format-sh
     @echo "Pre-commit checks passed"
 
 # Testing
+# Default `test` excludes the e2e suite (run separately via `test-e2e`).
 test:
-    uv run pytest
+    uv run pytest -m "not e2e"
 
 test-unit:
     uv run pytest -m unit
@@ -62,7 +63,11 @@ test-integration:
     uv run pytest -m integration
 
 test-e2e:
-    uv run pytest tests/e2e -m e2e --no-cov
+    uv run pytest -m e2e --no-cov || test $? -eq 5
+
+# Everything, including the e2e suite.
+test-all:
+    uv run pytest --no-cov
 
 # Build & Package
 build: sync
