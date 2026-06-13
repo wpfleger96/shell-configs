@@ -204,9 +204,10 @@ class Shell(ABC):
             List of ConfigFile objects
         """
 
-    @abstractmethod
     def _get_validation_command(self, temp_file: Path) -> list[str]:
         """Get the validation command for this shell.
+
+        Defaults to a no-op; shells with real syntax checkers override.
 
         Args:
             temp_file: Path to temporary file with content
@@ -214,14 +215,15 @@ class Shell(ABC):
         Returns:
             Command list to execute
         """
+        return self._noop_validation_command()
 
-    @abstractmethod
     def _get_temp_suffix(self) -> str:
         """Get the file suffix for temp validation files.
 
         Returns:
             File suffix (e.g., ".sh", ".zsh", ".gitconfig")
         """
+        return ".txt"
 
     def _noop_validation_command(self) -> list[str]:
         from shell_configs.platform import Platform, is_platform

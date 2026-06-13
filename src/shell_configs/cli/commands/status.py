@@ -6,18 +6,14 @@ import click
 
 from shell_configs.cli.helpers import (
     build_context,
-    parse_shell_filter,
     run_components_parallel,
 )
+from shell_configs.cli.options import profile_option, shells_option
 
 
 @click.command()
-@click.option(
-    "--shells",
-    callback=parse_shell_filter,
-    help="Comma-separated list of shells to check",
-)
-@click.option("--profile", "profile_name", default=None, help="Profile to use")
+@shells_option("Comma-separated list of shells to check")
+@profile_option
 def status(shells: list[str] | None, profile_name: str | None) -> None:
     """Show the status of managed configurations."""
     from shell_configs.cli.components import STATUS_COMPONENTS

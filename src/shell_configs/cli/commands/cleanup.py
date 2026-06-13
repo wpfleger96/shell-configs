@@ -6,13 +6,15 @@ from pathlib import Path
 
 import click
 
+from shell_configs.cli.options import yes_option
+
 
 @click.command()
 @click.option(
     "--dry-run", is_flag=True, help="Show what would be deleted without deleting"
 )
 @click.option("--keep", type=int, help="Number of backups to keep per config file")
-@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
+@yes_option
 def cleanup(dry_run: bool, keep: int | None, yes: bool) -> None:
     """Clean up old backup files created by shell-configs."""
     from collections import defaultdict

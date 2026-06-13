@@ -20,12 +20,7 @@ class NotepadPPShell(Shell):
         return "Notepad++"
 
     def _get_config_dir(self) -> Path | None:
-        if is_platform(Platform.WINDOWS):
-            appdata = get_windows_appdata_roaming()
-            if appdata is None:
-                return None
-            return appdata / "Notepad++"
-        if not is_platform(Platform.WSL):
+        if not (is_platform(Platform.WINDOWS) or is_platform(Platform.WSL)):
             return None
         appdata = get_windows_appdata_roaming()
         if appdata is None:
@@ -48,9 +43,3 @@ class NotepadPPShell(Shell):
                 xml_guiconfig_merge=True,
             ),
         ]
-
-    def _get_validation_command(self, temp_file: Path) -> list[str]:
-        return self._noop_validation_command()
-
-    def _get_temp_suffix(self) -> str:
-        return ".xml"

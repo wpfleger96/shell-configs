@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import difflib
 import sys
 
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
@@ -13,12 +12,14 @@ from typing import TYPE_CHECKING, Any
 import click
 
 from shell_configs.config import ConfigReader
+from shell_configs.fsio import unified_diff_text
 from shell_configs.shells.base import merge_json_with_profile
 
 if TYPE_CHECKING:
     from shell_configs.cli.context import Context, FileDiff
     from shell_configs.extensions import ExtensionResult
     from shell_configs.manager import ConfigManager
+    from shell_configs.profiles.profile import Profile
     from shell_configs.shells.base import Shell
     from shell_configs.shells.registry import ShellRegistry
 
@@ -30,6 +31,20 @@ def parse_shell_filter(
     if not value:
         return None
     return [s.strip() for s in value.split(",")]
+
+
+def load_profile_context(
+    profile_name: str | None,
+    config_dir: Path | None = None,
+) -> tuple[ConfigReader, ShellRegistry, Profile | None]:
+    """Build the ConfigReader/ShellRegistry/active-profile trio used by most commands."""
+    from shell_configs.profiles import ProfileLoader, resolve_active_profile
+    from shell_configs.shells.registry import ShellRegistry
+
+    config_reader = ConfigReader(config_dir=config_dir)
+    registry = ShellRegistry()
+    profile_loader = ProfileLoader(config_reader.config_dir)
+    return config_reader, registry, resolve_active_profile(profile_name, profile_loader)
 
 
 def build_context(
@@ -45,14 +60,10 @@ def build_context(
     Returns None when no shells are found (caller should warn and return).
     """
     from shell_configs.cli.context import Context
-    from shell_configs.config import ConfigReader
-    from shell_configs.profiles import ProfileLoader, resolve_active_profile
-    from shell_configs.shells.registry import ShellRegistry
 
-    config_reader = ConfigReader(config_dir=config_dir)
-    registry = ShellRegistry()
-    profile_loader = ProfileLoader(config_reader.config_dir)
-    active_profile = resolve_active_profile(profile_name, profile_loader)
+    config_reader, registry, active_profile = load_profile_context(
+        profile_name, config_dir
+    )
     selected_shells = _get_selected_shells(
         registry, shells_filter, config_reader=config_reader
     )
@@ -222,16 +233,14 @@ def _compute_diffs_for_shells(
             if section.content.strip() == repo_content.strip():
                 continue
 
-            installed_lines = section.content.splitlines(keepends=True)
-            repo_lines = repo_content.splitlines(keepends=True)
-            diff_text = "\n".join(
-                difflib.unified_diff(
-                    installed_lines,
-                    repo_lines,
+            diff_text = (
+                unified_diff_text(
+                    section.content,
+                    repo_content,
                     fromfile="Installed",
                     tofile="Repository",
-                    lineterm="",
                 )
+                or ""
             )
             diffs.append(
                 FileDiff(
@@ -360,16 +369,14 @@ def _compute_diffs_for_shells(
                         continue
                 installed_content = additional_file.target_path.read_text()
 
-            installed_lines = installed_content.splitlines(keepends=True)
-            repo_lines = repo_content.splitlines(keepends=True)
-            diff_text = "\n".join(
-                difflib.unified_diff(
-                    installed_lines,
-                    repo_lines,
+            diff_text = (
+                unified_diff_text(
+                    installed_content,
+                    repo_content,
                     fromfile="Installed",
                     tofile="Repository",
-                    lineterm="",
                 )
+                or ""
             )
             diffs.append(
                 FileDiff(

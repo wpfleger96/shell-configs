@@ -188,7 +188,7 @@ class TestInstallAgent:
 
     def test_npm_method(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.agents.is_platform",
+            "shell_configs.installers.is_platform",
             lambda p: p.value == "macos",
         )
         agent = _make_agent(
@@ -214,7 +214,7 @@ class TestInstallAgent:
 
     def test_script_fallback(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.agents.is_platform",
+            "shell_configs.installers.is_platform",
             lambda p: False,
         )
         agent = _make_agent(
@@ -233,7 +233,7 @@ class TestInstallAgent:
 
     def test_script_install_failure(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.agents.is_platform",
+            "shell_configs.installers.is_platform",
             lambda p: False,
         )
         agent = _make_agent(install_cmd="curl -fsSL https://example.com | bash")
@@ -250,7 +250,7 @@ class TestInstallAgent:
 
     def test_script_install_timeout(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.agents.is_platform",
+            "shell_configs.installers.is_platform",
             lambda p: False,
         )
         agent = _make_agent(install_cmd="curl -fsSL https://example.com | bash")
@@ -264,7 +264,7 @@ class TestInstallAgent:
 
     def test_linux_uses_install_cmd(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.agents.is_platform",
+            "shell_configs.installers.is_platform",
             lambda p: p.value == "wsl",
         )
         agent = _make_agent(
@@ -283,7 +283,7 @@ class TestInstallAgent:
 
     def test_dry_run_npm(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.agents.is_platform",
+            "shell_configs.installers.is_platform",
             lambda p: p.value == "macos",
         )
         agent = _make_agent(
@@ -304,7 +304,7 @@ class TestInstallAgent:
 
     def test_no_install_method_returns_error(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.agents.is_platform",
+            "shell_configs.installers.is_platform",
             lambda p: False,
         )
         agent = _make_agent()
@@ -315,7 +315,7 @@ class TestInstallAgent:
 
     def test_npm_unavailable_returns_clear_message(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.agents.is_platform",
+            "shell_configs.installers.is_platform",
             lambda p: p.value == "macos",
         )
         agent = _make_agent(
@@ -774,7 +774,7 @@ class TestUninstallAgent:
 
     def test_npm_uninstall(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.agents.is_platform", lambda p: p.value == "macos"
+            "shell_configs.installers.is_platform", lambda p: p.value == "macos"
         )
         agent = _make_agent(
             name="gemini-cli",
@@ -795,7 +795,7 @@ class TestUninstallAgent:
         assert called_cmd == ["npm", "uninstall", "-g", "@google/gemini-cli"]
 
     def test_script_uninstall(self, monkeypatch):
-        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: False)
+        monkeypatch.setattr("shell_configs.installers.is_platform", lambda p: False)
         agent = _make_agent(uninstall_cmd="rm -rf /tmp/test-agent")
         with (
             patch("shell_configs.agents.is_agent_installed", return_value=True),
@@ -809,7 +809,7 @@ class TestUninstallAgent:
         assert mock_run.call_args[1].get("shell") is True
 
     def test_no_uninstall_method(self, monkeypatch):
-        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: False)
+        monkeypatch.setattr("shell_configs.installers.is_platform", lambda p: False)
         agent = _make_agent()  # no uninstall_cmd, no platform config
         with patch("shell_configs.agents.is_agent_installed", return_value=True):
             ok, msg = uninstall_agent(agent)
@@ -818,7 +818,7 @@ class TestUninstallAgent:
 
     def test_dry_run_npm(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.agents.is_platform", lambda p: p.value == "macos"
+            "shell_configs.installers.is_platform", lambda p: p.value == "macos"
         )
         agent = _make_agent(
             name="gemini-cli",
@@ -835,7 +835,7 @@ class TestUninstallAgent:
 
     def test_npm_failure(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.agents.is_platform", lambda p: p.value == "macos"
+            "shell_configs.installers.is_platform", lambda p: p.value == "macos"
         )
         agent = _make_agent(
             name="gemini-cli",
@@ -855,7 +855,7 @@ class TestUninstallAgent:
         assert "permission denied" in msg
 
     def test_timeout(self, monkeypatch):
-        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: False)
+        monkeypatch.setattr("shell_configs.installers.is_platform", lambda p: False)
         agent = _make_agent(uninstall_cmd="sleep 999")
         with (
             patch("shell_configs.agents.is_agent_installed", return_value=True),
@@ -894,7 +894,7 @@ class TestDeprecatedAgentRegistry:
 class TestGetAgentInstallMethod:
     def test_npm_on_macos(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.agents.is_platform", lambda p: p.value == "macos"
+            "shell_configs.installers.is_platform", lambda p: p.value == "macos"
         )
         agent = _make_agent(
             macos=AgentInstallConfig(method="npm", package="@google/gemini-cli")
@@ -904,7 +904,7 @@ class TestGetAgentInstallMethod:
         assert pkg == "@google/gemini-cli"
 
     def test_script_fallback(self, monkeypatch):
-        monkeypatch.setattr("shell_configs.agents.is_platform", lambda p: False)
+        monkeypatch.setattr("shell_configs.installers.is_platform", lambda p: False)
         agent = _make_agent(install_cmd="curl | bash")
         method, pkg = get_agent_install_method(agent)
         assert method == "script"

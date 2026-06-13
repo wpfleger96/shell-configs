@@ -20,6 +20,7 @@ try:
 except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore[no-redef]
 
+from shell_configs.fsio import atomic_write_text
 from shell_configs.platform import Platform, detect_platform
 
 logger = logging.getLogger(__name__)
@@ -103,7 +104,6 @@ class ScriptManifest:
             logger.warning("Corrupt script manifest at %s: %s", self.path, e)
 
     def save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "version": 1,
             "scripts": {
@@ -115,17 +115,7 @@ class ScriptManifest:
                 for name, entry in sorted(self.scripts.items())
             },
         }
-        content = json.dumps(data, indent=2) + "\n"
-        fd, temp_path = tempfile.mkstemp(
-            dir=self.path.parent, prefix=".manifest.", suffix=".tmp"
-        )
-        try:
-            with os.fdopen(fd, "w") as f:
-                f.write(content)
-            shutil.move(temp_path, self.path)
-        except BaseException:
-            Path(temp_path).unlink(missing_ok=True)
-            raise
+        atomic_write_text(self.path, json.dumps(data, indent=2) + "\n")
 
     def record_install(self, name: str, source_hash: str, source_path: str) -> None:
         self.scripts[name] = ManifestEntry(

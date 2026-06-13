@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
-from shell_configs.cli.context import Component, ComponentPlan, Context, LanguagesPlan
+from shell_configs.cli.context import (
+    Component,
+    ComponentPlan,
+    Context,
+    LanguagesPlan,
+    expect_plan,
+)
 
 
 class LanguagesComponent(Component):
     label = "languages"
     display_name = "Languages"
+    apply_stage = "pre"
 
     def plan(self, ctx: Context) -> LanguagesPlan:
         from shell_configs.languages import is_language_installed, load_languages
@@ -25,8 +32,7 @@ class LanguagesComponent(Component):
         )
 
     def display_plan(self, plan: ComponentPlan) -> None:
-        if not isinstance(plan, LanguagesPlan):
-            raise TypeError(f"expected LanguagesPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, LanguagesPlan)
         if not plan.has_changes:
             return
 
@@ -37,8 +43,7 @@ class LanguagesComponent(Component):
             print_add(f"{lang.name}: {lang.description}", indent=2)
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        if not isinstance(plan, LanguagesPlan):
-            raise TypeError(f"expected LanguagesPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, LanguagesPlan)
 
         from shell_configs.languages import ensure_language_paths
 

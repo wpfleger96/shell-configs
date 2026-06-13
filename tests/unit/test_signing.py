@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import patch
 
@@ -202,7 +203,7 @@ class TestValidateAllStepsNoMutation:
                 "shell_configs.signing.get_github_key_fingerprints", return_value=set()
             ),
             patch(
-                "shell_configs.signing.get_key_fingerprint_from_pub",
+                "shell_configs.signing.get_key_fingerprint",
                 return_value="SHA256:test",
             ),
         ):
@@ -218,7 +219,7 @@ class TestValidateAllStepsNoMutation:
 class TestEnsureGhScopes:
     def test_returns_true_when_all_scopes_present(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.signing._run",
+            "shell_configs.fsio.run_quiet",
             lambda *a, **kw: subprocess.CompletedProcess(
                 a[0],
                 0,
@@ -238,7 +239,7 @@ class TestEnsureGhScopes:
 
     def test_returns_false_when_missing_scope_noninteractive(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.signing._run",
+            "shell_configs.fsio.run_quiet",
             lambda *a, **kw: subprocess.CompletedProcess(
                 a[0],
                 0,
@@ -258,7 +259,7 @@ class TestEnsureGhScopes:
 
     def test_parses_scopes_from_stderr_fallback(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.signing._run",
+            "shell_configs.fsio.run_quiet",
             lambda *a, **kw: subprocess.CompletedProcess(
                 a[0],
                 0,
@@ -276,7 +277,7 @@ class TestEnsureGhScopes:
 
     def test_returns_false_when_gh_auth_fails(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.signing._run",
+            "shell_configs.fsio.run_quiet",
             lambda *a, **kw: subprocess.CompletedProcess(
                 a[0], 1, stdout="", stderr="not logged in"
             ),
@@ -288,7 +289,7 @@ class TestEnsureGhScopes:
 
     def test_parses_scopes_when_split_across_streams(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.signing._run",
+            "shell_configs.fsio.run_quiet",
             lambda *a, **kw: subprocess.CompletedProcess(
                 a[0],
                 0,
@@ -390,3 +391,71 @@ class TestUploadAuthKey:
         ok, msg = upload_auth_key(key_path)
         assert ok is True
         assert any("ssh-key" in str(c) and "add" in str(c) for c in calls)
+
+
+@pytest.mark.unit
+class TestFindStaleGithubKeys:
+    """Regression tests for stale-key detection by computed fingerprint."""
+
+    def _mock_run(
+        self, gh_stdout: str
+    ) -> Callable[..., subprocess.CompletedProcess[str]]:
+        # ssh-keygen fingerprints by a marker in the piped key; gh list is fixed.
+        def mock_run(*a, **kw):
+            cmd = a[0] if a else kw.get("args", [])
+            if cmd[:2] == ["gh", "ssh-key"]:
+                return _make_result(0, stdout=gh_stdout)
+            if cmd[:2] == ["ssh-keygen", "-lf"]:
+                key = kw.get("input", "")
+                fp = "SHA256:STALE" if "STALEKEY" in key else "SHA256:LOCAL"
+                return _make_result(0, stdout=f"256 {fp} comment (ED25519)")
+            return _make_result(0)
+
+        return mock_run
+
+    def test_flags_only_keys_with_mismatched_fingerprint(self, monkeypatch, tmp_path):
+        key_path = tmp_path / "id_ed25519"
+        key_path.with_suffix(".pub").write_text("ssh-ed25519 LOCALKEY user@host\n")
+
+        # Real `gh ssh-key list` columns: title, key, added, id, type — no
+        # fingerprint column, so the local matching key must NOT be reported.
+        gh_stdout = (
+            "laptop\tssh-ed25519 LOCALKEY\t2024-01-01\t111\tauthentication\n"
+            "old-host\tssh-ed25519 STALEKEY\t2023-01-01\t222\tauthentication\n"
+        )
+        monkeypatch.setattr("shell_configs.signing._run", self._mock_run(gh_stdout))
+
+        from shell_configs.signing import find_stale_github_keys
+
+        stale, current_fp = find_stale_github_keys(key_path)
+
+        assert current_fp == "SHA256:LOCAL"
+        assert [(k.title, k.fingerprint) for k in stale] == [
+            ("old-host", "SHA256:STALE")
+        ]
+
+    def test_returns_empty_when_local_pub_missing(self, monkeypatch, tmp_path):
+        monkeypatch.setattr("shell_configs.signing._run", self._mock_run(""))
+
+        from shell_configs.signing import find_stale_github_keys
+
+        stale, current_fp = find_stale_github_keys(tmp_path / "absent")
+
+        assert stale == []
+        assert current_fp is None
+
+
+@pytest.mark.unit
+class TestGetPubFingerprint:
+    """get_pub_fingerprint degrades gracefully on unreadable .pub files."""
+
+    def test_missing_file_returns_empty(self, tmp_path):
+        from shell_configs.signing import get_pub_fingerprint
+
+        assert get_pub_fingerprint(tmp_path / "nope.pub") == ""
+
+    def test_unreadable_path_returns_empty(self, tmp_path):
+        from shell_configs.signing import get_pub_fingerprint
+
+        # Reading a directory raises IsADirectoryError (an OSError subclass).
+        assert get_pub_fingerprint(tmp_path) == ""

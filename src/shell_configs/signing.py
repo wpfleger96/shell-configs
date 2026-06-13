@@ -7,27 +7,56 @@ import os
 import shutil
 import socket
 import stat
-import subprocess
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
+from shell_configs.fsio import run_quiet as _run
 from shell_configs.platform import detect_platform
 
-
-def _run(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
-    try:
-        return subprocess.run(*args, **kwargs)  # noqa: S603
-    except subprocess.TimeoutExpired:
-        cmd = args[0] if args else kwargs.get("args", [])
-        timeout = kwargs.get("timeout", "?")
-        return subprocess.CompletedProcess(
-            cmd, returncode=1, stdout="", stderr=f"Command timed out after {timeout}s"
-        )
-
-
 DEFAULT_GENERATION_PATH = Path.home() / ".ssh" / "id_ed25519"
+
+
+def _key_data(key: str) -> str:
+    """Extract the base64 key-data column from an SSH public key string."""
+    parts = key.split()
+    return parts[1] if len(parts) >= 2 else ""
+
+
+@dataclass(frozen=True)
+class GhSshKey:
+    """One row of `gh ssh-key list` (title, key data, date, id, type)."""
+
+    title: str
+    key_data: str
+    key_type: str
+    raw: str
+
+
+def list_github_ssh_keys() -> list[GhSshKey]:
+    """Run `gh ssh-key list` and parse its tab-separated output."""
+    result = _run(
+        ["gh", "ssh-key", "list"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        return []
+    keys: list[GhSshKey] = []
+    for line in result.stdout.strip().split("\n"):
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        keys.append(
+            GhSshKey(
+                title=parts[0],
+                key_data=parts[1].strip() if len(parts) >= 2 else "",
+                key_type=parts[4].strip().lower() if len(parts) >= 5 else "",
+                raw=line,
+            )
+        )
+    return keys
 
 
 @dataclass
@@ -92,7 +121,7 @@ def ensure_ssh_agent(
         return False, f"Public key not found: {pub_path}", None
 
     pub_key = pub_path.read_text().strip()
-    key_data = pub_key.split()[1] if len(pub_key.split()) >= 2 else ""
+    key_data = _key_data(pub_key)
 
     result = _run(["ssh-add", "-L"], capture_output=True, text=True, timeout=10)
 
@@ -194,22 +223,11 @@ def upload_auth_key(key_path: Path) -> tuple[bool, str]:
     if not pub_path.exists():
         return False, f"Public key not found: {pub_path}"
 
-    pub_parts = pub_path.read_text().strip().split()
-    pub_key_data = pub_parts[1] if len(pub_parts) >= 2 else ""
+    pub_key_data = _key_data(pub_path.read_text().strip())
 
-    existing = _run(
-        ["gh", "ssh-key", "list"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    if existing.returncode == 0 and pub_key_data:
-        for line in existing.stdout.strip().split("\n"):
-            if not line.strip() or pub_key_data not in line:
-                continue
-            cols = line.split("\t")
-            key_type = cols[4].strip().lower() if len(cols) >= 5 else ""
-            if key_type == "authentication":
+    if pub_key_data:
+        for gh_key in list_github_ssh_keys():
+            if pub_key_data in gh_key.raw and gh_key.key_type == "authentication":
                 return True, "SSH auth key already uploaded to GitHub"
 
     title = socket.gethostname()
@@ -234,46 +252,24 @@ class StaleKeyInfo:
 def find_stale_github_keys(
     key_path: Path,
 ) -> tuple[list[StaleKeyInfo], str | None]:
-    """Find GitHub SSH keys that don't match the current machine's key.
+    """Find GitHub SSH keys whose fingerprint doesn't match the local key.
 
-    Returns (stale_keys, current_fingerprint). Compares fingerprints of all
-    GitHub SSH keys against the local key at key_path.pub.
+    Returns (stale_keys, current_fingerprint). ``gh ssh-key list`` has no
+    fingerprint column, so each GitHub key's fingerprint is computed from its
+    key data and compared against the local key at key_path.pub.
     """
-    pub_path = key_path.with_suffix(".pub")
-    if not pub_path.exists():
-        return [], None
-
-    current_fp = get_key_fingerprint(pub_path.read_text().strip())
+    current_fp = get_pub_fingerprint(key_path.with_suffix(".pub"))
     if not current_fp:
         return [], None
 
-    result = _run(
-        ["gh", "ssh-key", "list"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    if result.returncode != 0:
-        return [], current_fp
-
     stale: list[StaleKeyInfo] = []
-    for line in result.stdout.strip().split("\n"):
-        if not line.strip():
-            continue
-        parts = line.split("\t")
-        if len(parts) < 4:
-            continue
-        title, _, key_type_field, fingerprint = (
-            parts[0],
-            parts[1],
-            parts[2],
-            parts[3] if len(parts) > 3 else "",
-        )
+    for gh_key in list_github_ssh_keys():
+        fingerprint = get_key_fingerprint(gh_key.key_data) if gh_key.key_data else ""
         if fingerprint and fingerprint != current_fp:
             stale.append(
                 StaleKeyInfo(
-                    title=title,
-                    key_type=key_type_field,
+                    title=gh_key.title,
+                    key_type=gh_key.key_type,
                     fingerprint=fingerprint,
                 )
             )
@@ -334,20 +330,6 @@ def find_local_ssh_keys() -> list[Path]:
     return keys
 
 
-def get_key_fingerprint_from_pub(pub_path: Path) -> str | None:
-    """Get SHA256 fingerprint of a .pub key file."""
-    result = _run(
-        ["ssh-keygen", "-lf", str(pub_path)],
-        capture_output=True,
-        text=True,
-        timeout=10,
-    )
-    if result.returncode != 0:
-        return None
-    parts = result.stdout.strip().split()
-    return parts[1] if len(parts) >= 2 else None
-
-
 def get_github_key_fingerprints() -> set[str]:
     """Get fingerprints of all SSH keys registered on the user's GitHub account.
 
@@ -356,22 +338,10 @@ def get_github_key_fingerprints() -> set[str]:
     """
     if not shutil.which("gh"):
         return set()
-    result = _run(
-        ["gh", "ssh-key", "list"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    if result.returncode != 0:
-        return set()
     fingerprints: set[str] = set()
-    for line in result.stdout.strip().split("\n"):
-        if not line.strip():
-            continue
-        parts = line.split("\t")
-        if len(parts) >= 2:
-            key_data = parts[1].strip()
-            fp = get_key_fingerprint(key_data)
+    for gh_key in list_github_ssh_keys():
+        if gh_key.key_data:
+            fp = get_key_fingerprint(gh_key.key_data)
             if fp:
                 fingerprints.add(fp)
     return fingerprints
@@ -382,7 +352,7 @@ def discover_managed_key(
 ) -> Path | None:
     """Match a local key against GitHub-registered keys by fingerprint."""
     for key_path in local_keys:
-        fp = get_key_fingerprint_from_pub(key_path.with_suffix(".pub"))
+        fp = get_pub_fingerprint(key_path.with_suffix(".pub"))
         if fp and fp in github_fingerprints:
             return key_path
     return None
@@ -472,7 +442,7 @@ def _resolve_key_path(
     print_warning("Multiple SSH keys found, none registered on your GitHub account:")
     console.print()
     for i, kp in enumerate(local_keys, 1):
-        fp = get_key_fingerprint_from_pub(kp.with_suffix(".pub")) or "unknown"
+        fp = get_pub_fingerprint(kp.with_suffix(".pub")) or "unknown"
         key_type = kp.name.split("_", 1)[1] if "_" in kp.name else "unknown"
         console.print(f"  {i}. {kp} ({key_type.upper()}, {fp})")
 
@@ -677,27 +647,17 @@ def _validate_all_steps(key_path: Path | None) -> list[StepResult]:
         pub_key_data = ""
         pub_path = key_path.with_suffix(".pub")
         if pub_path.exists():
-            parts = pub_path.read_text().strip().split()
-            if len(parts) >= 2:
-                pub_key_data = parts[1]
+            pub_key_data = _key_data(pub_path.read_text().strip())
 
-        existing = _run(
-            ["gh", "ssh-key", "list"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
         has_auth_key = False
         has_signing_key = False
-        if existing.returncode == 0 and pub_key_data:
-            for line in existing.stdout.strip().split("\n"):
-                if not line.strip() or pub_key_data not in line:
+        if pub_key_data:
+            for gh_key in list_github_ssh_keys():
+                if pub_key_data not in gh_key.raw:
                     continue
-                cols = line.split("\t")
-                key_type = cols[4].strip().lower() if len(cols) >= 5 else ""
-                if key_type == "authentication":
+                if gh_key.key_type == "authentication":
                     has_auth_key = True
-                elif key_type == "signing":
+                elif gh_key.key_type == "signing":
                     has_signing_key = True
 
         if has_auth_key:
@@ -747,37 +707,15 @@ def get_github_signing_keys() -> list[str]:
     """Get SSH signing keys registered with GitHub."""
     if not shutil.which("gh"):
         return []
-
-    result = _run(
-        ["gh", "ssh-key", "list"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    if result.returncode != 0:
-        return []
-
-    signing_keys = []
-    for line in result.stdout.strip().split("\n"):
-        if not line.strip():
-            continue
-        parts = line.split("\t")
-        if len(parts) >= 5 and parts[4].strip().lower() == "signing":
-            signing_keys.append(line)
-    return signing_keys
+    return [k.raw for k in list_github_ssh_keys() if k.key_type == "signing"]
 
 
 def key_is_registered(agent_key: str, github_keys: list[str]) -> bool:
     """Check if an agent key matches any GitHub signing key."""
-    agent_parts = agent_key.split()
-    if len(agent_parts) < 2:
+    agent_key_data = _key_data(agent_key)
+    if not agent_key_data:
         return False
-    agent_key_data = agent_parts[1]
-
-    for gh_key in github_keys:
-        if agent_key_data in gh_key:
-            return True
-    return False
+    return any(agent_key_data in gh_key for gh_key in github_keys)
 
 
 def get_key_fingerprint(key: str) -> str:
@@ -795,6 +733,14 @@ def get_key_fingerprint(key: str) -> str:
     return parts[1] if len(parts) >= 2 else ""
 
 
+def get_pub_fingerprint(pub_path: Path) -> str:
+    """SHA256 fingerprint of a public key file, or "" if missing/unreadable."""
+    try:
+        return get_key_fingerprint(pub_path.read_text())
+    except OSError:
+        return ""
+
+
 def register_signing_key(key: str, auto_refresh_scope: bool = True) -> tuple[bool, str]:
     """Register an SSH key as a signing key with GitHub.
 
@@ -805,8 +751,7 @@ def register_signing_key(key: str, auto_refresh_scope: bool = True) -> tuple[boo
     Returns:
         (success, message) tuple
     """
-    key_parts = key.strip().split()
-    key_data = key_parts[1] if len(key_parts) >= 2 else ""
+    key_data = _key_data(key.strip())
     if key_data:
         for signing_line in get_github_signing_keys():
             parts = signing_line.split("\t")

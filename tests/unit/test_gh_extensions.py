@@ -484,6 +484,12 @@ class TestInstallExtension:
 
 @pytest.mark.unit
 class TestGhExtensionsComponent:
+    @pytest.fixture(autouse=True)
+    def _gh_available(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "shell_configs.bootstrap.is_command_available", lambda cmd: True
+        )
+
     def _make_ctx(self, dry_run: bool = False) -> MagicMock:
         ctx = MagicMock()
         ctx.dry_run = dry_run
@@ -500,7 +506,8 @@ class TestGhExtensionsComponent:
                 "shell_configs.gh_extensions.list_installed", return_value=installed
             ):
                 component = GhExtensionsComponent()
-                result = component.install(self._make_ctx())
+                ctx = self._make_ctx()
+                result = component.apply(ctx, component.plan(ctx))
         assert result is True
 
     def test_component_install_missing(self) -> None:
@@ -516,7 +523,8 @@ class TestGhExtensionsComponent:
                     return_value=install_result,
                 ) as mock_run:
                     component = GhExtensionsComponent()
-                    result = component.install(self._make_ctx())
+                    ctx = self._make_ctx()
+                    result = component.apply(ctx, component.plan(ctx))
         assert result is True
         mock_run.assert_called_once_with(
             ["gh", "extension", "install", "babarot/gh-infra"],
@@ -538,7 +546,8 @@ class TestGhExtensionsComponent:
                     return_value=fail_result,
                 ):
                     component = GhExtensionsComponent()
-                    result = component.install(self._make_ctx())
+                    ctx = self._make_ctx()
+                    result = component.apply(ctx, component.plan(ctx))
         assert result is False
 
     def test_component_install_dry_run(self) -> None:
@@ -550,7 +559,8 @@ class TestGhExtensionsComponent:
             with patch("shell_configs.gh_extensions.list_installed", return_value={}):
                 with patch("shell_configs.gh_extensions.subprocess.run") as mock_run:
                     component = GhExtensionsComponent()
-                    result = component.install(self._make_ctx(dry_run=True))
+                    ctx = self._make_ctx(dry_run=True)
+                    result = component.apply(ctx, component.plan(ctx))
         mock_run.assert_not_called()
         # dry_run path still returns True (no failures, just skipped)
         assert result is True
@@ -609,7 +619,7 @@ class TestGhExtensionsComponent:
                 "shell_configs.gh_extensions.list_installed", return_value=installed
             ):
                 component = GhExtensionsComponent()
-                result = component.diff(self._make_ctx())
+                result = component.plan(self._make_ctx()).has_changes
         assert result is False
 
     def test_component_diff_with_missing(self) -> None:
@@ -620,7 +630,7 @@ class TestGhExtensionsComponent:
         with patch("shell_configs.gh_extensions.load_extensions", return_value=desired):
             with patch("shell_configs.gh_extensions.list_installed", return_value={}):
                 component = GhExtensionsComponent()
-                result = component.diff(self._make_ctx())
+                result = component.plan(self._make_ctx()).has_changes
         assert result is True
 
     def test_component_diff_with_extra(self) -> None:
@@ -637,7 +647,7 @@ class TestGhExtensionsComponent:
                 "shell_configs.gh_extensions.list_installed", return_value=installed
             ):
                 component = GhExtensionsComponent()
-                result = component.diff(self._make_ctx())
+                result = component.plan(self._make_ctx()).has_changes
         assert result is True
 
     def test_plan_local_extension_matched_by_command_name(self) -> None:
@@ -690,7 +700,8 @@ class TestGhExtensionsComponent:
             ) as mock_source,
         ):
             component = GhExtensionsComponent()
-            result = component.install(self._make_ctx())
+            ctx = self._make_ctx()
+            result = component.apply(ctx, component.plan(ctx))
         assert result is True
         mock_source.assert_called_once_with(
             "wpfleger96/gh-infra", "./cmd/gh-infra/", pin=None, dry_run=False

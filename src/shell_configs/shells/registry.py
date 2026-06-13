@@ -37,19 +37,13 @@ class ShellRegistry:
         if is_platform(Platform.WSL):
             self.register(CursorLocalShell())
             self.register(VSCodeLocalShell())
-            from shell_configs.shells.windows_terminal import WindowsTerminalShell
-
-            self.register(WindowsTerminalShell())
-            from shell_configs.shells.notepadpp import NotepadPPShell
-
-            self.register(NotepadPPShell())
         if is_platform(Platform.WINDOWS):
             self.register(PowerShellShell())
+        if is_platform(Platform.WSL) or is_platform(Platform.WINDOWS):
+            from shell_configs.shells.notepadpp import NotepadPPShell
             from shell_configs.shells.windows_terminal import WindowsTerminalShell
 
             self.register(WindowsTerminalShell())
-            from shell_configs.shells.notepadpp import NotepadPPShell
-
             self.register(NotepadPPShell())
 
     def register(self, shell: Shell) -> None:

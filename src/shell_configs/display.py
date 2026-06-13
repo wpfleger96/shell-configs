@@ -80,48 +80,52 @@ def dim(text: str) -> str:
 # ─── Print helpers ───────────────────────────────────────────────────────────
 
 
+def _print_with_icon(icon: str, message: str, indent: int) -> None:
+    get_console().print(f"{' ' * indent}{icon} {message}")
+
+
 def print_error(message: str, *, indent: int = 0) -> None:
-    get_console().print(f"{' ' * indent}{ICON_ERROR} {message}")
+    _print_with_icon(ICON_ERROR, message, indent)
 
 
 def print_warning(message: str, *, indent: int = 0) -> None:
-    get_console().print(f"{' ' * indent}{ICON_WARNING} {message}")
+    _print_with_icon(ICON_WARNING, message, indent)
 
 
 def print_info(message: str, *, indent: int = 0) -> None:
-    get_console().print(f"{' ' * indent}{ICON_INFO} {message}")
+    _print_with_icon(ICON_INFO, message, indent)
 
 
 def print_hint(message: str, *, indent: int = 0) -> None:
-    get_console().print(f"{' ' * indent}{ICON_HINT} {message}")
+    _print_with_icon(ICON_HINT, message, indent)
 
 
 def print_success(message: str, *, indent: int = 0) -> None:
-    get_console().print(f"{' ' * indent}{ICON_SUCCESS} {message}")
+    _print_with_icon(ICON_SUCCESS, message, indent)
 
 
 def print_done(message: str, *, indent: int = 0) -> None:
-    get_console().print(f"{' ' * indent}{ICON_DONE} {message}")
+    _print_with_icon(ICON_DONE, message, indent)
 
 
 def print_unchanged(message: str, *, indent: int = 0) -> None:
-    get_console().print(f"{' ' * indent}{ICON_UNCHANGED} {message}")
+    _print_with_icon(ICON_UNCHANGED, message, indent)
 
 
 def print_skipped(message: str, *, indent: int = 0) -> None:
-    get_console().print(f"{' ' * indent}{ICON_SKIPPED} {message}")
+    _print_with_icon(ICON_SKIPPED, message, indent)
 
 
 def print_would(message: str, *, indent: int = 0) -> None:
-    get_console().print(f"{' ' * indent}{ICON_WOULD} {message}")
+    _print_with_icon(ICON_WOULD, message, indent)
 
 
 def print_add(message: str, *, indent: int = 0) -> None:
-    get_console().print(f"{' ' * indent}{ICON_ADD} {message}")
+    _print_with_icon(ICON_ADD, message, indent)
 
 
 def print_progress(message: str, *, indent: int = 0) -> None:
-    get_console().print(f"{' ' * indent}{ICON_PROGRESS} {message}")
+    _print_with_icon(ICON_PROGRESS, message, indent)
 
 
 def print_dim(message: str, *, indent: int = 0) -> None:
@@ -133,7 +137,7 @@ def print_label(key: str, value: str, *, indent: int = 0) -> None:
 
 
 def print_builtin(message: str, *, indent: int = 0) -> None:
-    get_console().print(f"{' ' * indent}{ICON_BUILTIN} {message}")
+    _print_with_icon(ICON_BUILTIN, message, indent)
 
 
 def print_section(title: str) -> None:

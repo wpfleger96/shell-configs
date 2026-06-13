@@ -6,18 +6,14 @@ import click
 
 from shell_configs.cli.helpers import (
     _get_selected_shells,
-    parse_shell_filter,
     run_components_parallel,
 )
+from shell_configs.cli.options import shells_option, yes_option
 
 
 @click.command()
-@click.option(
-    "--shells",
-    callback=parse_shell_filter,
-    help="Comma-separated list of shells to uninstall",
-)
-@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
+@shells_option("Comma-separated list of shells to uninstall")
+@yes_option
 def uninstall(shells: list[str] | None, yes: bool) -> None:
     """Remove managed configuration sections."""
     from shell_configs.cli.components import UNINSTALL_COMPONENTS

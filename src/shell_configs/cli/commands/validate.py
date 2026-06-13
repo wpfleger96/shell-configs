@@ -6,17 +6,13 @@ import sys
 
 import click
 
-from shell_configs.cli.helpers import _get_selected_shells, parse_shell_filter
-from shell_configs.config import ConfigReader
+from shell_configs.cli.helpers import _get_selected_shells, load_profile_context
+from shell_configs.cli.options import profile_option, shells_option
 
 
 @click.command()
-@click.option(
-    "--shells",
-    callback=parse_shell_filter,
-    help="Comma-separated list of shells to validate",
-)
-@click.option("--profile", "profile_name", default=None, help="Profile to use")
+@shells_option("Comma-separated list of shells to validate")
+@profile_option
 def validate(shells: list[str] | None, profile_name: str | None) -> None:
     """Validate configuration file syntax."""
     from shell_configs.display import (
@@ -27,13 +23,8 @@ def validate(shells: list[str] | None, profile_name: str | None) -> None:
         print_info,
         print_warning,
     )
-    from shell_configs.profiles import ProfileLoader, resolve_active_profile
-    from shell_configs.shells.registry import ShellRegistry
 
-    config_reader = ConfigReader()
-    registry = ShellRegistry()
-    profile_loader = ProfileLoader(config_reader.config_dir)
-    active_profile = resolve_active_profile(profile_name, profile_loader)
+    config_reader, registry, active_profile = load_profile_context(profile_name)
 
     selected_shells = _get_selected_shells(
         registry, shells, config_reader=config_reader
@@ -61,8 +52,10 @@ def validate(shells: list[str] | None, profile_name: str | None) -> None:
 
         console.print(table)
 
+    from shell_configs.profiles import ProfileLoader
     from shell_configs.profiles.profile import ProfileError
 
+    profile_loader = ProfileLoader(config_reader.config_dir)
     profile_errors: list[str] = []
     for pname in profile_loader.list_profiles():
         try:

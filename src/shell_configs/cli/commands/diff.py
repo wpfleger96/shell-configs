@@ -6,18 +6,14 @@ import click
 
 from shell_configs.cli.helpers import (
     build_context,
-    parse_shell_filter,
     run_components_parallel,
 )
+from shell_configs.cli.options import profile_option, shells_option
 
 
 @click.command()
-@click.option(
-    "--shells",
-    callback=parse_shell_filter,
-    help="Comma-separated list of shells to diff",
-)
-@click.option("--profile", "profile_name", default=None, help="Profile to use")
+@shells_option("Comma-separated list of shells to diff")
+@profile_option
 def diff(shells: list[str] | None, profile_name: str | None) -> None:
     """Show differences between repository and installed configurations."""
     from shell_configs.cli.components import DIFF_COMPONENTS

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import click
 
+from shell_configs.cli.options import dry_run_option, yes_option
+
 
 @click.group()
 def scripts() -> None:
@@ -12,8 +14,8 @@ def scripts() -> None:
 
 
 @scripts.command(name="install")
-@click.option("--dry-run", is_flag=True, help="Show what would be installed")
-@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
+@dry_run_option("Show what would be installed")
+@yes_option
 def scripts_install(dry_run: bool, yes: bool) -> None:
     """Install utility scripts to ~/.local/bin."""
     from shell_configs.display import (
@@ -78,8 +80,8 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
 
 
 @scripts.command(name="uninstall")
-@click.option("--dry-run", is_flag=True, help="Show what would be removed")
-@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
+@dry_run_option("Show what would be removed")
+@yes_option
 @click.option("--force", is_flag=True, help="Remove even user-modified scripts")
 def scripts_uninstall(dry_run: bool, yes: bool, force: bool) -> None:
     """Remove shell-configs-managed scripts from ~/.local/bin."""

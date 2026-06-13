@@ -7,12 +7,14 @@ from shell_configs.cli.context import (
     ComponentPlan,
     Context,
     GhExtensionsPlan,
+    expect_plan,
 )
 
 
 class GhExtensionsComponent(Component):
     label = "gh-extensions"
     display_name = "gh CLI Extensions"
+    apply_stage = "post"
 
     def plan(self, ctx: Context) -> GhExtensionsPlan:
         from shell_configs.bootstrap import is_command_available
@@ -50,8 +52,7 @@ class GhExtensionsComponent(Component):
         )
 
     def display_plan(self, plan: ComponentPlan) -> None:
-        if not isinstance(plan, GhExtensionsPlan):
-            raise TypeError(f"expected GhExtensionsPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, GhExtensionsPlan)
         if not plan.has_changes:
             return
 
@@ -77,8 +78,7 @@ class GhExtensionsComponent(Component):
             print_add(f"{ext_name} (not in manifest)", indent=2)
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        if not isinstance(plan, GhExtensionsPlan):
-            raise TypeError(f"expected GhExtensionsPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, GhExtensionsPlan)
         if not plan.missing:
             return True
 
@@ -102,20 +102,6 @@ class GhExtensionsComponent(Component):
                 print_error(msg)
                 all_ok = False
         return all_ok
-
-    def install(self, ctx: Context) -> bool:
-        from shell_configs.display import console, print_done, print_progress
-
-        console.print()
-        print_progress("Installing gh CLI extensions...")
-
-        plan = self.plan(ctx)
-
-        if not plan.missing:
-            print_done("All gh extensions already installed")
-            return True
-
-        return self.apply(ctx, plan)
 
     def status(self, ctx: Context) -> None:
         from shell_configs.display import console, print_warning
@@ -142,15 +128,6 @@ class GhExtensionsComponent(Component):
             )
 
         console.print()
-
-    def diff(self, ctx: Context) -> bool:
-        plan = self.plan(ctx)
-
-        if not plan.has_changes:
-            return False
-
-        self.display_plan(plan)
-        return True
 
     def uninstall(self, ctx: Context) -> None:
         from shell_configs.bootstrap import is_command_available

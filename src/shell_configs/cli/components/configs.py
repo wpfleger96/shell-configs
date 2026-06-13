@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from shell_configs.cli.context import Component, ComponentPlan, ConfigsPlan, Context
+from shell_configs.cli.context import (
+    Component,
+    ComponentPlan,
+    ConfigsPlan,
+    Context,
+    expect_plan,
+)
 
 
 class ConfigsComponent(Component):
@@ -77,8 +83,7 @@ class ConfigsComponent(Component):
         from shell_configs.cli.helpers import _render_diffs
         from shell_configs.display import console, print_section
 
-        if not isinstance(plan, ConfigsPlan):
-            raise TypeError(f"expected ConfigsPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, ConfigsPlan)
 
         state_db_by_shell: dict[str, list[StateDbChange]] = defaultdict(list)
         for change in plan.state_db_changes:
@@ -120,8 +125,7 @@ class ConfigsComponent(Component):
                 console.print(f"  {path_str}: [red]orphaned (source removed)[/red]")
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        if not isinstance(plan, ConfigsPlan):
-            raise TypeError(f"expected ConfigsPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, ConfigsPlan)
 
         from shell_configs.bootstrap import load_auto_update_config
         from shell_configs.bootstrap.config import save_auto_update_config
@@ -390,29 +394,6 @@ class ConfigsComponent(Component):
             additional_manifest.save()
 
         return True
-
-    def install(self, ctx: Context) -> bool:
-        import click
-
-        from shell_configs.display import console, print_info
-
-        configs_plan = self.plan(ctx)
-
-        if not ctx.yes or ctx.dry_run:
-            self.display_plan(configs_plan)
-
-            if configs_plan.has_changes and not ctx.dry_run:
-                console.print()
-                if not click.confirm("Apply these changes?"):
-                    print_info("Installation cancelled")
-                    return False
-
-        return self.apply(ctx, configs_plan)
-
-    def diff(self, ctx: Context) -> bool:
-        configs_plan = self.plan(ctx)
-        self.display_plan(configs_plan)
-        return configs_plan.has_changes
 
     def status(self, ctx: Context) -> None:
         from pathlib import Path

@@ -20,12 +20,7 @@ class SublimeShell(Shell):
         return "Sublime Text"
 
     def _get_settings_dir(self) -> Path | None:
-        if is_platform(Platform.WINDOWS):
-            appdata = get_windows_appdata_roaming()
-            if appdata is None:
-                return None
-            return appdata / "Sublime Text" / "Packages" / "User"
-        if is_platform(Platform.WSL):
+        if is_platform(Platform.WINDOWS) or is_platform(Platform.WSL):
             appdata = get_windows_appdata_roaming()
             if appdata is None:
                 return None
@@ -62,9 +57,3 @@ class SublimeShell(Shell):
                 target_merge=True,
             ),
         ]
-
-    def _get_validation_command(self, temp_file: Path) -> list[str]:
-        return self._noop_validation_command()
-
-    def _get_temp_suffix(self) -> str:
-        return ".json"

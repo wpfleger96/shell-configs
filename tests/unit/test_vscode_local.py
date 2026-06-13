@@ -113,7 +113,7 @@ class TestVSCodeLocalShell:
 
     def test_returns_none_on_non_wsl(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.shells.vscode.is_platform",
+            "shell_configs.shells.editor.is_platform",
             lambda p: p == Platform.LINUX,
         )
         shell = VSCodeLocalShell()
@@ -121,7 +121,7 @@ class TestVSCodeLocalShell:
 
     def test_returns_invoker_on_wsl(self, monkeypatch, tmp_path):
         monkeypatch.setattr(
-            "shell_configs.shells.vscode.is_platform",
+            "shell_configs.shells.editor.is_platform",
             lambda p: p == Platform.WSL,
         )
         monkeypatch.setattr(
@@ -144,7 +144,7 @@ class TestVSCodeLocalShell:
 
     def test_returns_none_when_username_unavailable(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.shells.vscode.is_platform",
+            "shell_configs.shells.editor.is_platform",
             lambda p: p == Platform.WSL,
         )
         monkeypatch.setattr(
@@ -156,7 +156,7 @@ class TestVSCodeLocalShell:
 
     def test_returns_none_when_code_cmd_not_found(self, monkeypatch):
         monkeypatch.setattr(
-            "shell_configs.shells.vscode.is_platform",
+            "shell_configs.shells.editor.is_platform",
             lambda p: p == Platform.WSL,
         )
         monkeypatch.setattr(
@@ -168,7 +168,7 @@ class TestVSCodeLocalShell:
 
     def test_extension_list_paths(self, monkeypatch, tmp_path):
         monkeypatch.setattr(
-            "shell_configs.shells.vscode.get_config_dir", lambda: tmp_path
+            "shell_configs.shells.editor.get_config_dir", lambda: tmp_path
         )
         shell = VSCodeLocalShell()
         paths = shell.get_extension_list_paths()

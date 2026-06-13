@@ -8,9 +8,9 @@ from shell_configs.cli.helpers import (
     _get_extension_shells,
     _print_extension_result,
     _print_ignored_builtin_extensions,
-    parse_shell_filter,
+    load_profile_context,
 )
-from shell_configs.config import ConfigReader
+from shell_configs.cli.options import profile_option, shells_option, yes_option
 
 
 @click.group()
@@ -20,12 +20,8 @@ def extensions() -> None:
 
 
 @extensions.command(name="status")
-@click.option(
-    "--shells",
-    callback=parse_shell_filter,
-    help="Comma-separated list of IDEs (e.g., vscode,cursor)",
-)
-@click.option("--profile", "profile_name", default=None, help="Profile to use")
+@shells_option("Comma-separated list of IDEs (e.g., vscode,cursor)")
+@profile_option
 def extensions_status(shells: list[str] | None, profile_name: str | None) -> None:
     """Show extension sync status for each IDE."""
     from rich.table import Table
@@ -37,15 +33,9 @@ def extensions_status(shells: list[str] | None, profile_name: str | None) -> Non
         print_builtin,
         print_warning,
     )
-    from shell_configs.extensions import ExtensionManager
-    from shell_configs.profiles import ProfileLoader, resolve_active_profile
-    from shell_configs.shells.registry import ShellRegistry
+    from shell_configs.extensions import compute_extension_states
 
-    config_reader = ConfigReader()
-    registry = ShellRegistry()
-    profile_loader = ProfileLoader(config_reader.config_dir)
-    active_profile = resolve_active_profile(profile_name, profile_loader)
-    ext_manager = ExtensionManager()
+    _, registry, active_profile = load_profile_context(profile_name)
 
     ide_shells = _get_extension_shells(registry, shells)
     if not ide_shells:
@@ -61,23 +51,8 @@ def extensions_status(shells: list[str] | None, profile_name: str | None) -> Non
     table.add_column("Status")
     ignored_by_shell: list[tuple[str, frozenset[str]]] = []
 
-    for shell in ide_shells:
-        invoker = shell.get_extension_invoker()
-        cli_cmd = shell.get_extension_cli()
-        if invoker is None and cli_cmd is None:
-            continue
-
-        desired = ext_manager.load_desired_extensions(
-            shell.name, shell.get_extension_list_paths(), profile=active_profile
-        )
-        installed = ext_manager.get_installed_extensions(
-            cli_cmd,
-            invoker=invoker,
-            extensions_json_path=shell.get_extensions_json_path(),
-        )
-        if installed is None:
-            continue
-        diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
+    for st in compute_extension_states(ide_shells, active_profile):
+        shell, desired, installed, diff = st.shell, st.desired, st.installed, st.diff
         if diff.ignored:
             ignored_by_shell.append((shell.display_name, diff.ignored))
 
@@ -107,12 +82,8 @@ def extensions_status(shells: list[str] | None, profile_name: str | None) -> Non
 
 
 @extensions.command(name="diff")
-@click.option(
-    "--shells",
-    callback=parse_shell_filter,
-    help="Comma-separated list of IDEs (e.g., vscode,cursor)",
-)
-@click.option("--profile", "profile_name", default=None, help="Profile to use")
+@shells_option("Comma-separated list of IDEs (e.g., vscode,cursor)")
+@profile_option
 def extensions_diff(shells: list[str] | None, profile_name: str | None) -> None:
     """Show differences between desired and installed extensions."""
     from shell_configs.display import (
@@ -125,15 +96,9 @@ def extensions_diff(shells: list[str] | None, profile_name: str | None) -> None:
         print_section,
         print_warning,
     )
-    from shell_configs.extensions import ExtensionManager
-    from shell_configs.profiles import ProfileLoader, resolve_active_profile
-    from shell_configs.shells.registry import ShellRegistry
+    from shell_configs.extensions import compute_extension_states
 
-    config_reader = ConfigReader()
-    registry = ShellRegistry()
-    profile_loader = ProfileLoader(config_reader.config_dir)
-    active_profile = resolve_active_profile(profile_name, profile_loader)
-    ext_manager = ExtensionManager()
+    _, registry, active_profile = load_profile_context(profile_name)
 
     ide_shells = _get_extension_shells(registry, shells)
     if not ide_shells:
@@ -141,23 +106,8 @@ def extensions_diff(shells: list[str] | None, profile_name: str | None) -> None:
         return
 
     found_diffs = False
-    for shell in ide_shells:
-        invoker = shell.get_extension_invoker()
-        cli_cmd = shell.get_extension_cli()
-        if invoker is None and cli_cmd is None:
-            continue
-
-        desired = ext_manager.load_desired_extensions(
-            shell.name, shell.get_extension_list_paths(), profile=active_profile
-        )
-        installed = ext_manager.get_installed_extensions(
-            cli_cmd,
-            invoker=invoker,
-            extensions_json_path=shell.get_extensions_json_path(),
-        )
-        if installed is None:
-            continue
-        diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
+    for st in compute_extension_states(ide_shells, active_profile):
+        shell, diff = st.shell, st.diff
 
         if not diff.missing and not diff.extra and not diff.ignored:
             continue
@@ -187,19 +137,15 @@ def extensions_diff(shells: list[str] | None, profile_name: str | None) -> None:
 
 
 @extensions.command(name="install")
-@click.option(
-    "--shells",
-    callback=parse_shell_filter,
-    help="Comma-separated list of IDEs (e.g., vscode,cursor)",
-)
+@shells_option("Comma-separated list of IDEs (e.g., vscode,cursor)")
 @click.option(
     "--prune", is_flag=True, help="Uninstall extensions not in the desired list"
 )
 @click.option(
     "--dry-run", is_flag=True, help="Show what would be done without doing it"
 )
-@click.option("-y", "--yes", is_flag=True, help="Auto-confirm without prompting")
-@click.option("--profile", "profile_name", default=None, help="Profile to use")
+@yes_option
+@profile_option
 def extensions_install(
     shells: list[str] | None,
     prune: bool,
@@ -216,14 +162,9 @@ def extensions_install(
         print_section,
         print_warning,
     )
-    from shell_configs.extensions import ExtensionManager
-    from shell_configs.profiles import ProfileLoader, resolve_active_profile
-    from shell_configs.shells.registry import ShellRegistry
+    from shell_configs.extensions import ExtensionManager, compute_extension_states
 
-    config_reader = ConfigReader()
-    registry = ShellRegistry()
-    profile_loader = ProfileLoader(config_reader.config_dir)
-    active_profile = resolve_active_profile(profile_name, profile_loader)
+    _, registry, active_profile = load_profile_context(profile_name)
     ext_manager = ExtensionManager()
 
     ide_shells = _get_extension_shells(registry, shells)
@@ -232,23 +173,9 @@ def extensions_install(
         return
 
     any_activity = False
-    for shell in ide_shells:
-        invoker = shell.get_extension_invoker()
-        cli_cmd = shell.get_extension_cli()
-        if invoker is None and cli_cmd is None:
-            continue
-
-        desired = ext_manager.load_desired_extensions(
-            shell.name, shell.get_extension_list_paths(), profile=active_profile
-        )
-        installed = ext_manager.get_installed_extensions(
-            cli_cmd,
-            invoker=invoker,
-            extensions_json_path=shell.get_extensions_json_path(),
-        )
-        if installed is None:
-            continue
-        diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
+    for st in compute_extension_states(ide_shells, active_profile):
+        shell, invoker, cli_cmd = st.shell, st.invoker, st.cli_cmd
+        diff = st.diff
 
         to_install = diff.missing
         to_uninstall = diff.extra if prune else frozenset()
@@ -309,12 +236,8 @@ def extensions_install(
 
 
 @extensions.command(name="list")
-@click.option(
-    "--shells",
-    callback=parse_shell_filter,
-    help="Comma-separated list of IDEs (e.g., vscode,cursor)",
-)
-@click.option("--profile", "profile_name", default=None, help="Profile to use")
+@shells_option("Comma-separated list of IDEs (e.g., vscode,cursor)")
+@profile_option
 def extensions_list(shells: list[str] | None, profile_name: str | None) -> None:
     """List all extensions for each IDE with their install status."""
     from rich.table import Table
@@ -327,15 +250,9 @@ def extensions_list(shells: list[str] | None, profile_name: str | None) -> None:
         print_info,
         print_warning,
     )
-    from shell_configs.extensions import ExtensionManager
-    from shell_configs.profiles import ProfileLoader, resolve_active_profile
-    from shell_configs.shells.registry import ShellRegistry
+    from shell_configs.extensions import compute_extension_states
 
-    config_reader = ConfigReader()
-    registry = ShellRegistry()
-    profile_loader = ProfileLoader(config_reader.config_dir)
-    active_profile = resolve_active_profile(profile_name, profile_loader)
-    ext_manager = ExtensionManager()
+    _, registry, active_profile = load_profile_context(profile_name)
 
     ide_shells = _get_extension_shells(registry, shells)
     if not ide_shells:
@@ -343,23 +260,8 @@ def extensions_list(shells: list[str] | None, profile_name: str | None) -> None:
         return
 
     any_output = False
-    for shell in ide_shells:
-        invoker = shell.get_extension_invoker()
-        cli_cmd = shell.get_extension_cli()
-        if invoker is None and cli_cmd is None:
-            continue
-
-        desired = ext_manager.load_desired_extensions(
-            shell.name, shell.get_extension_list_paths(), profile=active_profile
-        )
-        installed = ext_manager.get_installed_extensions(
-            cli_cmd,
-            invoker=invoker,
-            extensions_json_path=shell.get_extensions_json_path(),
-        )
-        if installed is None:
-            continue
-        diff = ext_manager.compute_diff(desired, installed, shell_name=shell.name)
+    for st in compute_extension_states(ide_shells, active_profile):
+        shell, diff = st.shell, st.diff
 
         rows: list[tuple[str, str]] = []
         for ext_id in diff.matched:

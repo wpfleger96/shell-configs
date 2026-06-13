@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from shell_configs.cli.context import Component, ComponentPlan, Context, ScriptsPlan
+from shell_configs.cli.context import (
+    Component,
+    ComponentPlan,
+    Context,
+    ScriptsPlan,
+    expect_plan,
+)
 
 
 class ScriptsComponent(Component):
@@ -40,8 +46,7 @@ class ScriptsComponent(Component):
         return ScriptsPlan(has_changes=has_changes, entries=entries, orphaned=orphaned)
 
     def display_plan(self, plan: ComponentPlan) -> None:
-        if not isinstance(plan, ScriptsPlan):
-            raise TypeError(f"expected ScriptsPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, ScriptsPlan)
         if not plan.has_changes:
             return
 
@@ -67,8 +72,7 @@ class ScriptsComponent(Component):
             )
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        if not isinstance(plan, ScriptsPlan):
-            raise TypeError(f"expected ScriptsPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, ScriptsPlan)
         if not plan.has_changes:
             return True
 
@@ -117,74 +121,6 @@ class ScriptsComponent(Component):
 
         return success
 
-    def install(self, ctx: Context) -> bool:
-        from shell_configs.display import (
-            console,
-            print_dim,
-            print_done,
-            print_error,
-            print_progress,
-            print_success,
-            print_warning,
-            print_would,
-        )
-        from shell_configs.script_manager import (
-            InstallResult,
-            ScriptManifest,
-            UninstallResult,
-            discover_scripts,
-            find_orphaned_scripts,
-            get_default_manifest_path,
-            get_default_target_dir,
-            install_script,
-            uninstall_script,
-        )
-
-        console.print()
-        print_progress("Installing utility scripts...")
-        target_dir = get_default_target_dir()
-        manifest = ScriptManifest(get_default_manifest_path())
-        entries = discover_scripts()
-        if not entries:
-            print_dim("No scripts available for this platform")
-        else:
-            for entry in entries:
-                script_result, msg = install_script(
-                    entry, target_dir, manifest, dry_run=ctx.dry_run
-                )
-                if script_result == InstallResult.COLLISION:
-                    print_warning(msg)
-                elif script_result in (InstallResult.INSTALLED, InstallResult.UPDATED):
-                    print_success(msg)
-                elif script_result == InstallResult.ALREADY_SYNCED:
-                    print_done(msg)
-                elif script_result in (
-                    InstallResult.WOULD_INSTALL,
-                    InstallResult.WOULD_UPDATE,
-                ):
-                    print_would(msg)
-                elif script_result == InstallResult.SKIPPED_PLATFORM:
-                    pass
-                else:
-                    print_error(msg)
-
-        all_scripts = discover_scripts(include_all=True)
-        orphaned = find_orphaned_scripts(manifest, all_scripts)
-        for name in orphaned:
-            uninstall_result, msg = uninstall_script(
-                name, target_dir, manifest, force=False, dry_run=ctx.dry_run
-            )
-            if uninstall_result == UninstallResult.REMOVED:
-                print_success(f"Removed orphaned script: {msg}")
-            elif uninstall_result == UninstallResult.WOULD_REMOVE:
-                print_would(msg)
-            elif uninstall_result == UninstallResult.MODIFIED:
-                print_warning(f"Orphaned script was modified by user, skipping: {msg}")
-            elif uninstall_result != UninstallResult.NOT_FOUND:
-                print_error(msg)
-
-        return True
-
     def status(self, ctx: Context) -> None:
         from shell_configs.display import (
             console,
@@ -221,11 +157,6 @@ class ScriptsComponent(Component):
                 )
 
         console.print()
-
-    def diff(self, ctx: Context) -> bool:
-        plan = self.plan(ctx)
-        self.display_plan(plan)
-        return plan.has_changes
 
     def uninstall(self, ctx: Context) -> None:
         from shell_configs.display import print_operation_result, print_warning

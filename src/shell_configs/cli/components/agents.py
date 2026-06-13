@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
-from shell_configs.cli.context import AgentsPlan, Component, ComponentPlan, Context
+from shell_configs.cli.context import (
+    AgentsPlan,
+    Component,
+    ComponentPlan,
+    Context,
+    expect_plan,
+)
 
 
 class AgentsComponent(Component):
     label = "agents"
     display_name = "AI Coding Agents"
+    apply_stage = "pre"
 
     def plan(self, ctx: Context) -> AgentsPlan:
         import shutil
@@ -46,8 +53,7 @@ class AgentsComponent(Component):
         )
 
     def display_plan(self, plan: ComponentPlan) -> None:
-        if not isinstance(plan, AgentsPlan):
-            raise TypeError(f"expected AgentsPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, AgentsPlan)
         if not plan.has_changes:
             return
 
@@ -67,8 +73,7 @@ class AgentsComponent(Component):
             console.print(f"  {name}: [red]orphaned (source removed)[/red]")
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
-        if not isinstance(plan, AgentsPlan):
-            raise TypeError(f"expected AgentsPlan, got {type(plan).__name__}")
+        plan = expect_plan(plan, AgentsPlan)
 
         if not plan.has_changes:
             return True
