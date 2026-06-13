@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 
 from dataclasses import dataclass
@@ -11,6 +10,7 @@ from pathlib import Path
 
 import yaml
 
+from shell_configs.bootstrap import is_command_available
 from shell_configs.config import get_config_dir
 from shell_configs.installers import (
     PlatformInstallConfig,
@@ -107,12 +107,12 @@ def is_language_installed(lang: Language) -> bool:
     """Return True if the language runtime is present on this machine."""
     if lang.check_path:
         return _resolve_check_path(lang.check_path) is not None
-    return shutil.which(lang.command) is not None
+    return is_command_available(lang.command)
 
 
 def get_language_version(lang: Language) -> str | None:
     """Return a short version string for display, or None if unavailable."""
-    if not shutil.which(lang.command):
+    if not is_command_available(lang.command):
         return None
     for flag in ("version", "--version"):
         try:

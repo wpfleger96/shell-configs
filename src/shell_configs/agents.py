@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 
 from dataclasses import dataclass
@@ -10,6 +9,7 @@ from pathlib import Path
 
 import yaml
 
+from shell_configs.bootstrap import is_command_available
 from shell_configs.config import get_config_dir
 from shell_configs.installers import (
     PlatformInstallConfig,
@@ -85,12 +85,12 @@ def is_agent_installed(agent: Agent) -> bool:
     """Return True if the agent is present on this machine."""
     if agent.check_path:
         return Path(agent.check_path.replace("~", str(Path.home()))).exists()
-    return shutil.which(agent.command) is not None
+    return is_command_available(agent.command)
 
 
 def get_agent_version(agent: Agent) -> str | None:
     """Return a short version string for display, or None if unavailable."""
-    if not shutil.which(agent.command):
+    if not is_command_available(agent.command):
         return None
     # Most agents use --version; goose uses "version" subcommand as fallback
     for flag in ("--version", "version"):
@@ -149,7 +149,7 @@ def uninstall_agent_by_manifest_entry(
     dry_run: bool = False,
 ) -> tuple[bool, str]:
     """Uninstall an agent using manifest-recorded install method."""
-    if not shutil.which(command):
+    if not is_command_available(command):
         return True, f"{name} is not installed"
     if install_method == "npm":
         return uninstall_npm(name, package or name, dry_run)
