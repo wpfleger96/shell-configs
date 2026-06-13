@@ -1,5 +1,6 @@
 """Update checking and application utilities."""
 
+import json
 import logging
 import re
 import subprocess
@@ -25,7 +26,7 @@ def fetch_changelog_entries(
 ) -> list[tuple[str, str]]:
     """Fetch changelog entries for versions between current and latest.
 
-    Uses GitHub CLI for private repo authentication.
+    Uses GitHub Releases API via GitHub CLI for private repo authentication.
 
     Args:
         repo: GitHub repository in format "owner/repo"
@@ -45,9 +46,9 @@ def fetch_changelog_entries(
             [
                 "gh",
                 "api",
-                f"repos/{repo}/contents/CHANGELOG.md",
-                "-H",
-                "Accept: application/vnd.github.raw",
+                f"repos/{repo}/releases",
+                "--jq",
+                "[.[] | {tag_name, body}]",
             ],
             capture_output=True,
             text=True,
@@ -58,36 +59,15 @@ def fetch_changelog_entries(
             logger.debug(f"Changelog fetch failed: {result.stderr.strip()}")
             return []
 
-        changelog_content = result.stdout
+        releases = json.loads(result.stdout)
 
         entries: list[tuple[str, str]] = []
-        current_entry_version: str | None = None
-        current_entry_lines: list[str] = []
-
-        for line in changelog_content.split("\n"):
-            version_match = re.match(r"^##\s+v?(\d+\.\d+\.\d+)", line)
-            if version_match:
-                if current_entry_version and current_entry_lines:
-                    version_obj = current_entry_version
-                    if is_newer(version_obj, current_version) and (
-                        version_obj == latest_version
-                        or not is_newer(version_obj, latest_version)
-                    ):
-                        entries.append(
-                            (current_entry_version, "\n".join(current_entry_lines))
-                        )
-
-                current_entry_version = version_match.group(1)
-                current_entry_lines = []
-            elif current_entry_version and line.strip():
-                current_entry_lines.append(line)
-
-        if current_entry_version and current_entry_lines:
-            if is_newer(current_entry_version, current_version) and (
-                current_entry_version == latest_version
-                or not is_newer(current_entry_version, latest_version)
+        for release in releases:
+            version = release["tag_name"].lstrip("v")
+            if is_newer(version, current_version) and (
+                version == latest_version or not is_newer(version, latest_version)
             ):
-                entries.append((current_entry_version, "\n".join(current_entry_lines)))
+                entries.append((version, release.get("body", "")))
 
         return entries
 

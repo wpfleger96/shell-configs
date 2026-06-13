@@ -5,7 +5,11 @@ import subprocess
 import pytest
 
 from shell_configs.bootstrap.installer import UV_NOT_FOUND_ERROR
-from shell_configs.bootstrap.updater import check_github_updates, perform_github_update
+from shell_configs.bootstrap.updater import (
+    check_github_updates,
+    fetch_changelog_entries,
+    perform_github_update,
+)
 
 
 @pytest.mark.unit
@@ -281,3 +285,80 @@ class TestPerformGitHubUpdate:
         assert "--force" in cmd
         assert "--reinstall" in cmd
         assert was_upgraded is True
+
+
+@pytest.mark.unit
+@pytest.mark.bootstrap
+class TestFetchChangelogEntries:
+    """Tests for fetch_changelog_entries function."""
+
+    def test_returns_entries_in_version_range(self, monkeypatch):
+        """Test that only releases between current and latest are returned."""
+        monkeypatch.setattr(
+            "shell_configs.bootstrap.updater.is_command_available", lambda cmd: True
+        )
+
+        releases_json = '[{"tag_name": "v1.2.0", "body": "notes 1.2.0"}, {"tag_name": "v1.1.0", "body": "notes 1.1.0"}, {"tag_name": "v1.0.0", "body": "notes 1.0.0"}]'
+
+        def mock_run(cmd, **kwargs):
+            class Result:
+                returncode = 0
+                stdout = releases_json
+                stderr = ""
+
+            return Result()
+
+        monkeypatch.setattr("shell_configs.bootstrap.updater.subprocess.run", mock_run)
+
+        entries = fetch_changelog_entries("owner/repo", "1.0.0", "1.2.0")
+        versions = [v for v, _ in entries]
+        assert "1.2.0" in versions
+        assert "1.1.0" in versions
+        assert "1.0.0" not in versions
+
+    def test_empty_releases_returns_empty_list(self, monkeypatch):
+        """Test that an empty releases list returns an empty result."""
+        monkeypatch.setattr(
+            "shell_configs.bootstrap.updater.is_command_available", lambda cmd: True
+        )
+
+        def mock_run(cmd, **kwargs):
+            class Result:
+                returncode = 0
+                stdout = "[]"
+                stderr = ""
+
+            return Result()
+
+        monkeypatch.setattr("shell_configs.bootstrap.updater.subprocess.run", mock_run)
+
+        entries = fetch_changelog_entries("owner/repo", "1.0.0", "1.2.0")
+        assert entries == []
+
+    def test_gh_not_available_returns_empty_list(self, monkeypatch):
+        """Test that missing gh CLI returns empty list without calling subprocess."""
+        monkeypatch.setattr(
+            "shell_configs.bootstrap.updater.is_command_available", lambda cmd: False
+        )
+
+        entries = fetch_changelog_entries("owner/repo", "1.0.0", "1.2.0")
+        assert entries == []
+
+    def test_gh_api_failure_returns_empty_list(self, monkeypatch):
+        """Test that a non-zero gh exit code returns empty list."""
+        monkeypatch.setattr(
+            "shell_configs.bootstrap.updater.is_command_available", lambda cmd: True
+        )
+
+        def mock_run(cmd, **kwargs):
+            class Result:
+                returncode = 1
+                stdout = ""
+                stderr = "API rate limit exceeded"
+
+            return Result()
+
+        monkeypatch.setattr("shell_configs.bootstrap.updater.subprocess.run", mock_run)
+
+        entries = fetch_changelog_entries("owner/repo", "1.0.0", "1.2.0")
+        assert entries == []
