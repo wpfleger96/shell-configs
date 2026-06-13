@@ -13,18 +13,20 @@ import yaml
 from shell_configs.config import get_config_dir
 from shell_configs.installers import (
     PlatformInstallConfig,
-    install_via_config,
+    install_npm,
+    install_winget,
     parse_platform_configs,
     resolve_platform_config,
     run_script,
+    run_via_config,
     uninstall_npm,
-    uninstall_via_config,
     uninstall_winget,
 )
 
 AgentInstallConfig = PlatformInstallConfig
 
-_AGENT_METHODS = frozenset({"npm", "winget"})
+_AGENT_INSTALL = {"npm": install_npm, "winget": install_winget}
+_AGENT_UNINSTALL = {"npm": uninstall_npm, "winget": uninstall_winget}
 
 
 @dataclass(frozen=True)
@@ -120,7 +122,7 @@ def install_agent(agent: Agent, dry_run: bool = False) -> tuple[bool, str]:
 
     config = _resolve_platform_config(agent)
     if config:
-        return install_via_config(agent.name, config, dry_run, methods=_AGENT_METHODS)
+        return run_via_config(agent.name, config, dry_run, handlers=_AGENT_INSTALL)
     if agent.install_cmd:
         return run_script(agent.name, agent.install_cmd, dry_run)
     return False, f"No install method configured for {agent.name} on this platform"
@@ -133,7 +135,7 @@ def uninstall_agent(agent: Agent, dry_run: bool = False) -> tuple[bool, str]:
 
     config = _resolve_platform_config(agent)
     if config:
-        return uninstall_via_config(agent.name, config, dry_run, methods=_AGENT_METHODS)
+        return run_via_config(agent.name, config, dry_run, handlers=_AGENT_UNINSTALL)
     if agent.uninstall_cmd:
         return run_script(agent.name, agent.uninstall_cmd, dry_run, verb="uninstall")
     return False, f"No uninstall method configured for {agent.name} on this platform"

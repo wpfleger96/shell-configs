@@ -52,8 +52,7 @@ def extensions_status(shells: list[str] | None, profile_name: str | None) -> Non
     ignored_by_shell: list[tuple[str, frozenset[str]]] = []
 
     for st in compute_extension_states(ide_shells, active_profile):
-        shell, invoker, cli_cmd = st.shell, st.invoker, st.cli_cmd
-        desired, installed, diff = st.desired, st.installed, st.diff
+        shell, desired, installed, diff = st.shell, st.desired, st.installed, st.diff
         if diff.ignored:
             ignored_by_shell.append((shell.display_name, diff.ignored))
 
@@ -108,8 +107,7 @@ def extensions_diff(shells: list[str] | None, profile_name: str | None) -> None:
 
     found_diffs = False
     for st in compute_extension_states(ide_shells, active_profile):
-        shell, invoker, cli_cmd = st.shell, st.invoker, st.cli_cmd
-        desired, installed, diff = st.desired, st.installed, st.diff
+        shell, diff = st.shell, st.diff
 
         if not diff.missing and not diff.extra and not diff.ignored:
             continue
@@ -177,7 +175,7 @@ def extensions_install(
     any_activity = False
     for st in compute_extension_states(ide_shells, active_profile):
         shell, invoker, cli_cmd = st.shell, st.invoker, st.cli_cmd
-        desired, installed, diff = st.desired, st.installed, st.diff
+        diff = st.diff
 
         to_install = diff.missing
         to_uninstall = diff.extra if prune else frozenset()
@@ -263,8 +261,7 @@ def extensions_list(shells: list[str] | None, profile_name: str | None) -> None:
 
     any_output = False
     for st in compute_extension_states(ide_shells, active_profile):
-        shell, invoker, cli_cmd = st.shell, st.invoker, st.cli_cmd
-        desired, installed, diff = st.desired, st.installed, st.diff
+        shell, diff = st.shell, st.diff
 
         rows: list[tuple[str, str]] = []
         for ext_id in diff.matched:

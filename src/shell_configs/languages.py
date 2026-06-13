@@ -14,15 +14,22 @@ import yaml
 from shell_configs.config import get_config_dir
 from shell_configs.installers import (
     PlatformInstallConfig,
-    install_via_config,
+    install_apt,
+    install_brew,
+    install_winget,
     parse_platform_configs,
     resolve_platform_config,
     run_script,
+    run_via_config,
 )
 
 LanguageInstallConfig = PlatformInstallConfig
 
-_LANGUAGE_METHODS = frozenset({"brew", "apt", "winget"})
+_LANGUAGE_INSTALL = {
+    "brew": install_brew,
+    "apt": install_apt,
+    "winget": install_winget,
+}
 
 
 @dataclass(frozen=True)
@@ -148,7 +155,7 @@ def install_language(lang: Language, dry_run: bool = False) -> tuple[bool, str]:
         macos=lang.macos, linux=lang.linux, windows=lang.windows
     )
     if config:
-        return install_via_config(lang.name, config, dry_run, methods=_LANGUAGE_METHODS)
+        return run_via_config(lang.name, config, dry_run, handlers=_LANGUAGE_INSTALL)
     if lang.install_cmd:
         return run_script(lang.name, lang.install_cmd, dry_run)
     return False, f"No install method configured for {lang.name} on this platform"

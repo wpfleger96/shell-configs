@@ -252,46 +252,24 @@ class StaleKeyInfo:
 def find_stale_github_keys(
     key_path: Path,
 ) -> tuple[list[StaleKeyInfo], str | None]:
-    """Find GitHub SSH keys that don't match the current machine's key.
+    """Find GitHub SSH keys whose fingerprint doesn't match the local key.
 
-    Returns (stale_keys, current_fingerprint). Compares fingerprints of all
-    GitHub SSH keys against the local key at key_path.pub.
+    Returns (stale_keys, current_fingerprint). ``gh ssh-key list`` has no
+    fingerprint column, so each GitHub key's fingerprint is computed from its
+    key data and compared against the local key at key_path.pub.
     """
-    pub_path = key_path.with_suffix(".pub")
-    if not pub_path.exists():
-        return [], None
-
-    current_fp = get_key_fingerprint(pub_path.read_text().strip())
+    current_fp = get_pub_fingerprint(key_path.with_suffix(".pub"))
     if not current_fp:
         return [], None
 
-    result = _run(
-        ["gh", "ssh-key", "list"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    if result.returncode != 0:
-        return [], current_fp
-
     stale: list[StaleKeyInfo] = []
-    for line in result.stdout.strip().split("\n"):
-        if not line.strip():
-            continue
-        parts = line.split("\t")
-        if len(parts) < 4:
-            continue
-        title, _, key_type_field, fingerprint = (
-            parts[0],
-            parts[1],
-            parts[2],
-            parts[3] if len(parts) > 3 else "",
-        )
+    for gh_key in list_github_ssh_keys():
+        fingerprint = get_key_fingerprint(gh_key.key_data) if gh_key.key_data else ""
         if fingerprint and fingerprint != current_fp:
             stale.append(
                 StaleKeyInfo(
-                    title=title,
-                    key_type=key_type_field,
+                    title=gh_key.title,
+                    key_type=gh_key.key_type,
                     fingerprint=fingerprint,
                 )
             )
@@ -374,7 +352,7 @@ def discover_managed_key(
 ) -> Path | None:
     """Match a local key against GitHub-registered keys by fingerprint."""
     for key_path in local_keys:
-        fp = get_key_fingerprint(key_path.with_suffix(".pub").read_text())
+        fp = get_pub_fingerprint(key_path.with_suffix(".pub"))
         if fp and fp in github_fingerprints:
             return key_path
     return None
@@ -464,7 +442,7 @@ def _resolve_key_path(
     print_warning("Multiple SSH keys found, none registered on your GitHub account:")
     console.print()
     for i, kp in enumerate(local_keys, 1):
-        fp = get_key_fingerprint(kp.with_suffix(".pub").read_text()) or "unknown"
+        fp = get_pub_fingerprint(kp.with_suffix(".pub")) or "unknown"
         key_type = kp.name.split("_", 1)[1] if "_" in kp.name else "unknown"
         console.print(f"  {i}. {kp} ({key_type.upper()}, {fp})")
 
@@ -753,6 +731,14 @@ def get_key_fingerprint(key: str) -> str:
         return ""
     parts = result.stdout.strip().split()
     return parts[1] if len(parts) >= 2 else ""
+
+
+def get_pub_fingerprint(pub_path: Path) -> str:
+    """SHA256 fingerprint of a public key file, or "" if missing/unreadable."""
+    try:
+        return get_key_fingerprint(pub_path.read_text())
+    except OSError:
+        return ""
 
 
 def register_signing_key(key: str, auto_refresh_scope: bool = True) -> tuple[bool, str]:

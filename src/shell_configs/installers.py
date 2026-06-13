@@ -10,7 +10,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -191,42 +191,23 @@ def run_script(
     )
 
 
-_INSTALL_BY_METHOD: dict[str, Callable[[str, str, bool], tuple[bool, str]]] = {
-    "npm": install_npm,
-    "brew": install_brew,
-    "apt": install_apt,
-    "winget": install_winget,
-}
-
-_UNINSTALL_BY_METHOD: dict[str, Callable[[str, str, bool], tuple[bool, str]]] = {
-    "npm": uninstall_npm,
-    "winget": uninstall_winget,
-}
+InstallHandler = Callable[[str, str, bool], tuple[bool, str]]
 
 
-def install_via_config(
+def run_via_config(
     name: str,
     config: PlatformInstallConfig,
     dry_run: bool,
     *,
-    methods: frozenset[str],
+    handlers: Mapping[str, InstallHandler],
 ) -> tuple[bool, str]:
-    """Install via the method named in config, restricted to allowed methods."""
-    fn = _INSTALL_BY_METHOD.get(config.method)
-    if fn is None or config.method not in methods:
-        return False, f"Unknown install method: {config.method}"
-    return fn(name, config.package or name, dry_run)
+    """Run the handler selected by ``config.method``.
 
-
-def uninstall_via_config(
-    name: str,
-    config: PlatformInstallConfig,
-    dry_run: bool,
-    *,
-    methods: frozenset[str],
-) -> tuple[bool, str]:
-    """Uninstall via the method named in config, restricted to allowed methods."""
-    fn = _UNINSTALL_BY_METHOD.get(config.method)
-    if fn is None or config.method not in methods:
+    ``handlers`` maps each supported method to its install (or uninstall)
+    function, so the single mapping both whitelists the allowed methods and
+    selects how to run them. Unknown methods report "Unknown install method".
+    """
+    fn = handlers.get(config.method)
+    if fn is None:
         return False, f"Unknown install method: {config.method}"
     return fn(name, config.package or name, dry_run)
