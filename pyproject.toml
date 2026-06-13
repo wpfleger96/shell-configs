@@ -62,7 +62,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --cov=shell_configs --cov-report=term-missing --ignore=tests/e2e"
+addopts = "-v --cov=shell_configs --cov-report=term-missing -m 'not e2e'"
 markers = [
     "unit: Unit tests that don't touch the filesystem",
     "integration: Integration tests that modify files",
