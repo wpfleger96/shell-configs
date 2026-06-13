@@ -170,7 +170,7 @@ def git_repo(e2e_home):
         "GIT_CONFIG_GLOBAL": str(home_dir / ".gitconfig"),
     }
 
-    def _git(*args: str) -> "subprocess.CompletedProcess[str]":
+    def _git(*args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             ["git", *args],
             capture_output=True,

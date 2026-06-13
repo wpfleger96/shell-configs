@@ -8,6 +8,7 @@ managed files are removed while unrelated user content survives.
 from __future__ import annotations
 
 import json
+import sys
 
 import pytest
 
@@ -31,6 +32,7 @@ class TestUninstallRoundTrip:
         assert not (home_dir / ".bash" / "git-prompt.sh").exists()
         assert not (home_dir / ".zsh" / "git-prompt.sh").exists()
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="~/.local/bin is POSIX-only")
     def test_scripts_removed(self, installed_home, run_cli):
         home_dir, _ = installed_home
         bin_dir = home_dir / ".local" / "bin"

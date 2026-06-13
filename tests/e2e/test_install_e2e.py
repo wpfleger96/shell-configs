@@ -10,6 +10,8 @@ into `install -y`.
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 from tests.e2e.helpers import has_managed_marker, strip_ansi
@@ -50,6 +52,9 @@ class TestFreshInstall:
 
 
 @pytest.mark.e2e
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="~/.local/bin + exec bit are POSIX-only"
+)
 class TestScriptsInstall:
     def test_scripts_installed_executable(self, run_cli, e2e_home):
         home_dir, _ = e2e_home
