@@ -1,4 +1,4 @@
-# shellcheck shell=bash disable=SC2034,SC2046,SC2086,SC2128,SC2154 # zsh file; shellcheck doesn't understand zsh builtins
+# shellcheck shell=bash disable=SC2016,SC2034,SC2046,SC2086,SC2128,SC2154 # zsh file; shellcheck doesn't understand zsh builtins
 # Tab completions for shell-configs managed scripts and helpers.
 # Sourced from zshrc after compinit; keep flags in sync with each script's CLI.
 
@@ -35,8 +35,15 @@ _wt() {
         esac
     elif ((CURRENT >= 4)); then
         case "${words[2]}" in
+        add)
+            _arguments \
+                '(-o --open)'{-o,--open}'[Open worktree in editor]' \
+                '(-b --base)'{-b,--base}'[Base branch for worktree]:branch:'
+            ;;
         rm)
-            _arguments '(-f --force)'{-f,--force}'[Force removal of worktree]'
+            _arguments \
+                '(-f --force)'{-f,--force}'[Force removal of worktree]' \
+                ':worktree:_values worktrees $(git worktree list 2>/dev/null | awk "NR>1 {print \$NF}" | tr -d "[]")'
             ;;
         prune)
             _arguments \
@@ -100,6 +107,7 @@ _db_helper() {
 
     if ((CURRENT == 2)); then
         _describe 'command' subcommands
+        compadd -- --dry-run --yes -y --help -h
     elif ((CURRENT >= 3)); then
         case "${words[2]}" in
         restore)

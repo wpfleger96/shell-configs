@@ -781,6 +781,7 @@ show_help() {
     echo -e "${YELLOW}Note:${NC} All migrations automatically create backups before making changes."
 }
 
+# Update config/{bash/completions.bash,zsh/completions.zsh} when changing flags
 main() {
     local non_flag_args=()
 

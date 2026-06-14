@@ -97,3 +97,12 @@ class TestZshSourcing:
         result = run_shell("zsh", 'source "$HOME/.zshrc"; whence -w wt')
         assert result.returncode == 0
         assert "function" in result.stdout
+
+    @pytest.mark.parametrize(
+        "func",
+        ["_wt", "_disk_cleanup", "_transcribe", "_db_helper", "_backup_resmed"],
+    )
+    def test_completion_function_defined(self, installed_home, run_shell, func):
+        result = run_shell("zsh", f'source "$HOME/.zshrc"; whence -w {func}')
+        assert result.returncode == 0, f"{func} not defined"
+        assert "function" in result.stdout

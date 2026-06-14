@@ -47,6 +47,7 @@ def parse_set_value(value: str):
         return value
 
 
+# Update config/{bash/completions.bash,zsh/completions.zsh} when changing flags
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Transcribe audio/video files using faster-whisper on GPU.",

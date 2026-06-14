@@ -23,8 +23,18 @@ _wt_completion() {
     elif [[ ${COMP_CWORD} -ge 3 ]]; then
         local cmd="${COMP_WORDS[1]}"
         case "$cmd" in
+        add)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=($(compgen -W "--open -o --base -b" -- "$cur"))
+            fi
+            ;;
         rm)
-            COMPREPLY=($(compgen -W "--force -f" -- "$cur"))
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=($(compgen -W "--force -f" -- "$cur"))
+            else
+                local worktrees=$(git worktree list 2>/dev/null | awk 'NR>1 {print $NF}' | tr -d '[]')
+                COMPREPLY=($(compgen -W "$worktrees" -- "$cur"))
+            fi
             ;;
         prune)
             COMPREPLY=($(compgen -W "--force -f --orphans -o" -- "$cur"))
@@ -130,11 +140,6 @@ _db_helper_completion() {
     generate-migrations)
         if [[ "$cur" == -* ]]; then
             COMPREPLY=($(compgen -W "$common_flags --clean" -- "$cur"))
-        fi
-        ;;
-    migrate-to)
-        if [[ "$cur" == -* ]]; then
-            COMPREPLY=($(compgen -W "$common_flags" -- "$cur"))
         fi
         ;;
     *)
