@@ -51,3 +51,10 @@ class PowerShellShell(Shell):
 
     def supports_shared_config(self) -> bool:
         return True
+
+    @property
+    def shared_config_suffix(self) -> str:
+        return ".ps1"
+
+    def format_config_dir_export(self, config_dir: Path) -> str | None:
+        return f"$env:SHELL_CONFIGS_DIR = '{config_dir}'"

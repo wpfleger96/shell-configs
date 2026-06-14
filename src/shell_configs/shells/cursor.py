@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from pathlib import Path
+from typing import ClassVar
 
 from shell_configs.platform import Platform, is_platform
 from shell_configs.shells.editor import EditorShell, LocalEditorShell
@@ -22,6 +23,13 @@ class CursorShell(EditorShell):
     config_subdir = "cursor"
     server_dir_name = ".cursor-server"
     cli_name = "cursor"
+    _builtin_extensions: ClassVar[frozenset[str]] = frozenset(
+        {
+            "anysphere.cursorpyright",
+            "github.copilot-chat",
+            "ms-python.vscode-pylance",
+        }
+    )
 
     def get_extension_cli(self) -> str | None:
         # Cursor's WSL extension host needs the remote CLI from ~/.cursor-server
@@ -60,6 +68,13 @@ class CursorLocalShell(LocalEditorShell):
     shell_name = "cursor-local"
     shell_display_name = "Cursor (Local)"
     config_subdir = "cursor"
+    _builtin_extensions: ClassVar[frozenset[str]] = frozenset(
+        {
+            "anysphere.cursorpyright",
+            "anysphere.remote-wsl",
+            "ms-vscode-remote.remote-wsl",
+        }
+    )
 
     def _find_windows_cmd(self) -> tuple[str, Path] | None:
         win_user = get_windows_username()

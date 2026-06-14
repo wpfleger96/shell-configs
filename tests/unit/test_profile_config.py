@@ -7,6 +7,8 @@ import pytest
 from shell_configs.config import ConfigReader
 from shell_configs.profiles.profile import Profile
 from shell_configs.shells.base import deep_merge, merge_json_with_profile
+from shell_configs.shells.bash import BashShell
+from shell_configs.shells.git import GitShell
 
 
 @pytest.mark.unit
@@ -129,7 +131,7 @@ class TestConfigReaderWithProfile:
 
         p = Profile(name="work", shell_overrides={"shared": "export WORK_SHARED=1"})
         reader = ConfigReader(config_dir=test_repo / "config")
-        content = reader.get_shared_config_content("bash", profile=p)
+        content = reader.get_shared_config_content(BashShell(), profile=p)
         assert content is not None
         assert "### Profile Override (work) ###" in content
         assert "export WORK_SHARED=1" in content
@@ -140,7 +142,7 @@ class TestConfigReaderWithProfile:
 
         p = Profile(name="work", shell_overrides={"shared": "export WORK_SHARED=1"})
         reader = ConfigReader(config_dir=test_repo / "config")
-        content = reader.get_shared_config_content("git", profile=p)
+        content = reader.get_shared_config_content(GitShell(), profile=p)
         assert content is not None
         assert "### Profile Override" not in content
         assert "export WORK_SHARED=1" not in content
@@ -151,9 +153,9 @@ class TestConfigReaderWithProfile:
         shared_sh.write_text("# Base shared\n")
 
         reader = ConfigReader(config_dir=test_repo / "config")
-        content_without = reader.get_shared_config_content("bash")
+        content_without = reader.get_shared_config_content(BashShell())
         content_with_empty = reader.get_shared_config_content(
-            "bash", profile=Profile(name="default")
+            BashShell(), profile=Profile(name="default")
         )
         assert content_without == content_with_empty
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 from shell_configs.shells.editor import EditorShell, LocalEditorShell
 from shell_configs.shells.utils import get_windows_programs, get_windows_username
@@ -17,6 +18,7 @@ class VSCodeShell(EditorShell):
     config_subdir = "vscode"
     server_dir_name = ".vscode-server"
     cli_name = "code"
+    _builtin_extensions: ClassVar[frozenset[str]] = frozenset({"github.copilot-chat"})
 
 
 class VSCodeLocalShell(LocalEditorShell):
@@ -25,6 +27,9 @@ class VSCodeLocalShell(LocalEditorShell):
     shell_name = "vscode-local"
     shell_display_name = "VS Code (Local)"
     config_subdir = "vscode"
+    _builtin_extensions: ClassVar[frozenset[str]] = frozenset(
+        {"github.copilot-chat", "ms-vscode-remote.remote-wsl"}
+    )
 
     def _find_windows_cmd(self) -> tuple[str, Path] | None:
         win_user = get_windows_username()

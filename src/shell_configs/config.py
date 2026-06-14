@@ -8,6 +8,7 @@ from shell_configs.platform import detect_platform
 
 if TYPE_CHECKING:
     from shell_configs.profiles.profile import Profile
+    from shell_configs.shells.base import Shell
 
 
 def get_config_dir() -> Path:
@@ -86,33 +87,25 @@ class ConfigReader:
 
     def get_shared_config_content(
         self,
-        shell_name: str,
+        shell: Shell,
         profile: Profile | None = None,
     ) -> str | None:
         """Get the content of shared configuration with platform overlay.
 
         This method:
-        1. Loads the base shared config (shared.sh or shared.gitconfig)
+        1. Loads the base shared config (e.g., shared.sh, shared.gitconfig)
         2. Appends platform-specific overlay if it exists
-        3. Prepends SHELL_CONFIGS_DIR export for shell configs (not git)
-        4. Appends profile shell_overrides["shared"] if present
+        3. Prepends the shell's SHELL_CONFIGS_DIR export line if applicable
+        4. Appends profile shell_overrides["shared"] if the shell supports it
 
         Args:
-            shell_name: Name of the shell (e.g., 'bash', 'zsh', 'git')
+            shell: Shell instance providing suffix and export formatting
             profile: Optional active Profile; shell_overrides["shared"] are appended
 
         Returns:
             Combined content with platform overlay, or None if not found
         """
-        if shell_name == "git":
-            base_path = self.config_dir / "shared.gitconfig"
-            suffix = ".gitconfig"
-        elif shell_name == "powershell":
-            base_path = self.config_dir / "shared.ps1"
-            suffix = ".ps1"
-        else:
-            base_path = self.config_dir / "shared.sh"
-            suffix = ".sh"
+        base_path = self.config_dir / f"shared{shell.shared_config_suffix}"
 
         if not base_path.exists():
             return None
@@ -120,21 +113,20 @@ class ConfigReader:
         content = base_path.read_text().rstrip("\n")
 
         platform = detect_platform()
-        overlay_path = self.config_dir / "platform" / f"{platform.value}{suffix}"
+        overlay_path = (
+            self.config_dir / "platform" / f"{platform.value}{shell.shared_config_suffix}"
+        )
 
         if overlay_path.exists():
             overlay = overlay_path.read_text().rstrip("\n")
             if overlay:
                 content = f"{content}\n\n### Platform-Specific ({platform.display_name}) ###\n{overlay}"
 
-        if shell_name == "powershell":
-            config_dir_export = f"$env:SHELL_CONFIGS_DIR = '{self.config_dir}'"
-            content = f"{config_dir_export}\n\n{content}"
-        elif shell_name != "git":
-            config_dir_export = f'export SHELL_CONFIGS_DIR="{self.config_dir}"'
-            content = f"{config_dir_export}\n\n{content}"
+        export_line = shell.format_config_dir_export(self.config_dir)
+        if export_line:
+            content = f"{export_line}\n\n{content}"
 
-        if shell_name != "git" and profile and "shared" in profile.shell_overrides:
+        if shell.supports_profile_shared_overrides and profile and "shared" in profile.shell_overrides:
             override = profile.shell_overrides["shared"].rstrip("\n")
             content = (
                 f"{content}\n\n### Profile Override ({profile.name}) ###\n{override}"

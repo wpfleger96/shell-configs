@@ -359,7 +359,7 @@ def _compute_diffs_for_shells(
             shared_content = None
             if shell.supports_shared_config():
                 shared_content = config_reader.get_shared_config_content(
-                    shell.name, profile=profile
+                    shell, profile=profile
                 )
 
             repo_content = manager.combine_content(shared_content, repo_content)

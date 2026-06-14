@@ -17,6 +17,8 @@ from shell_configs.extensions import (
     load_extensions_json,
 )
 from shell_configs.profiles.loader import ProfileLoader
+from shell_configs.shells.cursor import CursorShell
+from shell_configs.shells.vscode import VSCodeShell
 
 
 @pytest.mark.unit
@@ -112,27 +114,27 @@ class TestExtensionDiff:
     def test_builtin_extensions_excluded_from_extra(self):
         desired = {"golang.go"}
         installed = {"golang.go", "anysphere.cursorpyright"}
-        diff = self.manager.compute_diff(desired, installed, shell_name="cursor")
+        diff = self.manager.compute_diff(desired, installed, shell=CursorShell())
         assert diff.extra == frozenset()
         assert diff.ignored == frozenset()
 
     def test_pylance_excluded_from_cursor_extra(self):
         desired = {"golang.go"}
         installed = {"golang.go", "ms-python.vscode-pylance"}
-        diff = self.manager.compute_diff(desired, installed, shell_name="cursor")
+        diff = self.manager.compute_diff(desired, installed, shell=CursorShell())
         assert "ms-python.vscode-pylance" not in diff.extra
         assert not diff.extra
 
     def test_builtin_exclusion_only_for_matching_shell(self):
         desired = {"golang.go"}
         installed = {"golang.go", "anysphere.cursorpyright"}
-        diff = self.manager.compute_diff(desired, installed, shell_name="vscode")
+        diff = self.manager.compute_diff(desired, installed, shell=VSCodeShell())
         assert "anysphere.cursorpyright" in diff.extra
 
     def test_builtin_in_desired_is_ignored(self):
         desired = {"golang.go", "github.copilot-chat"}
         installed = {"golang.go"}
-        diff = self.manager.compute_diff(desired, installed, shell_name="vscode")
+        diff = self.manager.compute_diff(desired, installed, shell=VSCodeShell())
         assert diff.missing == frozenset()
         assert diff.ignored == frozenset({"github.copilot-chat"})
         assert diff.matched == frozenset({"golang.go"})
@@ -140,7 +142,7 @@ class TestExtensionDiff:
     def test_builtin_in_desired_and_installed_is_not_counted_as_matched(self):
         desired = {"golang.go", "anysphere.cursorpyright"}
         installed = {"golang.go", "anysphere.cursorpyright"}
-        diff = self.manager.compute_diff(desired, installed, shell_name="cursor")
+        diff = self.manager.compute_diff(desired, installed, shell=CursorShell())
         assert diff.missing == frozenset()
         assert diff.ignored == frozenset({"anysphere.cursorpyright"})
         assert diff.matched == frozenset({"golang.go"})

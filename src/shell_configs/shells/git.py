@@ -54,3 +54,14 @@ class GitShell(Shell):
     def supports_shared_config(self) -> bool:
         """Git supports shared configuration."""
         return True
+
+    @property
+    def shared_config_suffix(self) -> str:
+        return ".gitconfig"
+
+    def format_config_dir_export(self, config_dir: Path) -> str | None:
+        return None
+
+    @property
+    def supports_profile_shared_overrides(self) -> bool:
+        return False

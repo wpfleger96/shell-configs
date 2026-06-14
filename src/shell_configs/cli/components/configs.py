@@ -368,7 +368,7 @@ class ConfigsComponent(Component):
                 shared_content = None
                 if shell.supports_shared_config():
                     shared_content = ctx.config_reader.get_shared_config_content(
-                        shell.name, profile=ctx.profile
+                        shell, profile=ctx.profile
                     )
 
                 if content is None and shared_content is None:
@@ -535,7 +535,7 @@ class ConfigsComponent(Component):
                 shared_content = None
                 if shell.supports_shared_config():
                     shared_content = ctx.config_reader.get_shared_config_content(
-                        shell.name, profile=ctx.profile
+                        shell, profile=ctx.profile
                     )
 
                 if repo_content is None and shared_content is not None:

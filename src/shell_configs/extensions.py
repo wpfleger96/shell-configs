@@ -16,25 +16,11 @@ if TYPE_CHECKING:
 
     from shell_configs.profiles.profile import Profile
     from shell_configs.shells.base import Shell
+    from shell_configs.shells.editor import EditorShell, LocalEditorShell
 
 logger = logging.getLogger(__name__)
 
 _EXTENSION_ID_RE = re.compile(r"^[a-z0-9_-]+\.[a-z0-9_-]+$")
-
-BUILTIN_EXTENSIONS: dict[str, set[str]] = {
-    "vscode": {"github.copilot-chat"},
-    "vscode-local": {"github.copilot-chat", "ms-vscode-remote.remote-wsl"},
-    "cursor": {
-        "anysphere.cursorpyright",
-        "github.copilot-chat",
-        "ms-python.vscode-pylance",
-    },
-    "cursor-local": {
-        "anysphere.cursorpyright",
-        "anysphere.remote-wsl",
-        "ms-vscode-remote.remote-wsl",
-    },
-}
 
 
 class ExtensionInvoker(ABC):
@@ -104,10 +90,6 @@ class PowerShellExtensionInvoker(ExtensionInvoker):
     def uninstall_command(self, ext_id: str) -> list[str]:
         return self._ps_command(f"--uninstall-extension {ext_id}")
 
-
-def get_builtin_extensions(shell_name: str | None) -> frozenset[str]:
-    """Get the builtin extension IDs for an IDE shell."""
-    return frozenset(BUILTIN_EXTENSIONS.get(shell_name or "", set()))
 
 
 def is_builtin_install_error(message: str) -> bool:
@@ -276,16 +258,16 @@ class ExtensionManager:
         self,
         desired: set[str],
         installed: set[str],
-        shell_name: str | None = None,
+        shell: EditorShell | LocalEditorShell | None = None,
     ) -> ExtensionDiff:
         """Compare desired vs installed extensions.
 
         Args:
             desired: Set of desired extension IDs
             installed: Set of installed extension IDs
-            shell_name: Optional shell name to filter out builtin extensions
+            shell: Optional editor shell to filter out builtin extensions
         """
-        builtins = get_builtin_extensions(shell_name)
+        builtins = shell.get_builtin_extensions() if shell else frozenset()
         ignored = frozenset(desired & builtins)
         managed_desired = desired - builtins
         managed_installed = installed - builtins
@@ -485,7 +467,10 @@ def compute_extension_states(
         if installed is None:
             continue
 
-        diff = manager.compute_diff(desired, installed, shell_name=shell.name)
+        from shell_configs.shells.editor import EditorShell, LocalEditorShell
+
+        editor_shell = shell if isinstance(shell, (EditorShell, LocalEditorShell)) else None
+        diff = manager.compute_diff(desired, installed, shell=editor_shell)
         states.append(
             ShellExtensionState(
                 shell=shell,

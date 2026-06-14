@@ -363,6 +363,23 @@ class Shell(ABC):
         """
         return False
 
+    @property
+    def shared_config_suffix(self) -> str:
+        """File suffix for the shared config file (e.g., '.sh', '.gitconfig', '.ps1')."""
+        return ".sh"
+
+    def format_config_dir_export(self, config_dir: Path) -> str | None:
+        """Format the SHELL_CONFIGS_DIR export line for this shell.
+
+        Returns None for shells that don't export the config dir (e.g., git).
+        """
+        return f'export SHELL_CONFIGS_DIR="{config_dir}"'
+
+    @property
+    def supports_profile_shared_overrides(self) -> bool:
+        """Whether profile 'shared' overrides should be appended."""
+        return True
+
     def _run_validation_command(
         self, command: list[str], temp_file: Path
     ) -> tuple[bool, str]:
