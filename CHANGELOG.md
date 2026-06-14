@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.54.0](https://github.com/wpfleger96/shell-configs/compare/v0.53.0...v0.54.0) (2026-06-14)
+
+
+### Features
+
+* **completions:** standardize tab completions for all managed scripts ([#86](https://github.com/wpfleger96/shell-configs/issues/86)) ([dd1e271](https://github.com/wpfleger96/shell-configs/commit/dd1e271e97e0653d79b760a9a415c921c0a7fc24))
+
 ## [0.53.0](https://github.com/wpfleger96/shell-configs/compare/v0.52.2...v0.53.0) (2026-06-13)
 
 
