@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [0.54.1](https://github.com/wpfleger96/shell-configs/compare/v0.54.0...v0.54.1) (2026-06-14)
+
+
+### Bug Fixes
+
+* add explicit UTF-8 encoding to all text file I/O for Windows ([#88](https://github.com/wpfleger96/shell-configs/issues/88)) ([91d560f](https://github.com/wpfleger96/shell-configs/commit/91d560f6b4140f41565223e427a8c9223ee3e7ae))
+
+
+### Chores
+
+* add .tokeignore and LOC badge to README ([#92](https://github.com/wpfleger96/shell-configs/issues/92)) ([4657f9d](https://github.com/wpfleger96/shell-configs/commit/4657f9d29ea47f248db7d4f168b65a8d33cd6986))
+
+
+### Refactoring
+
+* simplification refactoring inspired by ai-agent-rules[#125](https://github.com/wpfleger96/shell-configs/issues/125) ([#93](https://github.com/wpfleger96/shell-configs/issues/93)) ([b1508b6](https://github.com/wpfleger96/shell-configs/commit/b1508b6bfcccb607fb0d8085af5f45c42c59722d))
+
 ## [0.54.0](https://github.com/wpfleger96/shell-configs/compare/v0.53.0...v0.54.0) (2026-06-14)
 
 
