@@ -1,0 +1,6 @@
+*.md
+*.json
+*.yaml
+*.yml
+*.toml
+*.txt
