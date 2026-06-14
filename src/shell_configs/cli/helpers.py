@@ -81,6 +81,32 @@ def build_context(
     )
 
 
+def _validate_shell_filter(
+    registry: ShellRegistry,
+    shells_filter: list[str],
+) -> list[Shell]:
+    """Validate shell names and return matching Shell instances.
+
+    Args:
+        registry: ShellRegistry instance
+        shells_filter: List of shell names to validate and resolve
+
+    Returns:
+        List of matching Shell instances
+
+    Raises:
+        SystemExit: If any shell names are unknown
+    """
+    from shell_configs.display import print_error, print_info
+
+    selected, invalid = registry.filter_by_names(shells_filter)
+    if invalid:
+        print_error(f"Unknown shells: {', '.join(invalid)}")
+        print_info(f"Available shells: {', '.join(registry.get_names())}")
+        sys.exit(1)
+    return selected
+
+
 def _get_selected_shells(
     registry: ShellRegistry,
     shells_filter: list[str] | None = None,
@@ -101,14 +127,8 @@ def _get_selected_shells(
     Raises:
         SystemExit: If invalid shell names provided
     """
-    from shell_configs.display import print_error, print_info
-
     if shells_filter:
-        selected_shells, invalid = registry.filter_by_names(shells_filter)
-        if invalid:
-            print_error(f"Unknown shells: {', '.join(invalid)}")
-            print_info(f"Available shells: {', '.join(registry.get_names())}")
-            sys.exit(1)
+        selected_shells = _validate_shell_filter(registry, shells_filter)
     elif use_all:
         selected_shells = registry.get_all()
     elif config_reader:
@@ -125,14 +145,8 @@ def _get_extension_shells(
     shells_filter: list[str] | None = None,
 ) -> list[Shell]:
     """Get shells that support extension management."""
-    from shell_configs.display import print_error, print_info
-
     if shells_filter:
-        selected, invalid = registry.filter_by_names(shells_filter)
-        if invalid:
-            print_error(f"Unknown shells: {', '.join(invalid)}")
-            print_info(f"Available shells: {', '.join(registry.get_names())}")
-            sys.exit(1)
+        selected = _validate_shell_filter(registry, shells_filter)
     else:
         selected = registry.get_all()
 

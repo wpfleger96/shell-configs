@@ -24,8 +24,11 @@ class AgentsComponent(Component):
             find_orphaned_agents,
             get_default_agent_manifest_path,
         )
-        from shell_configs.agents import is_agent_installed, load_agents
-        from shell_configs.agents_registry import DEPRECATED_AGENTS
+        from shell_configs.agents import (
+            DEPRECATED_AGENTS,
+            is_agent_installed,
+            load_agents,
+        )
 
         agents = load_agents()
         missing = [a for a in agents if not is_agent_installed(a)]
@@ -209,11 +212,11 @@ class AgentsComponent(Component):
             get_default_agent_manifest_path,
         )
         from shell_configs.agents import (
+            DEPRECATED_AGENTS,
             Agent,
             uninstall_agent,
             uninstall_agent_by_manifest_entry,
         )
-        from shell_configs.agents_registry import DEPRECATED_AGENTS
         from shell_configs.display import print_operation_result, print_warning
         from shell_configs.manager import OperationResult
 

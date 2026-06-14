@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -166,3 +167,15 @@ def get_agent_install_method(agent: Agent) -> tuple[str, str | None]:
     if config:
         return config.method, config.package or agent.name
     return "script", None
+
+
+@dataclass(frozen=True)
+class DeprecatedAgentSpec:
+    """A retired agent that should be removed if found installed."""
+
+    agent_id: str
+    command_name: str
+    is_still_in_use: Callable[[], bool] | None = None
+
+
+DEPRECATED_AGENTS: tuple[DeprecatedAgentSpec, ...] = ()

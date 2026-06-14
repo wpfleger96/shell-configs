@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-
 from shell_configs.cli.context import (
     Component,
     ComponentPlan,
@@ -81,6 +79,8 @@ class GhAuthComponent(Component):
 
         console.print()
         print_progress("Ensuring GitHub CLI auth and scopes...")
+
+        import sys
 
         interactive = sys.stdin.isatty()
 
