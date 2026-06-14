@@ -844,11 +844,6 @@ mcp_inspector() {
     npx -y @modelcontextprotocol/inspector "$@"
 }
 
-### Shell Completions ###
-_pipenv_run_complete() {
-    _arguments '1: :_files' '*:: :_default'
-}
-
 ### Rsync ###
 rsync-backup() {
     rsync -avzP --no-perms \
