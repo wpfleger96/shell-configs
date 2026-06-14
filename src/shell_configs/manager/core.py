@@ -713,7 +713,9 @@ class ConfigManager:
 
             diff_text = None
             if target_path.exists():
-                diff_text = unified_diff_text(target_path.read_text(encoding="utf-8"), content)
+                diff_text = unified_diff_text(
+                    target_path.read_text(encoding="utf-8"), content
+                )
 
             backup_msg = ""
             if target_path.exists():
@@ -973,7 +975,9 @@ class ConfigManager:
         try:
             managed_keys = self._managed_keys_from_source(source_path)
 
-            file_text = config_file.read_text(encoding="utf-8") if config_file.exists() else ""
+            file_text = (
+                config_file.read_text(encoding="utf-8") if config_file.exists() else ""
+            )
             file_text = self._clean_corrupted_ini_markers(file_text)
 
             old_sidecar_path = self._sidecar_path(config_file)
@@ -1403,7 +1407,9 @@ class ConfigManager:
         try:
             if not file1.exists() or not file2.exists():
                 return False
-            return file1.read_text(encoding="utf-8") == file2.read_text(encoding="utf-8")
+            return file1.read_text(encoding="utf-8") == file2.read_text(
+                encoding="utf-8"
+            )
         except Exception:
             return False
 

@@ -137,12 +137,20 @@ def merge_json_into_target(source_path: Path, target_path: Path) -> tuple[str, b
     import json
 
     try:
-        source = json.loads(source_path.read_text(encoding="utf-8")) if source_path.exists() else {}
+        source = (
+            json.loads(source_path.read_text(encoding="utf-8"))
+            if source_path.exists()
+            else {}
+        )
     except Exception:
         source = {}
 
     try:
-        target = json.loads(target_path.read_text(encoding="utf-8")) if target_path.exists() else {}
+        target = (
+            json.loads(target_path.read_text(encoding="utf-8"))
+            if target_path.exists()
+            else {}
+        )
     except Exception:
         target = {}
 
@@ -168,13 +176,19 @@ def merge_json_files(base_path: Path, override_path: Path) -> str:
         Formatted JSON string with trailing newline
     """
     try:
-        base = json.loads(base_path.read_text(encoding="utf-8")) if base_path.exists() else {}
+        base = (
+            json.loads(base_path.read_text(encoding="utf-8"))
+            if base_path.exists()
+            else {}
+        )
     except Exception:
         base = {}
 
     try:
         override = (
-            json.loads(override_path.read_text(encoding="utf-8")) if override_path.exists() else {}
+            json.loads(override_path.read_text(encoding="utf-8"))
+            if override_path.exists()
+            else {}
         )
     except Exception:
         override = {}

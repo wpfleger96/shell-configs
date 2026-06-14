@@ -355,7 +355,8 @@ class TestConfigManagerIniMerge:
         path.write_text(
             "[Default Applications]\n"
             "text/html=wslview.desktop\n"
-            "x-scheme-handler/http=wslview.desktop\n", encoding="utf-8"
+            "x-scheme-handler/http=wslview.desktop\n",
+            encoding="utf-8",
         )
 
     def test_install_ini_file_new(self, temp_dir):
