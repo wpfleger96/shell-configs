@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from shell_configs.cli.context import (
     Component,
     ComponentPlan,
@@ -10,38 +12,245 @@ from shell_configs.cli.context import (
     expect_plan,
 )
 
+if TYPE_CHECKING:
+    from rich.table import Table
+
+    from shell_configs.bootstrap import AutoUpdateConfig
+    from shell_configs.manager import (
+        AdditionalFileManifest,
+        ConfigManager,
+        OperationResult,
+    )
+    from shell_configs.shells.base import AdditionalFile, Shell
+
+
+def _count_successes(results: dict[str, OperationResult]) -> int:
+    from shell_configs.manager import OperationResult
+
+    return sum(1 for r in results.values() if r in (OperationResult.CREATED, OperationResult.UPDATED))
+
+
+def _add_file_status_row(
+    table: Table,
+    shell_display_name: str,
+    path_display: str,
+    status_str: str,
+    i: int,
+    has_shown_name: bool,
+) -> bool:
+    from shell_configs.display import add_additional_file_row, add_status_row
+
+    if i == 0 and not has_shown_name:
+        add_status_row(table, shell_display_name, path_display, status_str)
+        return True
+    add_additional_file_row(table, path_display, status_str)
+    return has_shown_name
+
+
+def _find_orphaned_additional_files(ctx: Context) -> tuple[AdditionalFileManifest, list[str]]:
+    from shell_configs.manager import (
+        AdditionalFileManifest,
+        get_default_additional_manifest_path,
+    )
+
+    manifest = AdditionalFileManifest(get_default_additional_manifest_path())
+    if manifest.is_new:
+        return manifest, []
+    current_targets = {
+        str(af.target_path)
+        for shell in ctx.selected_shells
+        for af in shell.get_additional_files()
+    }
+    return manifest, manifest.find_orphans(current_targets)
+
+
+def _install_additional_file(
+    additional_file: AdditionalFile,
+    manager: ConfigManager,
+    ctx: Context,
+    shell: Shell,
+) -> tuple[OperationResult, str, str | None]:
+    """Dispatch install to the correct manager method based on file type."""
+    from shell_configs.manager import OperationResult
+
+    if additional_file.xml_guiconfig_merge:
+        return manager.install_xml_guiconfig_file(
+            additional_file.source_path,
+            additional_file.target_path,
+            dry_run=ctx.dry_run,
+            force=ctx.force,
+        )
+    if additional_file.ini_merge:
+        return manager.install_ini_file(
+            additional_file.source_path,
+            additional_file.target_path,
+            dry_run=ctx.dry_run,
+            force=ctx.force,
+        )
+    if additional_file.comment_prefix:
+        content = additional_file.source_path.read_text()
+        return manager.install_section(
+            additional_file.target_path,
+            content,
+            dry_run=ctx.dry_run,
+            comment_prefix=additional_file.comment_prefix,
+            force=ctx.force,
+        )
+    if additional_file.target_merge:
+        from shell_configs.shells.base import merge_json_into_target
+
+        merged_content, is_synced = merge_json_into_target(
+            additional_file.source_path,
+            additional_file.target_path,
+        )
+        if is_synced:
+            return (
+                OperationResult.ALREADY_SYNCED,
+                f"Already synced: {additional_file.target_path}",
+                None,
+            )
+        return manager.install_additional_file_from_content(
+            merged_content,
+            additional_file.target_path,
+            dry_run=ctx.dry_run,
+            backup_dir=additional_file.backup_dir,
+            force=ctx.force,
+        )
+    if additional_file.base_source_path:
+        from shell_configs.shells.base import merge_json_with_profile
+
+        profile_overrides = (
+            ctx.profile.settings_overrides.get(shell.name) if ctx.profile else None
+        )
+        merged_content = merge_json_with_profile(
+            additional_file.base_source_path,
+            additional_file.source_path,
+            profile_overrides,
+        )
+        return manager.install_additional_file_from_content(
+            merged_content,
+            additional_file.target_path,
+            dry_run=ctx.dry_run,
+            backup_dir=additional_file.backup_dir,
+            force=ctx.force,
+        )
+    return manager.install_additional_file(
+        additional_file.source_path,
+        additional_file.target_path,
+        dry_run=ctx.dry_run,
+        backup_dir=additional_file.backup_dir,
+        force=ctx.force,
+    )
+
+
+def _check_additional_file_status(
+    additional_file: AdditionalFile,
+    manager: ConfigManager,
+    ctx: Context,
+    shell: Shell,
+) -> tuple[bool, bool]:
+    """Return (exists, synced) for an additional file."""
+    if additional_file.xml_guiconfig_merge:
+        exists = additional_file.target_path.exists()
+        synced = manager.check_xml_guiconfig_synced(
+            additional_file.source_path,
+            additional_file.target_path,
+        )
+        return exists, synced
+    if additional_file.ini_merge:
+        exists = additional_file.target_path.exists()
+        synced = manager.check_ini_file_synced(
+            additional_file.source_path,
+            additional_file.target_path,
+        )
+        return exists, synced
+    if additional_file.comment_prefix:
+        source_content = (
+            additional_file.source_path.read_text()
+            if additional_file.source_path.exists()
+            else None
+        )
+        section = manager.extract_managed_section(
+            additional_file.target_path,
+            comment_prefix=additional_file.comment_prefix,
+        )
+        exists = section is not None
+        synced = (
+            manager.managed_content_matches(section.content, source_content)
+            if section and source_content
+            else False
+        )
+        return exists, synced
+    # target_merge, base_source_path, or plain
+    exists = additional_file.target_path.exists()
+    if additional_file.target_merge:
+        from shell_configs.shells.base import merge_json_into_target
+
+        _, synced = merge_json_into_target(
+            additional_file.source_path,
+            additional_file.target_path,
+        )
+    elif additional_file.base_source_path:
+        from shell_configs.shells.base import merge_json_with_profile
+
+        profile_overrides = (
+            ctx.profile.settings_overrides.get(shell.name) if ctx.profile else None
+        )
+        merged_content = merge_json_with_profile(
+            additional_file.base_source_path,
+            additional_file.source_path,
+            profile_overrides,
+        )
+        synced = manager.content_matches(merged_content, additional_file.target_path)
+    else:
+        synced = manager.files_match(
+            additional_file.source_path, additional_file.target_path
+        )
+    return exists, synced
+
+
+def _uninstall_additional_file(
+    additional_file: AdditionalFile,
+    manager: ConfigManager,
+) -> tuple[OperationResult, str]:
+    """Dispatch uninstall to the correct manager method based on file type."""
+    if additional_file.xml_guiconfig_merge:
+        return manager.uninstall_xml_guiconfig_file(
+            additional_file.source_path,
+            additional_file.target_path,
+        )
+    if additional_file.ini_merge:
+        return manager.uninstall_ini_file(additional_file.target_path)
+    if additional_file.comment_prefix:
+        return manager.uninstall_section(
+            additional_file.target_path,
+            comment_prefix=additional_file.comment_prefix,
+        )
+    return manager.uninstall_additional_file(
+        additional_file.target_path,
+        backup_dir=additional_file.backup_dir,
+    )
+
 
 class ConfigsComponent(Component):
     label = "configs"
     display_name = "Configs"
 
-    def plan(self, ctx: Context) -> ConfigsPlan:
+    @staticmethod
+    def _create_manager() -> tuple[AutoUpdateConfig, ConfigManager]:
         from shell_configs.bootstrap import load_auto_update_config
-        from shell_configs.cli.helpers import _compute_diffs_for_shells
-        from shell_configs.manager import (
-            AdditionalFileManifest,
-            ConfigManager,
-            get_default_additional_manifest_path,
-        )
+        from shell_configs.manager import ConfigManager
 
         auto_update_config = load_auto_update_config()
-        manager = ConfigManager(backup_retention=auto_update_config.backup_retention)
+        return auto_update_config, ConfigManager(backup_retention=auto_update_config.backup_retention)
+
+    def plan(self, ctx: Context) -> ConfigsPlan:
+        from shell_configs.cli.helpers import _compute_diffs_for_shells
+
+        _, manager = self._create_manager()
         diffs = _compute_diffs_for_shells(ctx, manager)
 
-        additional_manifest = AdditionalFileManifest(
-            get_default_additional_manifest_path()
-        )
-        if additional_manifest.is_new:
-            orphaned_additional_files: list[str] = []
-        else:
-            current_targets = {
-                str(af.target_path)
-                for shell in ctx.selected_shells
-                for af in shell.get_additional_files()
-            }
-            orphaned_additional_files = additional_manifest.find_orphans(
-                current_targets
-            )
+        _, orphaned_additional_files = _find_orphaned_additional_files(ctx)
 
         from shell_configs.cli.context import StateDbChange
         from shell_configs.shells.state_db import (
@@ -127,7 +336,6 @@ class ConfigsComponent(Component):
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
         plan = expect_plan(plan, ConfigsPlan)
 
-        from shell_configs.bootstrap import load_auto_update_config
         from shell_configs.bootstrap.config import save_auto_update_config
         from shell_configs.display import (
             print_diff,
@@ -136,11 +344,9 @@ class ConfigsComponent(Component):
             print_operation_result,
             print_warning,
         )
-        from shell_configs.manager import ConfigManager, OperationResult
-        from shell_configs.shells.base import merge_json_with_profile
+        from shell_configs.manager import OperationResult
 
-        auto_update_config = load_auto_update_config()
-        manager = ConfigManager(backup_retention=auto_update_config.backup_retention)
+        auto_update_config, manager = self._create_manager()
 
         results = {}
         additional_file_results = {}
@@ -199,78 +405,9 @@ class ConfigsComponent(Component):
                     or additional_file.comment_prefix
                     or additional_file.target_merge
                 )
-                if additional_file.xml_guiconfig_merge:
-                    result, message, diff_text = manager.install_xml_guiconfig_file(
-                        additional_file.source_path,
-                        additional_file.target_path,
-                        dry_run=ctx.dry_run,
-                        force=ctx.force,
-                    )
-                elif additional_file.ini_merge:
-                    result, message, diff_text = manager.install_ini_file(
-                        additional_file.source_path,
-                        additional_file.target_path,
-                        dry_run=ctx.dry_run,
-                        force=ctx.force,
-                    )
-                elif additional_file.comment_prefix:
-                    content = additional_file.source_path.read_text()
-                    result, message, diff_text = manager.install_section(
-                        additional_file.target_path,
-                        content,
-                        dry_run=ctx.dry_run,
-                        comment_prefix=additional_file.comment_prefix,
-                        force=ctx.force,
-                    )
-                elif additional_file.target_merge:
-                    from shell_configs.shells.base import merge_json_into_target
-
-                    merged_content, is_synced = merge_json_into_target(
-                        additional_file.source_path,
-                        additional_file.target_path,
-                    )
-                    if is_synced:
-                        result = OperationResult.ALREADY_SYNCED
-                        message = f"Already synced: {additional_file.target_path}"
-                        diff_text = None
-                    else:
-                        result, message, diff_text = (
-                            manager.install_additional_file_from_content(
-                                merged_content,
-                                additional_file.target_path,
-                                dry_run=ctx.dry_run,
-                                backup_dir=additional_file.backup_dir,
-                                force=ctx.force,
-                            )
-                        )
-                elif additional_file.base_source_path:
-                    profile_overrides = (
-                        ctx.profile.settings_overrides.get(shell.name)
-                        if ctx.profile
-                        else None
-                    )
-                    merged_content = merge_json_with_profile(
-                        additional_file.base_source_path,
-                        additional_file.source_path,
-                        profile_overrides,
-                    )
-                    result, message, diff_text = (
-                        manager.install_additional_file_from_content(
-                            merged_content,
-                            additional_file.target_path,
-                            dry_run=ctx.dry_run,
-                            backup_dir=additional_file.backup_dir,
-                            force=ctx.force,
-                        )
-                    )
-                else:
-                    result, message, diff_text = manager.install_additional_file(
-                        additional_file.source_path,
-                        additional_file.target_path,
-                        dry_run=ctx.dry_run,
-                        backup_dir=additional_file.backup_dir,
-                        force=ctx.force,
-                    )
+                result, message, diff_text = _install_additional_file(
+                    additional_file, manager, ctx, shell
+                )
                 print_operation_result(result, message)
                 if diff_text and result == OperationResult.UPDATED:
                     print_diff(diff_text)
@@ -350,31 +487,9 @@ class ConfigsComponent(Component):
         if ctx.dry_run:
             print_hint("Use without --dry-run to apply changes.")
 
-        success_count = sum(
-            1
-            for r in results.values()
-            if r in [OperationResult.CREATED, OperationResult.UPDATED]
-        )
-        additional_success_count = sum(
-            1
-            for r in additional_file_results.values()
-            if r in [OperationResult.CREATED, OperationResult.UPDATED]
-        )
-        preferences_success_count = sum(
-            1
-            for r in preferences_results.values()
-            if r in [OperationResult.CREATED, OperationResult.UPDATED]
-        )
-        state_db_success_count = sum(
-            1
-            for r in state_db_results.values()
-            if r in [OperationResult.CREATED, OperationResult.UPDATED]
-        )
-        total_success = (
-            success_count
-            + additional_success_count
-            + preferences_success_count
-            + state_db_success_count
+        total_success = sum(
+            _count_successes(d)
+            for d in [results, additional_file_results, preferences_results, state_db_results]
         )
 
         if total_success > 0 and not ctx.dry_run:
@@ -398,19 +513,14 @@ class ConfigsComponent(Component):
     def status(self, ctx: Context) -> None:
         from pathlib import Path
 
-        from shell_configs.bootstrap import load_auto_update_config
         from shell_configs.display import (
-            add_additional_file_row,
             add_status_row,
             console,
             create_status_table,
             get_status_indicator,
         )
-        from shell_configs.manager import ConfigManager
-        from shell_configs.shells.base import merge_json_with_profile
 
-        auto_update_config = load_auto_update_config()
-        manager = ConfigManager(backup_retention=auto_update_config.backup_retention)
+        _, manager = self._create_manager()
 
         table = create_status_table()
         home = str(Path.home())
@@ -450,69 +560,14 @@ class ConfigsComponent(Component):
 
             additional_files = shell.get_additional_files()
             for i, additional_file in enumerate(additional_files):
-                if additional_file.xml_guiconfig_merge:
-                    exists = additional_file.target_path.exists()
-                    synced = manager.check_xml_guiconfig_synced(
-                        additional_file.source_path,
-                        additional_file.target_path,
-                    )
-                elif additional_file.ini_merge:
-                    exists = additional_file.target_path.exists()
-                    synced = manager.check_ini_file_synced(
-                        additional_file.source_path,
-                        additional_file.target_path,
-                    )
-                elif additional_file.comment_prefix:
-                    source_content = (
-                        additional_file.source_path.read_text()
-                        if additional_file.source_path.exists()
-                        else None
-                    )
-                    section = manager.extract_managed_section(
-                        additional_file.target_path,
-                        comment_prefix=additional_file.comment_prefix,
-                    )
-                    exists = section is not None
-                    synced = (
-                        manager.managed_content_matches(section.content, source_content)
-                        if section and source_content
-                        else False
-                    )
-                else:
-                    exists = additional_file.target_path.exists()
-                    if additional_file.target_merge:
-                        from shell_configs.shells.base import merge_json_into_target
-
-                        _, synced = merge_json_into_target(
-                            additional_file.source_path,
-                            additional_file.target_path,
-                        )
-                    elif additional_file.base_source_path:
-                        profile_overrides = (
-                            ctx.profile.settings_overrides.get(shell.name)
-                            if ctx.profile
-                            else None
-                        )
-                        merged_content = merge_json_with_profile(
-                            additional_file.base_source_path,
-                            additional_file.source_path,
-                            profile_overrides,
-                        )
-                        synced = manager.content_matches(
-                            merged_content, additional_file.target_path
-                        )
-                    else:
-                        synced = manager.files_match(
-                            additional_file.source_path, additional_file.target_path
-                        )
+                exists, synced = _check_additional_file_status(
+                    additional_file, manager, ctx, shell
+                )
                 status_str = get_status_indicator(synced, exists)
                 path_display = str(additional_file.target_path).replace(home, "~")
-
-                if i == 0 and not has_shown_name:
-                    add_status_row(table, shell.display_name, path_display, status_str)
-                    has_shown_name = True
-                else:
-                    add_additional_file_row(table, path_display, status_str)
+                has_shown_name = _add_file_status_row(
+                    table, shell.display_name, path_display, status_str, i, has_shown_name
+                )
 
             preferences_files = shell.get_preferences_files()
             for i, pref_file in enumerate(preferences_files):
@@ -521,12 +576,9 @@ class ConfigsComponent(Component):
                 )
                 status_str = get_status_indicator(synced, exists)
                 path_display = f"{pref_file.domain} (preferences)"
-
-                if i == 0 and not has_shown_name:
-                    add_status_row(table, shell.display_name, path_display, status_str)
-                    has_shown_name = True
-                else:
-                    add_additional_file_row(table, path_display, status_str)
+                has_shown_name = _add_file_status_row(
+                    table, shell.display_name, path_display, status_str, i, has_shown_name
+                )
 
             from shell_configs.shells.state_db import (
                 read_state_db_value as _read_state_db_value,
@@ -547,47 +599,29 @@ class ConfigsComponent(Component):
                 status_str = get_status_indicator(synced, exists or current is not None)
                 path_display = str(entry.db_path).replace(home, "~")
                 label = f"{path_display} ({entry.name})"
-                if i == 0 and not has_shown_name:
-                    add_status_row(table, shell.display_name, label, status_str)
-                    has_shown_name = True
-                else:
-                    add_additional_file_row(table, label, status_str)
+                has_shown_name = _add_file_status_row(
+                    table, shell.display_name, label, status_str, i, has_shown_name
+                )
 
         console.print(table)
 
-        from shell_configs.manager import (
-            AdditionalFileManifest,
-            get_default_additional_manifest_path,
-        )
-
-        additional_manifest = AdditionalFileManifest(
-            get_default_additional_manifest_path()
-        )
-        if not additional_manifest.is_new:
+        _, orphaned = _find_orphaned_additional_files(ctx)
+        if orphaned:
             from shell_configs.display import print_warning
 
-            current_targets = {
-                str(af.target_path)
-                for shell in ctx.selected_shells
-                for af in shell.get_additional_files()
-            }
-            orphaned = additional_manifest.find_orphans(current_targets)
-            if orphaned:
-                print_warning(
-                    f"{len(orphaned)} orphaned additional file(s) no longer in config"
-                    " — run 'shell-configs install' to clean up",
-                    indent=2,
-                )
+            print_warning(
+                f"{len(orphaned)} orphaned additional file(s) no longer in config"
+                " — run 'shell-configs install' to clean up",
+                indent=2,
+            )
 
         console.print()
 
     def uninstall(self, ctx: Context) -> None:
-        from shell_configs.bootstrap import load_auto_update_config
         from shell_configs.display import print_operation_result
-        from shell_configs.manager import ConfigManager, OperationResult
+        from shell_configs.manager import OperationResult
 
-        auto_update_config = load_auto_update_config()
-        manager = ConfigManager(backup_retention=auto_update_config.backup_retention)
+        _, manager = self._create_manager()
 
         for shell in ctx.selected_shells:
             for config_file in shell.get_config_files():
@@ -598,25 +632,7 @@ class ConfigsComponent(Component):
         for shell in ctx.selected_shells:
             additional_files = shell.get_additional_files()
             for additional_file in additional_files:
-                if additional_file.xml_guiconfig_merge:
-                    result, message = manager.uninstall_xml_guiconfig_file(
-                        additional_file.source_path,
-                        additional_file.target_path,
-                    )
-                elif additional_file.ini_merge:
-                    result, message = manager.uninstall_ini_file(
-                        additional_file.target_path,
-                    )
-                elif additional_file.comment_prefix:
-                    result, message = manager.uninstall_section(
-                        additional_file.target_path,
-                        comment_prefix=additional_file.comment_prefix,
-                    )
-                else:
-                    result, message = manager.uninstall_additional_file(
-                        additional_file.target_path,
-                        backup_dir=additional_file.backup_dir,
-                    )
+                result, message = _uninstall_additional_file(additional_file, manager)
                 if result != OperationResult.NOT_FOUND:
                     print_operation_result(result, message)
 
