@@ -2,6 +2,8 @@
 
 Manage shell configuration files across machines with version control.
 
+[![Lines of Code](https://aschey.tech/tokei/github/wpfleger96/shell-configs?category=code)](https://github.com/wpfleger96/shell-configs)
+
 ## Features
 
 - **Non-destructive**: Preserves existing configurations while adding managed sections
