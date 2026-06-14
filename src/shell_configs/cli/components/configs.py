@@ -27,7 +27,11 @@ if TYPE_CHECKING:
 def _count_successes(results: dict[str, OperationResult]) -> int:
     from shell_configs.manager import OperationResult
 
-    return sum(1 for r in results.values() if r in (OperationResult.CREATED, OperationResult.UPDATED))
+    return sum(
+        1
+        for r in results.values()
+        if r in (OperationResult.CREATED, OperationResult.UPDATED)
+    )
 
 
 def _add_file_status_row(
@@ -47,7 +51,9 @@ def _add_file_status_row(
     return has_shown_name
 
 
-def _find_orphaned_additional_files(ctx: Context) -> tuple[AdditionalFileManifest, list[str]]:
+def _find_orphaned_additional_files(
+    ctx: Context,
+) -> tuple[AdditionalFileManifest, list[str]]:
     from shell_configs.manager import (
         AdditionalFileManifest,
         get_default_additional_manifest_path,
@@ -242,7 +248,9 @@ class ConfigsComponent(Component):
         from shell_configs.manager import ConfigManager
 
         auto_update_config = load_auto_update_config()
-        return auto_update_config, ConfigManager(backup_retention=auto_update_config.backup_retention)
+        return auto_update_config, ConfigManager(
+            backup_retention=auto_update_config.backup_retention
+        )
 
     def plan(self, ctx: Context) -> ConfigsPlan:
         from shell_configs.cli.helpers import _compute_diffs_for_shells
@@ -489,7 +497,12 @@ class ConfigsComponent(Component):
 
         total_success = sum(
             _count_successes(d)
-            for d in [results, additional_file_results, preferences_results, state_db_results]
+            for d in [
+                results,
+                additional_file_results,
+                preferences_results,
+                state_db_results,
+            ]
         )
 
         if total_success > 0 and not ctx.dry_run:
@@ -566,7 +579,12 @@ class ConfigsComponent(Component):
                 status_str = get_status_indicator(synced, exists)
                 path_display = str(additional_file.target_path).replace(home, "~")
                 has_shown_name = _add_file_status_row(
-                    table, shell.display_name, path_display, status_str, i, has_shown_name
+                    table,
+                    shell.display_name,
+                    path_display,
+                    status_str,
+                    i,
+                    has_shown_name,
                 )
 
             preferences_files = shell.get_preferences_files()
@@ -577,7 +595,12 @@ class ConfigsComponent(Component):
                 status_str = get_status_indicator(synced, exists)
                 path_display = f"{pref_file.domain} (preferences)"
                 has_shown_name = _add_file_status_row(
-                    table, shell.display_name, path_display, status_str, i, has_shown_name
+                    table,
+                    shell.display_name,
+                    path_display,
+                    status_str,
+                    i,
+                    has_shown_name,
                 )
 
             from shell_configs.shells.state_db import (

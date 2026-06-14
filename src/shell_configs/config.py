@@ -114,7 +114,9 @@ class ConfigReader:
 
         platform = detect_platform()
         overlay_path = (
-            self.config_dir / "platform" / f"{platform.value}{shell.shared_config_suffix}"
+            self.config_dir
+            / "platform"
+            / f"{platform.value}{shell.shared_config_suffix}"
         )
 
         if overlay_path.exists():
@@ -126,7 +128,11 @@ class ConfigReader:
         if export_line:
             content = f"{export_line}\n\n{content}"
 
-        if shell.supports_profile_shared_overrides and profile and "shared" in profile.shell_overrides:
+        if (
+            shell.supports_profile_shared_overrides
+            and profile
+            and "shared" in profile.shell_overrides
+        ):
             override = profile.shell_overrides["shared"].rstrip("\n")
             content = (
                 f"{content}\n\n### Profile Override ({profile.name}) ###\n{override}"

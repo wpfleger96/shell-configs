@@ -91,7 +91,6 @@ class PowerShellExtensionInvoker(ExtensionInvoker):
         return self._ps_command(f"--uninstall-extension {ext_id}")
 
 
-
 def is_builtin_install_error(message: str) -> bool:
     """Check whether CLI install output indicates the extension is builtin."""
     return "built-in extension" in message.lower()
@@ -469,7 +468,9 @@ def compute_extension_states(
 
         from shell_configs.shells.editor import EditorShell, LocalEditorShell
 
-        editor_shell = shell if isinstance(shell, (EditorShell, LocalEditorShell)) else None
+        editor_shell = (
+            shell if isinstance(shell, (EditorShell, LocalEditorShell)) else None
+        )
         diff = manager.compute_diff(desired, installed, shell=editor_shell)
         states.append(
             ShellExtensionState(
