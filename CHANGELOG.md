@@ -1,5 +1,45 @@
 # CHANGELOG
 
+## [0.53.0](https://github.com/wpfleger96/shell-configs/compare/v0.52.2...v0.53.0) (2026-06-13)
+
+
+### Features
+
+* **completions:** add tab completions for disk-cleanup ([#81](https://github.com/wpfleger96/shell-configs/issues/81)) ([c7c0c1c](https://github.com/wpfleger96/shell-configs/commit/c7c0c1c8358159d181d674d9bf539fef43122f73))
+* **disk-cleanup:** change default command to interactive mode ([dbfcd70](https://github.com/wpfleger96/shell-configs/commit/dbfcd70ca64f3dab5b27afe3f586a7b5e83368f3))
+
+
+### Bug Fixes
+
+* **signing:** skip GitHub API calls when gh is unauthenticated ([87be5c1](https://github.com/wpfleger96/shell-configs/commit/87be5c187d35bf12380e02583a047c07362ff6b9))
+* **updater:** fetch release notes from GitHub Releases API ([#82](https://github.com/wpfleger96/shell-configs/issues/82)) ([d9a93c6](https://github.com/wpfleger96/shell-configs/commit/d9a93c614ef2ba1d778b316e138b2fb5105c4ec7))
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#78](https://github.com/wpfleger96/shell-configs/issues/78)) ([d5433a6](https://github.com/wpfleger96/shell-configs/commit/d5433a6370ffbe0598830415610c8098c8a001af))
+* **deps:** Update github-actions to v8.2.0 ([#77](https://github.com/wpfleger96/shell-configs/issues/77)) ([fd1d0f8](https://github.com/wpfleger96/shell-configs/commit/fd1d0f845fb145b9016dcfab4482aa5aa7fd70e4))
+* sync Justfile ([1cd33a5](https://github.com/wpfleger96/shell-configs/commit/1cd33a5d32a9bd114d6702e2a16ced60624ffd7f))
+
+
+### Continuous Integration
+
+* switch e2e exclusion from --ignore to marker-based filtering ([#84](https://github.com/wpfleger96/shell-configs/issues/84)) ([c89625b](https://github.com/wpfleger96/shell-configs/commit/c89625beff3d4593ba912eb2541c455bf92fa4d0))
+* sync CI workflow ([05a50cf](https://github.com/wpfleger96/shell-configs/commit/05a50cfcbe83756151d1344ea068ffc7fb94acf9))
+* sync CI workflow ([c157459](https://github.com/wpfleger96/shell-configs/commit/c1574599d41b462d0a9012dfb9e1962956b6e5d8))
+* sync release workflow ([d0871a4](https://github.com/wpfleger96/shell-configs/commit/d0871a43ae56499e32ca10f6ad437512be74244b))
+
+
+### Refactoring
+
+* **bootstrap:** extract shared tool-detection helpers into detection.py ([#85](https://github.com/wpfleger96/shell-configs/issues/85)) ([a4cb780](https://github.com/wpfleger96/shell-configs/commit/a4cb780e7b220abe74d3b88708cf71c380a8b92c))
+* consolidate duplicated patterns across managers, CLI, packages, and shells ([#80](https://github.com/wpfleger96/shell-configs/issues/80)) ([7c73fef](https://github.com/wpfleger96/shell-configs/commit/7c73fef279291d6998f7fc6e5931cf19a5c5fd1d))
+
+
+### Testing
+
+* **e2e:** simulate real-world usage and add configs-only install path ([#83](https://github.com/wpfleger96/shell-configs/issues/83)) ([3a44956](https://github.com/wpfleger96/shell-configs/commit/3a44956cf73924b1c2d7c039c5f2710e97065b9a))
+
 ## [0.52.2](https://github.com/wpfleger96/shell-configs/compare/v0.52.1...v0.52.2) (2026-06-09)
 
 
