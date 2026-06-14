@@ -69,7 +69,12 @@ class LanguagesComponent(Component):
         return success
 
     def status(self, ctx: Context) -> None:
-        from shell_configs.display import print_dim, print_success, print_warning
+        from shell_configs.display import (
+            console,
+            print_dim,
+            print_success,
+            print_warning,
+        )
         from shell_configs.languages import get_language_version, is_language_installed
 
         plan = self.plan(ctx)
@@ -78,6 +83,7 @@ class LanguagesComponent(Component):
 
         if not plan.all_languages:
             print_dim("No languages configured", indent=2)
+            console.print()
             return
 
         if not plan.missing:
@@ -102,3 +108,5 @@ class LanguagesComponent(Component):
                 print_success(f"{lang.name}{tag}", indent=4)
             else:
                 print_warning(f"{lang.name}: not installed", indent=4)
+
+        console.print()

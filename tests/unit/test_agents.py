@@ -11,8 +11,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from shell_configs.agents import (
+    DEPRECATED_AGENTS,
     Agent,
     AgentInstallConfig,
+    DeprecatedAgentSpec,
     get_agent_install_method,
     get_agent_version,
     install_agent,
@@ -21,7 +23,6 @@ from shell_configs.agents import (
     uninstall_agent,
     uninstall_agent_by_manifest_entry,
 )
-from shell_configs.agents_registry import DEPRECATED_AGENTS, DeprecatedAgentSpec
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -483,7 +484,7 @@ class TestAgentsComponent:
         with (
             patch("shell_configs.agents.get_config_dir", return_value=tmp_path),
             patch("shell_configs.agents.is_agent_installed", return_value=True),
-            patch("shell_configs.agents_registry.DEPRECATED_AGENTS", deprecated),
+            patch("shell_configs.agents.DEPRECATED_AGENTS", deprecated),
             patch("shutil.which", return_value="/usr/bin/old-tool"),
             patch("shell_configs.agent_manifest.AgentManifest") as MockManifest,
         ):

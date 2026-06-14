@@ -33,6 +33,10 @@ class EditorShell(Shell):
     config_subdir: ClassVar[str]  # repo config dir: "vscode" / "cursor"
     server_dir_name: ClassVar[str]  # ".vscode-server" / ".cursor-server"
     cli_name: ClassVar[str]  # "code" / "cursor"
+    _builtin_extensions: ClassVar[frozenset[str]] = frozenset()
+
+    def get_builtin_extensions(self) -> frozenset[str]:
+        return self._builtin_extensions
 
     @property
     def name(self) -> str:
@@ -131,6 +135,10 @@ class LocalEditorShell(Shell):
     shell_name: ClassVar[str]  # "vscode-local" / "cursor-local"
     shell_display_name: ClassVar[str]  # "VS Code (Local)" / "Cursor (Local)"
     config_subdir: ClassVar[str]  # repo config dir: "vscode" / "cursor"
+    _builtin_extensions: ClassVar[frozenset[str]] = frozenset()
+
+    def get_builtin_extensions(self) -> frozenset[str]:
+        return self._builtin_extensions
 
     @property
     def name(self) -> str:

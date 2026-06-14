@@ -320,22 +320,18 @@ class TestBuiltinExtensionsVscodeLocal:
     """Tests for vscode-local builtin extension filtering."""
 
     def test_vscode_local_builtins(self):
-        from shell_configs.extensions import get_builtin_extensions
-
-        builtins = get_builtin_extensions("vscode-local")
+        builtins = VSCodeLocalShell().get_builtin_extensions()
         assert "ms-vscode-remote.remote-wsl" in builtins
 
     def test_vscode_local_builtins_includes_copilot_chat(self):
-        from shell_configs.extensions import get_builtin_extensions
-
-        builtins = get_builtin_extensions("vscode-local")
+        builtins = VSCodeLocalShell().get_builtin_extensions()
         assert "github.copilot-chat" in builtins
 
     def test_compute_diff_ignores_wsl_extension(self):
         manager = ExtensionManager()
         desired = {"ms-vscode.powershell", "ms-vscode-remote.remote-wsl"}
         installed = {"ms-vscode.powershell", "ms-vscode-remote.remote-wsl"}
-        diff = manager.compute_diff(desired, installed, shell_name="vscode-local")
+        diff = manager.compute_diff(desired, installed, shell=VSCodeLocalShell())
         assert "ms-vscode-remote.remote-wsl" in diff.ignored
         assert not diff.missing
         assert not diff.extra
@@ -344,6 +340,6 @@ class TestBuiltinExtensionsVscodeLocal:
         manager = ExtensionManager()
         desired = {"ms-vscode.powershell"}
         installed = {"ms-vscode.powershell", "github.copilot-chat"}
-        diff = manager.compute_diff(desired, installed, shell_name="vscode-local")
+        diff = manager.compute_diff(desired, installed, shell=VSCodeLocalShell())
         assert "github.copilot-chat" not in diff.extra
         assert not diff.extra

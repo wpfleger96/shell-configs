@@ -5,7 +5,6 @@ import pytest
 from shell_configs.extensions import (
     ExtensionManager,
     PowerShellExtensionInvoker,
-    get_builtin_extensions,
 )
 from shell_configs.platform import Platform
 from shell_configs.shells.cursor import CursorLocalShell
@@ -148,7 +147,8 @@ class TestBuiltinExtensionsCursorLocal:
     """Tests for cursor-local builtin extension filtering."""
 
     def test_cursor_local_builtins(self):
-        builtins = get_builtin_extensions("cursor-local")
+        shell = CursorLocalShell()
+        builtins = shell.get_builtin_extensions()
         assert "anysphere.remote-wsl" in builtins
         assert "anysphere.cursorpyright" in builtins
         assert "ms-vscode-remote.remote-wsl" in builtins
@@ -165,7 +165,7 @@ class TestBuiltinExtensionsCursorLocal:
             "anysphere.remote-wsl",
             "anysphere.cursorpyright",
         }
-        diff = manager.compute_diff(desired, installed, shell_name="cursor-local")
+        diff = manager.compute_diff(desired, installed, shell=CursorLocalShell())
         assert "anysphere.remote-wsl" in diff.ignored
         assert "anysphere.cursorpyright" in diff.ignored
         assert not diff.missing

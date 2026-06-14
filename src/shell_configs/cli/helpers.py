@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from shell_configs.extensions import ExtensionResult
     from shell_configs.manager import ConfigManager
     from shell_configs.profiles.profile import Profile
-    from shell_configs.shells.base import Shell
+    from shell_configs.shells.base import AdditionalFile, Shell
     from shell_configs.shells.registry import ShellRegistry
 
 
@@ -81,6 +81,32 @@ def build_context(
     )
 
 
+def _validate_shell_filter(
+    registry: ShellRegistry,
+    shells_filter: list[str],
+) -> list[Shell]:
+    """Validate shell names and return matching Shell instances.
+
+    Args:
+        registry: ShellRegistry instance
+        shells_filter: List of shell names to validate and resolve
+
+    Returns:
+        List of matching Shell instances
+
+    Raises:
+        SystemExit: If any shell names are unknown
+    """
+    from shell_configs.display import print_error, print_info
+
+    selected, invalid = registry.filter_by_names(shells_filter)
+    if invalid:
+        print_error(f"Unknown shells: {', '.join(invalid)}")
+        print_info(f"Available shells: {', '.join(registry.get_names())}")
+        sys.exit(1)
+    return selected
+
+
 def _get_selected_shells(
     registry: ShellRegistry,
     shells_filter: list[str] | None = None,
@@ -101,14 +127,8 @@ def _get_selected_shells(
     Raises:
         SystemExit: If invalid shell names provided
     """
-    from shell_configs.display import print_error, print_info
-
     if shells_filter:
-        selected_shells, invalid = registry.filter_by_names(shells_filter)
-        if invalid:
-            print_error(f"Unknown shells: {', '.join(invalid)}")
-            print_info(f"Available shells: {', '.join(registry.get_names())}")
-            sys.exit(1)
+        selected_shells = _validate_shell_filter(registry, shells_filter)
     elif use_all:
         selected_shells = registry.get_all()
     elif config_reader:
@@ -125,14 +145,8 @@ def _get_extension_shells(
     shells_filter: list[str] | None = None,
 ) -> list[Shell]:
     """Get shells that support extension management."""
-    from shell_configs.display import print_error, print_info
-
     if shells_filter:
-        selected, invalid = registry.filter_by_names(shells_filter)
-        if invalid:
-            print_error(f"Unknown shells: {', '.join(invalid)}")
-            print_info(f"Available shells: {', '.join(registry.get_names())}")
-            sys.exit(1)
+        selected = _validate_shell_filter(registry, shells_filter)
     else:
         selected = registry.get_all()
 
@@ -185,6 +199,140 @@ def _print_extension_result(result: ExtensionResult) -> None:
         print_error(f"{result.extension_id}: {result.message}", indent=2)
 
 
+def _compute_additional_file_diff(
+    additional_file: AdditionalFile,
+    manager: ConfigManager,
+    profile: Profile | None,
+    shell_name: str,
+    shell_display_name: str,
+) -> FileDiff | None:
+    """Compute a FileDiff for a single additional file.
+
+    Returns None if the file is already in sync; returns a FileDiff otherwise.
+    """
+    from shell_configs.cli.context import FileDiff
+
+    if not additional_file.target_path.exists():
+        return FileDiff(
+            shell_name=shell_display_name,
+            file_path=str(additional_file.target_path),
+            diff_text="",
+            file_type="additional",
+            current_content="",
+            desired_content="",
+        )
+
+    if additional_file.base_source_path:
+        profile_overrides = (
+            profile.settings_overrides.get(shell_name) if profile else None
+        )
+        repo_content = merge_json_with_profile(
+            additional_file.base_source_path,
+            additional_file.source_path,
+            profile_overrides,
+        )
+    else:
+        repo_content = additional_file.source_path.read_text()
+
+    if additional_file.xml_guiconfig_merge:
+        if manager.check_xml_guiconfig_synced(
+            additional_file.source_path, additional_file.target_path
+        ):
+            return None
+        xml_diff = manager.diff_xml_guiconfig_file(
+            additional_file.source_path, additional_file.target_path
+        )
+        if xml_diff:
+            return FileDiff(
+                shell_name=shell_display_name,
+                file_path=str(additional_file.target_path),
+                diff_text=xml_diff,
+                file_type="additional",
+                current_content="",
+                desired_content=repo_content,
+            )
+        return None
+
+    if additional_file.ini_merge:
+        if manager.check_ini_file_synced(
+            additional_file.source_path, additional_file.target_path
+        ):
+            return None
+        ini_diff = manager.diff_ini_file(
+            additional_file.source_path, additional_file.target_path
+        )
+        if ini_diff:
+            return FileDiff(
+                shell_name=shell_display_name,
+                file_path=str(additional_file.target_path),
+                diff_text=ini_diff,
+                file_type="additional",
+                current_content="",
+                desired_content=repo_content,
+            )
+        return None
+
+    if additional_file.comment_prefix:
+        section = manager.extract_managed_section(
+            additional_file.target_path,
+            comment_prefix=additional_file.comment_prefix,
+        )
+        if section is None:
+            return FileDiff(
+                shell_name=shell_display_name,
+                file_path=str(additional_file.target_path),
+                diff_text="",
+                file_type="additional",
+                current_content="",
+                desired_content=repo_content,
+            )
+
+        if manager.managed_content_matches(section.content, repo_content):
+            return None
+
+        installed_content = section.content
+        repo_content = manager.strip_json_outer_brackets(repo_content)
+    elif additional_file.target_merge:
+        from shell_configs.shells.base import merge_json_into_target
+
+        merged_content, is_synced = merge_json_into_target(
+            additional_file.source_path,
+            additional_file.target_path,
+        )
+        if is_synced:
+            return None
+        installed_content = additional_file.target_path.read_text()
+        repo_content = merged_content
+    else:
+        if additional_file.base_source_path:
+            if manager.content_matches(repo_content, additional_file.target_path):
+                return None
+        else:
+            if manager.files_match(
+                additional_file.source_path, additional_file.target_path
+            ):
+                return None
+        installed_content = additional_file.target_path.read_text()
+
+    diff_text = (
+        unified_diff_text(
+            installed_content,
+            repo_content,
+            fromfile="Installed",
+            tofile="Repository",
+        )
+        or ""
+    )
+    return FileDiff(
+        shell_name=shell_display_name,
+        file_path=str(additional_file.target_path),
+        diff_text=diff_text,
+        file_type="additional",
+        current_content=installed_content,
+        desired_content=repo_content,
+    )
+
+
 def _compute_diffs_for_shells(
     ctx: Context,
     manager: ConfigManager,
@@ -211,7 +359,7 @@ def _compute_diffs_for_shells(
             shared_content = None
             if shell.supports_shared_config():
                 shared_content = config_reader.get_shared_config_content(
-                    shell.name, profile=profile
+                    shell, profile=profile
                 )
 
             repo_content = manager.combine_content(shared_content, repo_content)
@@ -253,141 +401,12 @@ def _compute_diffs_for_shells(
                 )
             )
 
-        additional_files = shell.get_additional_files()
-        for additional_file in additional_files:
-            if not additional_file.target_path.exists():
-                diffs.append(
-                    FileDiff(
-                        shell_name=shell.display_name,
-                        file_path=str(additional_file.target_path),
-                        diff_text="",
-                        file_type="additional",
-                        current_content="",
-                        desired_content="",
-                    )
-                )
-                continue
-
-            if additional_file.base_source_path:
-                profile_overrides = (
-                    profile.settings_overrides.get(shell.name) if profile else None
-                )
-                repo_content = merge_json_with_profile(
-                    additional_file.base_source_path,
-                    additional_file.source_path,
-                    profile_overrides,
-                )
-            else:
-                repo_content = additional_file.source_path.read_text()
-
-            if additional_file.xml_guiconfig_merge:
-                if manager.check_xml_guiconfig_synced(
-                    additional_file.source_path, additional_file.target_path
-                ):
-                    continue
-                xml_diff = manager.diff_xml_guiconfig_file(
-                    additional_file.source_path, additional_file.target_path
-                )
-                if xml_diff:
-                    diffs.append(
-                        FileDiff(
-                            shell_name=shell.display_name,
-                            file_path=str(additional_file.target_path),
-                            diff_text=xml_diff,
-                            file_type="additional",
-                            current_content="",
-                            desired_content=repo_content,
-                        )
-                    )
-                continue
-
-            if additional_file.ini_merge:
-                if manager.check_ini_file_synced(
-                    additional_file.source_path, additional_file.target_path
-                ):
-                    continue
-                ini_diff = manager.diff_ini_file(
-                    additional_file.source_path, additional_file.target_path
-                )
-                if ini_diff:
-                    diffs.append(
-                        FileDiff(
-                            shell_name=shell.display_name,
-                            file_path=str(additional_file.target_path),
-                            diff_text=ini_diff,
-                            file_type="additional",
-                            current_content="",
-                            desired_content=repo_content,
-                        )
-                    )
-                continue
-
-            if additional_file.comment_prefix:
-                section = manager.extract_managed_section(
-                    additional_file.target_path,
-                    comment_prefix=additional_file.comment_prefix,
-                )
-                if section is None:
-                    diffs.append(
-                        FileDiff(
-                            shell_name=shell.display_name,
-                            file_path=str(additional_file.target_path),
-                            diff_text="",
-                            file_type="additional",
-                            current_content="",
-                            desired_content=repo_content,
-                        )
-                    )
-                    continue
-
-                if manager.managed_content_matches(section.content, repo_content):
-                    continue
-
-                installed_content = section.content
-                repo_content = manager.strip_json_outer_brackets(repo_content)
-            elif additional_file.target_merge:
-                from shell_configs.shells.base import merge_json_into_target
-
-                merged_content, is_synced = merge_json_into_target(
-                    additional_file.source_path,
-                    additional_file.target_path,
-                )
-                if is_synced:
-                    continue
-                installed_content = additional_file.target_path.read_text()
-                repo_content = merged_content
-            else:
-                if additional_file.base_source_path:
-                    if manager.content_matches(
-                        repo_content, additional_file.target_path
-                    ):
-                        continue
-                else:
-                    if manager.files_match(
-                        additional_file.source_path, additional_file.target_path
-                    ):
-                        continue
-                installed_content = additional_file.target_path.read_text()
-
-            diff_text = (
-                unified_diff_text(
-                    installed_content,
-                    repo_content,
-                    fromfile="Installed",
-                    tofile="Repository",
-                )
-                or ""
+        for additional_file in shell.get_additional_files():
+            diff = _compute_additional_file_diff(
+                additional_file, manager, profile, shell.name, shell.display_name
             )
-            diffs.append(
-                FileDiff(
-                    shell_name=shell.display_name,
-                    file_path=str(additional_file.target_path),
-                    diff_text=diff_text,
-                    file_type="additional",
-                    current_content=installed_content,
-                    desired_content=repo_content,
-                )
-            )
+            if diff is not None:
+                diffs.append(diff)
 
         preferences_files = shell.get_preferences_files()
         for pref_file in preferences_files:

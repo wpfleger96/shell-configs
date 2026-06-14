@@ -6,8 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, ClassVar, Literal
 
 if TYPE_CHECKING:
-    from shell_configs.agents import Agent
-    from shell_configs.agents_registry import DeprecatedAgentSpec
+    from shell_configs.agents import Agent, DeprecatedAgentSpec
     from shell_configs.config import ConfigReader
     from shell_configs.extensions import ExtensionDiff
     from shell_configs.gh_extensions import GhExtension
