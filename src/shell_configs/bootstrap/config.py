@@ -68,7 +68,7 @@ def load_auto_update_config(package_name: str = "shell-configs") -> AutoUpdateCo
         return AutoUpdateConfig()
 
     try:
-        with open(config_path) as f:
+        with open(config_path, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
         return AutoUpdateConfig.from_dict(data)
     except yaml.YAMLError, OSError:
@@ -90,12 +90,12 @@ def save_auto_update_config(
         new_data = asdict(config)
 
         if config_path.exists():
-            with open(config_path) as f:
+            with open(config_path, encoding="utf-8") as f:
                 existing_data = yaml.safe_load(f) or {}
             if existing_data == new_data:
                 return
 
-        with open(config_path, "w") as f:
+        with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(new_data, f, default_flow_style=False, sort_keys=False)
     except OSError as e:
         logger.debug(f"Failed to save config to {config_path}: {e}")

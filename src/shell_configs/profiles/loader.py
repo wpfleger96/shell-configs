@@ -95,7 +95,7 @@ class ProfileLoader:
             )
 
         try:
-            with open(profile_path) as f:
+            with open(profile_path, encoding="utf-8") as f:
                 data: dict[str, Any] = yaml.safe_load(f) or {}
         except yaml.YAMLError as e:
             raise ProfileError(f"Profile '{name}' has invalid YAML: {e}") from e

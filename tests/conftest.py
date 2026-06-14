@@ -46,7 +46,7 @@ def _stub_ssh_keygen(cmd: list[Any]) -> subprocess.CompletedProcess[str]:
             key_path.write_text(
                 "-----BEGIN OPENSSH PRIVATE KEY-----\n"
                 "FAKEKEYDATA\n"
-                "-----END OPENSSH PRIVATE KEY-----\n"
+                "-----END OPENSSH PRIVATE KEY-----\n", encoding="utf-8"
             )
             key_path.with_suffix(".pub").write_text(
                 "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAFAKEKEYDATA test@stubbed\n"
