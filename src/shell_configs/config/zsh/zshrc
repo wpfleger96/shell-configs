@@ -50,48 +50,7 @@ bindkey '^W' backward-kill-word        # Ctrl+W
 autoload -Uz compinit
 compinit
 
-# Worktree completion
-_wt() {
-    local -a subcmds
-    subcmds=('add:Create a new worktree' 'rm:Remove a worktree' 'ls:List worktrees'
-             'cd:Navigate to worktree' 'prune:Remove merged worktrees'
-             'orphans:Find stale worktrees' 'clean:Interactive cleanup' 'help:Show help')
-
-    if (( CURRENT == 2 )); then
-        _describe 'command' subcmds
-    elif (( CURRENT == 3 )); then
-        case "${words[2]}" in
-            add)
-                # Complete with remote branches not yet checked out
-                _values 'branches' $(git branch -r 2>/dev/null | sed 's/origin\///' | grep -v HEAD)
-                ;;
-            rm|cd)
-                # Complete with existing worktree branch names
-                _values 'worktrees' $(git worktree list 2>/dev/null | { skip=1; while IFS= read -r line; do [[ $skip -eq 1 ]] && { skip=0; continue; }; b="${line##* }"; b="${b#\[}"; b="${b%\]}"; echo "$b"; done; })
-                ;;
-        esac
-    fi
-}
-compdef _wt wt
-
-# disk-cleanup completion (keep flags in sync with the script's argparse)
-_disk_cleanup() {
-    _arguments \
-        '1:command:((check\:"Report disk usage" fix\:"Clean all tiers" interactive\:"Select items to clean (default)"))' \
-        '(-y --yes)'{-y,--yes}'[Skip confirmation prompts]' \
-        '--dev-dir[Development directory to scan]:directory:_files -/' \
-        '--no-color[Disable colored output]' \
-        '--workers[Parallel thread count for size computation]:count:' \
-        '--cache-ttl[Cache TTL for du results in seconds]:seconds:' \
-        '--no-cache[Bypass size cache and force fresh du scan]' \
-        '--skip-discover[Skip discovery scan]' \
-        '*--scan-dir[Root to scan for large files (repeatable)]:directory:_files -/' \
-        '--discover-top[Max items per category from discovery]:count:' \
-        '--discover-min-size[Min item size for discovery (e.g. 100M, 1G)]:size:' \
-        '--stale-days[Days before an item is flagged as stale]:days:' \
-        '*--high-risk-dir[Directory flagged for staleness (repeatable)]:directory:_files -/'
-}
-compdef _disk_cleanup disk-cleanup
+[[ -f ~/.zsh/completions.zsh ]] && source ~/.zsh/completions.zsh
 
 ### Prompt ###
 if [ -f ~/.zsh/git-prompt.sh ]; then

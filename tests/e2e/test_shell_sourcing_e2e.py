@@ -55,6 +55,21 @@ class TestBashSourcing:
         assert result.returncode == 0, result.stderr
         assert "main" in result.stdout
 
+    @pytest.mark.parametrize(
+        "cmd,func",
+        [
+            ("disk-cleanup", "_disk_cleanup_completion"),
+            ("transcribe", "_transcribe_completion"),
+            ("db-helper", "_db_helper_completion"),
+            ("backup-resmed", "_backup_resmed_completion"),
+            ("wt", "_wt_completion"),
+        ],
+    )
+    def test_completion_registered(self, installed_home, run_shell, cmd, func):
+        result = run_shell("bash", f'source "$HOME/.bashrc"; complete -p {cmd}')
+        assert result.returncode == 0, f"no completion for {cmd}"
+        assert func in result.stdout
+
 
 @pytest.mark.e2e
 @pytest.mark.skipif(not shell_available("zsh"), reason="zsh not installed")
@@ -81,4 +96,13 @@ class TestZshSourcing:
     def test_function_wt_defined(self, installed_home, run_shell):
         result = run_shell("zsh", 'source "$HOME/.zshrc"; whence -w wt')
         assert result.returncode == 0
+        assert "function" in result.stdout
+
+    @pytest.mark.parametrize(
+        "func",
+        ["_wt", "_disk_cleanup", "_transcribe", "_db_helper", "_backup_resmed"],
+    )
+    def test_completion_function_defined(self, installed_home, run_shell, func):
+        result = run_shell("zsh", f'source "$HOME/.zshrc"; whence -w {func}')
+        assert result.returncode == 0, f"{func} not defined"
         assert "function" in result.stdout

@@ -274,6 +274,7 @@ sync_datalog() {
     fi
 }
 
+# Update config/{bash/completions.bash,zsh/completions.zsh} when changing flags
 show_help() {
     echo -e "${BLUE}ResMed SD Card Backup${NC}"
     echo ""

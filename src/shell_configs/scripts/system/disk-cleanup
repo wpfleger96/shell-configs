@@ -1604,7 +1604,7 @@ def _run_fix_selected(
 
 
 # ---------------------------------------------------------------------------
-# CLI
+# CLI — update config/{bash/completions.bash,zsh/completions.zsh} when changing flags
 # ---------------------------------------------------------------------------
 
 _DEFAULT_WORKERS = min(os.cpu_count() or 4, 16)

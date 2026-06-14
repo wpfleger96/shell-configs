@@ -40,7 +40,9 @@ class TestFreshInstall:
         run_cli(["configs", "install", "--shells", "bash,zsh,git", "-y"])
 
         assert (home_dir / ".bash" / "git-prompt.sh").exists()
+        assert (home_dir / ".bash" / "completions.bash").exists()
         assert (home_dir / ".zsh" / "git-prompt.sh").exists()
+        assert (home_dir / ".zsh" / "completions.zsh").exists()
         assert (home_dir / ".config" / "git" / "ignore").exists()
 
     def test_additional_file_manifest_recorded(self, run_cli, e2e_home):
