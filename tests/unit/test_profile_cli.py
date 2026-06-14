@@ -122,7 +122,7 @@ class TestProfileSwitch:
         assert result.exit_code == 0
         assert "work" in result.output
 
-        with open(config_file) as f:
+        with open(config_file, encoding="utf-8") as f:
             saved = yaml.safe_load(f)
         assert saved["active_profile"] == "work"
 

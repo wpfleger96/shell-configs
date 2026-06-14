@@ -28,7 +28,7 @@ def atomic_write_text(path: Path, content: str, *, preserve_stat: bool = False) 
 
     fd, temp_path = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
     try:
-        with os.fdopen(fd, "w") as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
         if preserve_stat and path.exists():
             shutil.copystat(path, temp_path)

@@ -16,7 +16,7 @@ def load_desired_scopes(manifest_path: Path | None = None) -> list[str]:
     path = manifest_path or get_config_dir() / "gh_auth.yaml"
     if not path.exists():
         return list(_DEFAULT_SCOPES)
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     if data is None:
         return list(_DEFAULT_SCOPES)

@@ -736,7 +736,7 @@ def get_key_fingerprint(key: str) -> str:
 def get_pub_fingerprint(pub_path: Path) -> str:
     """SHA256 fingerprint of a public key file, or "" if missing/unreadable."""
     try:
-        return get_key_fingerprint(pub_path.read_text())
+        return get_key_fingerprint(pub_path.read_text(encoding="utf-8"))
     except OSError:
         return ""
 
@@ -852,12 +852,12 @@ def generate_allowed_signers_file(
 
     file_exists = allowed_signers_path.exists()
     if file_exists:
-        existing_content = allowed_signers_path.read_text()
+        existing_content = allowed_signers_path.read_text(encoding="utf-8")
         if existing_content == new_content:
             return True, f"allowed_signers is up to date with {len(keys)} key(s)"
 
     allowed_signers_path.parent.mkdir(parents=True, exist_ok=True)
-    allowed_signers_path.write_text(new_content)
+    allowed_signers_path.write_text(new_content, encoding="utf-8")
 
     if file_exists:
         return True, f"Updated allowed_signers with {len(keys)} key(s)"

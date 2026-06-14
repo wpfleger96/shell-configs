@@ -52,7 +52,8 @@ where = ["src"]
 shell_configs = ["config/**/*", "scripts/**/*"]
 
 [tool.ruff.lint]
-select = ["I", "F", "UP", "B"]  # isort, pyflakes, pyupgrade, bugbear
+preview = true
+select = ["I", "F", "UP", "B", "PLW1514"]  # isort, pyflakes, pyupgrade, bugbear, unspecified-encoding
 
 [tool.ruff.lint.isort]
 lines-between-types = 1

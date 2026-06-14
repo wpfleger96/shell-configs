@@ -125,7 +125,7 @@ def load_extension_file(path: Path) -> set[str]:
         return set()
 
     try:
-        content = path.read_text()
+        content = path.read_text(encoding="utf-8")
     except OSError:
         return set()
 
@@ -142,7 +142,7 @@ def load_extensions_json(path: Path) -> set[str] | None:
     if not path.exists():
         return None
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except OSError, json.JSONDecodeError:
         logger.warning("Failed to parse extensions manifest: %s", path)
         return None

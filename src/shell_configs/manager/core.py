@@ -150,7 +150,7 @@ class ConfigManager:
             return False
 
         _, start_marker, end_marker = self._build_markers(comment_prefix)
-        content = config_file.read_text()
+        content = config_file.read_text(encoding="utf-8")
         return start_marker in content and end_marker in content
 
     def extract_managed_section(
@@ -169,7 +169,7 @@ class ConfigManager:
             return None
 
         decoration, start_marker, end_marker = self._build_markers(comment_prefix)
-        lines = config_file.read_text().splitlines(keepends=True)
+        lines = config_file.read_text(encoding="utf-8").splitlines(keepends=True)
         start_idx = None
         end_idx = None
 
@@ -467,7 +467,7 @@ class ConfigManager:
                     new_content = f"{decoration}\n{start_marker}\n{decoration}\n{content}\n{decoration}\n{end_marker}\n{decoration}\n"
         else:
             if config_file.exists():
-                existing_content = config_file.read_text()
+                existing_content = config_file.read_text(encoding="utf-8")
                 if existing_content and not existing_content.endswith("\n"):
                     existing_content += "\n"
             else:
@@ -487,7 +487,7 @@ class ConfigManager:
             comment_prefix: Comment prefix to use for markers
         """
         decoration, start_marker, end_marker = self._build_markers(comment_prefix)
-        lines = config_file.read_text().splitlines(keepends=True)
+        lines = config_file.read_text(encoding="utf-8").splitlines(keepends=True)
         start_idx = None
         end_idx = None
 
@@ -609,7 +609,7 @@ class ConfigManager:
                 )
 
             backup_msg = self.backup_with_note(config_file)
-            lines = config_file.read_text().splitlines(keepends=True)
+            lines = config_file.read_text(encoding="utf-8").splitlines(keepends=True)
 
             new_lines = lines[: section.start_line] + lines[section.end_line + 1 :]
 
@@ -655,7 +655,7 @@ class ConfigManager:
                 None,
             )
         try:
-            content = source_path.read_text()
+            content = source_path.read_text(encoding="utf-8")
         except Exception as e:
             return (
                 OperationResult.ERROR,
@@ -713,7 +713,9 @@ class ConfigManager:
 
             diff_text = None
             if target_path.exists():
-                diff_text = unified_diff_text(target_path.read_text(), content)
+                diff_text = unified_diff_text(
+                    target_path.read_text(encoding="utf-8"), content
+                )
 
             backup_msg = ""
             if target_path.exists():
@@ -749,7 +751,7 @@ class ConfigManager:
         try:
             if not file_path.exists():
                 return False
-            return file_path.read_text() == content
+            return file_path.read_text(encoding="utf-8") == content
         except Exception:
             return False
 
@@ -904,7 +906,7 @@ class ConfigManager:
     def _managed_keys_from_source(
         self, source_path: Path
     ) -> list[tuple[str, str, str]]:
-        cp = self._parse_ini(source_path.read_text())
+        cp = self._parse_ini(source_path.read_text(encoding="utf-8"))
         return [
             (section, key, cp.get(section, key))
             for section in cp.sections()
@@ -934,7 +936,7 @@ class ConfigManager:
         try:
             managed_keys = self._managed_keys_from_source(source_path)
             installed = self._parse_ini(
-                config_file.read_text() if config_file.exists() else ""
+                config_file.read_text(encoding="utf-8") if config_file.exists() else ""
             )
             old_lines: list[str] = []
             new_lines: list[str] = []
@@ -953,7 +955,7 @@ class ConfigManager:
             return False
         try:
             managed_keys = self._managed_keys_from_source(source_path)
-            installed = self._parse_ini(config_file.read_text())
+            installed = self._parse_ini(config_file.read_text(encoding="utf-8"))
             return all(
                 installed.has_section(section)
                 and installed.has_option(section, key)
@@ -973,7 +975,9 @@ class ConfigManager:
         try:
             managed_keys = self._managed_keys_from_source(source_path)
 
-            file_text = config_file.read_text() if config_file.exists() else ""
+            file_text = (
+                config_file.read_text(encoding="utf-8") if config_file.exists() else ""
+            )
             file_text = self._clean_corrupted_ini_markers(file_text)
 
             old_sidecar_path = self._sidecar_path(config_file)
@@ -1109,7 +1113,7 @@ class ConfigManager:
                 keys = []
 
             if config_file.exists() and keys:
-                text = config_file.read_text()
+                text = config_file.read_text(encoding="utf-8")
                 new_text = self._remove_ini_keys(text, keys)
                 remaining = self._parse_ini(new_text)
 
@@ -1403,7 +1407,9 @@ class ConfigManager:
         try:
             if not file1.exists() or not file2.exists():
                 return False
-            return file1.read_text() == file2.read_text()
+            return file1.read_text(encoding="utf-8") == file2.read_text(
+                encoding="utf-8"
+            )
         except Exception:
             return False
 
@@ -1495,7 +1501,7 @@ class ConfigManager:
                     None,
                 )
 
-            managed_prefs = json.loads(source_path.read_text())
+            managed_prefs = json.loads(source_path.read_text(encoding="utf-8"))
 
             null_keys = [k for k, v in managed_prefs.items() if v is None]
             if null_keys:
@@ -1598,7 +1604,7 @@ class ConfigManager:
                     f"Source file does not exist: {source_path}",
                 )
 
-            managed_prefs = json.loads(source_path.read_text())
+            managed_prefs = json.loads(source_path.read_text(encoding="utf-8"))
             domain_data = self._export_defaults_domain(domain)
 
             if domain_data is None:
@@ -1670,7 +1676,7 @@ class ConfigManager:
             if not source_path.exists():
                 return (False, False)
 
-            managed_prefs = json.loads(source_path.read_text())
+            managed_prefs = json.loads(source_path.read_text(encoding="utf-8"))
             domain_data = self._export_defaults_domain(domain)
 
             if domain_data is None:
@@ -1699,7 +1705,7 @@ class ConfigManager:
             if not source_path.exists():
                 return None
 
-            managed_prefs = json.loads(source_path.read_text())
+            managed_prefs = json.loads(source_path.read_text(encoding="utf-8"))
             domain_data = self._export_defaults_domain(domain)
 
             return self._build_preferences_diff(managed_prefs, domain_data or {})

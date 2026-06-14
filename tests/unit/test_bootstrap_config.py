@@ -116,7 +116,7 @@ class TestSaveAutoUpdateConfig:
         assert config_file.exists()
         import yaml
 
-        with open(config_file) as f:
+        with open(config_file, encoding="utf-8") as f:
             saved_data = yaml.safe_load(f)
         assert saved_data["backup_retention"] == 10
 

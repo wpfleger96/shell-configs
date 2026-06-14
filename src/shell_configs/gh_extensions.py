@@ -30,7 +30,7 @@ def load_extensions(manifest_path: Path | None = None) -> list[GhExtension]:
     path = manifest_path or get_config_dir() / "gh_extensions.yaml"
     if not path.exists():
         return []
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
 
     extensions = data.get("extensions") or []

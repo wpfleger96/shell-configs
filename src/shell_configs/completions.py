@@ -102,7 +102,7 @@ def is_completion_installed(config_path: Path) -> bool:
     if not config_path.exists():
         return False
 
-    content = config_path.read_text()
+    content = config_path.read_text(encoding="utf-8")
     return COMPLETION_MARKER_START in content
 
 
@@ -267,7 +267,7 @@ def uninstall_completion(config_path: Path) -> tuple[bool, str]:
         return True, f"Completion not installed in {config_path}"
 
     try:
-        content = config_path.read_text()
+        content = config_path.read_text(encoding="utf-8")
 
         start_re = re.escape(COMPLETION_MARKER_START)
         end_re = re.escape(COMPLETION_MARKER_END)
@@ -279,7 +279,7 @@ def uninstall_completion(config_path: Path) -> tuple[bool, str]:
 
         new_content = re.sub(r"\n{3,}", "\n\n", new_content)
 
-        config_path.write_text(new_content)
+        config_path.write_text(new_content, encoding="utf-8")
         return True, f"Completion removed from {config_path}"
     except Exception as e:
         return False, f"Failed to modify {config_path}: {e}"
