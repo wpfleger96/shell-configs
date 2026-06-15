@@ -40,7 +40,7 @@ class AgentManifest:
         if not self.path.exists():
             return
         try:
-            data = json.loads(self.path.read_text())
+            data = json.loads(self.path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as e:
             logger.warning("Corrupt agent manifest at %s: %s", self.path, e)
             return
@@ -74,7 +74,7 @@ class AgentManifest:
             dir=self.path.parent, prefix=".manifest.", suffix=".tmp"
         )
         try:
-            with os.fdopen(fd, "w") as f:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(content)
             shutil.move(temp_path, self.path)
         except BaseException:

@@ -206,7 +206,7 @@ def install_completion(shell: str, dry_run: bool = False) -> tuple[bool, str]:
         return True, f"Would append completion script to {config_path}"
 
     try:
-        with config_path.open("a") as f:
+        with config_path.open("a", encoding="utf-8") as f:
             f.write(f"\n{script}\n")
         return (
             True,
@@ -236,7 +236,7 @@ def update_completion(shell: str, dry_run: bool = False) -> tuple[bool, str]:
     if dry_run:
         return True, f"Would update completion in {config_path}"
 
-    content = config_path.read_text()
+    content = config_path.read_text(encoding="utf-8")
 
     start_re = re.escape(COMPLETION_MARKER_START)
     end_re = re.escape(COMPLETION_MARKER_END)
@@ -244,7 +244,7 @@ def update_completion(shell: str, dry_run: bool = False) -> tuple[bool, str]:
     new_content, n = re.subn(pattern, lambda _: new_script, content, flags=re.DOTALL)
     if n == 0:
         return False, f"Could not find completion block in {config_path}"
-    config_path.write_text(new_content)
+    config_path.write_text(new_content, encoding="utf-8")
     return (
         True,
         f"Completion updated in {config_path}. Restart your shell or run: source {config_path}",
