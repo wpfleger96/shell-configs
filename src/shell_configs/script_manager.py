@@ -93,7 +93,7 @@ class ScriptManifest:
         if not self.path.exists():
             return
         try:
-            data = json.loads(self.path.read_text())
+            data = json.loads(self.path.read_text(encoding="utf-8"))
             for name, entry in data.get("scripts", {}).items():
                 self.scripts[name] = ManifestEntry(
                     source_hash=entry["source_hash"],

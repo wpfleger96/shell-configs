@@ -23,11 +23,32 @@ def is_command_available(command: str) -> bool:
     return shutil.which(command) is not None
 
 
+def _uv_tools_base() -> Path:
+    """Return the platform-appropriate uv tools directory.
+
+    Honors UV_TOOL_DIR env var if set (uv's official override).
+    Windows default: %APPDATA%/uv/tools
+    Unix default:    $XDG_DATA_HOME/uv/tools (fallback ~/.local/share/uv/tools)
+    """
+    override = os.environ.get("UV_TOOL_DIR")
+    if override:
+        return Path(override)
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
+        return Path(appdata) / "uv" / "tools"
+    data_home = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
+    return Path(data_home) / "uv" / "tools"
+
+
 def uv_tool_dir(package_name: str) -> Path:
     """Root directory of a uv tool installation.
 
-    $XDG_DATA_HOME/uv/tools/{package} (the dir holding uv-receipt.toml). Owns the
-    XDG_DATA_HOME fallback shared by the path helpers and receipt lookup.
+    Returns the directory holding uv-receipt.toml for the given package.
+
+    Windows default: %APPDATA%/uv/tools/{package}
+    Unix default:    $XDG_DATA_HOME/uv/tools/{package}
+
+    UV_TOOL_DIR env var overrides the base directory on all platforms.
 
     Args:
         package_name: Name of the uv tool package
@@ -35,8 +56,7 @@ def uv_tool_dir(package_name: str) -> Path:
     Returns:
         Path to the tool's root directory in the uv tools location
     """
-    data_home = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
-    return Path(data_home) / "uv" / "tools" / package_name
+    return _uv_tools_base() / package_name
 
 
 def uv_tool_site_packages_dir(package_name: str) -> Path:

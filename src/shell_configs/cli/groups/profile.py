@@ -77,7 +77,7 @@ def profile_show(name: str, resolved: bool) -> None:
                     return
                 print_error(f"Profile '{name}' not found")
                 return
-            data = yaml.safe_load(profile_path.read_text()) or {}
+            data = yaml.safe_load(profile_path.read_text(encoding="utf-8")) or {}
 
         console.print(
             yaml.dump(data, default_flow_style=False, sort_keys=False).rstrip()

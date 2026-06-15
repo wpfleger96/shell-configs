@@ -984,7 +984,7 @@ class ConfigManager:
             stale_keys: list[list[str]] = []
             if old_sidecar_path.exists():
                 try:
-                    raw = json.loads(old_sidecar_path.read_text())
+                    raw = json.loads(old_sidecar_path.read_text(encoding="utf-8"))
                     if isinstance(raw, list) and all(
                         isinstance(item, list)
                         and len(item) == 2
@@ -1087,7 +1087,7 @@ class ConfigManager:
 
             if sidecar.exists():
                 try:
-                    raw = json.loads(sidecar.read_text())
+                    raw = json.loads(sidecar.read_text(encoding="utf-8"))
                     if not (
                         isinstance(raw, list)
                         and all(

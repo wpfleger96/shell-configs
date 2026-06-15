@@ -66,7 +66,7 @@ class AdditionalFileManifest:
         if not self.path.exists():
             return
         try:
-            data = json.loads(self.path.read_text())
+            data = json.loads(self.path.read_text(encoding="utf-8"))
             for target, entry in data.get("files", {}).items():
                 self.files[target] = AdditionalFileEntry(
                     shell_name=entry["shell_name"],

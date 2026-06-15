@@ -120,7 +120,7 @@ def ensure_ssh_agent(
     if not pub_path.exists():
         return False, f"Public key not found: {pub_path}", None
 
-    pub_key = pub_path.read_text().strip()
+    pub_key = pub_path.read_text(encoding="utf-8").strip()
     key_data = _key_data(pub_key)
 
     result = _run(["ssh-add", "-L"], capture_output=True, text=True, timeout=10)
@@ -223,7 +223,7 @@ def upload_auth_key(key_path: Path) -> tuple[bool, str]:
     if not pub_path.exists():
         return False, f"Public key not found: {pub_path}"
 
-    pub_key_data = _key_data(pub_path.read_text().strip())
+    pub_key_data = _key_data(pub_path.read_text(encoding="utf-8").strip())
 
     if pub_key_data:
         for gh_key in list_github_ssh_keys():
@@ -600,7 +600,7 @@ def _read_pub_key(key_path: Path) -> str | None:
     pub_path = key_path.with_suffix(".pub")
     if not pub_path.exists():
         return None
-    return pub_path.read_text().strip()
+    return pub_path.read_text(encoding="utf-8").strip()
 
 
 def _validate_all_steps(key_path: Path | None) -> list[StepResult]:
@@ -647,7 +647,7 @@ def _validate_all_steps(key_path: Path | None) -> list[StepResult]:
         pub_key_data = ""
         pub_path = key_path.with_suffix(".pub")
         if pub_path.exists():
-            pub_key_data = _key_data(pub_path.read_text().strip())
+            pub_key_data = _key_data(pub_path.read_text(encoding="utf-8").strip())
 
         has_auth_key = False
         has_signing_key = False

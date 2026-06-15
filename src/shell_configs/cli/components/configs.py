@@ -94,7 +94,7 @@ def _install_additional_file(
             force=ctx.force,
         )
     if additional_file.comment_prefix:
-        content = additional_file.source_path.read_text()
+        content = additional_file.source_path.read_text(encoding="utf-8")
         return manager.install_section(
             additional_file.target_path,
             content,
@@ -172,7 +172,7 @@ def _check_additional_file_status(
         return exists, synced
     if additional_file.comment_prefix:
         source_content = (
-            additional_file.source_path.read_text()
+            additional_file.source_path.read_text(encoding="utf-8")
             if additional_file.source_path.exists()
             else None
         )

@@ -59,7 +59,7 @@ class ConfigReader:
         if not config_path.exists():
             return None
 
-        content = config_path.read_text().rstrip("\n")
+        content = config_path.read_text(encoding="utf-8").rstrip("\n")
 
         if profile and shell_name in profile.shell_overrides:
             override = profile.shell_overrides[shell_name].rstrip("\n")
@@ -110,7 +110,7 @@ class ConfigReader:
         if not base_path.exists():
             return None
 
-        content = base_path.read_text().rstrip("\n")
+        content = base_path.read_text(encoding="utf-8").rstrip("\n")
 
         platform = detect_platform()
         overlay_path = (
@@ -120,7 +120,7 @@ class ConfigReader:
         )
 
         if overlay_path.exists():
-            overlay = overlay_path.read_text().rstrip("\n")
+            overlay = overlay_path.read_text(encoding="utf-8").rstrip("\n")
             if overlay:
                 content = f"{content}\n\n### Platform-Specific ({platform.display_name}) ###\n{overlay}"
 

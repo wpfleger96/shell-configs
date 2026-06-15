@@ -232,7 +232,7 @@ def _compute_additional_file_diff(
             profile_overrides,
         )
     else:
-        repo_content = additional_file.source_path.read_text()
+        repo_content = additional_file.source_path.read_text(encoding="utf-8")
 
     if additional_file.xml_guiconfig_merge:
         if manager.check_xml_guiconfig_synced(
@@ -301,7 +301,7 @@ def _compute_additional_file_diff(
         )
         if is_synced:
             return None
-        installed_content = additional_file.target_path.read_text()
+        installed_content = additional_file.target_path.read_text(encoding="utf-8")
         repo_content = merged_content
     else:
         if additional_file.base_source_path:
@@ -312,7 +312,7 @@ def _compute_additional_file_diff(
                 additional_file.source_path, additional_file.target_path
             ):
                 return None
-        installed_content = additional_file.target_path.read_text()
+        installed_content = additional_file.target_path.read_text(encoding="utf-8")
 
     diff_text = (
         unified_diff_text(
