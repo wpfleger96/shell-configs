@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.54.2](https://github.com/wpfleger96/shell-configs/compare/v0.54.1...v0.54.2) (2026-06-15)
+
+
+### Bug Fixes
+
+* **windows:** correct uv tools path and add explicit UTF-8 encoding ([#94](https://github.com/wpfleger96/shell-configs/issues/94)) ([9e0fcd0](https://github.com/wpfleger96/shell-configs/commit/9e0fcd0003607eeabddb4ec196b5ba67282df64c))
+
 ## [0.54.1](https://github.com/wpfleger96/shell-configs/compare/v0.54.0...v0.54.1) (2026-06-14)
 
 
