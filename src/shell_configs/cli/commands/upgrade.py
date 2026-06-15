@@ -105,19 +105,33 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
             print_info("Cancelled")
             return
 
+    import shutil as _shutil
+
+    _shell_configs_bin = _shutil.which("shell-configs")
+    self_post_upgrade_cmd = (
+        [_shell_configs_bin, "install", "--yes", "--force"]
+        if _shell_configs_bin
+        else None
+    )
+
     upgraded_tools = []
     for tool, _ in tool_updates:
         with console.status(f"Upgrading {tool.display_name}..."):
             try:
                 success, msg, was_upgraded = perform_github_update(
-                    make_github_install_url(tool.github_repo)
+                    make_github_install_url(tool.github_repo),
+                    is_self=True,
+                    post_upgrade_cmd=self_post_upgrade_cmd,
                 )
             except Exception as e:
                 print_error(f"{tool.display_name} upgrade failed: {e}")
                 continue
 
         if success:
-            if was_upgraded:
+            if msg == "deferred":
+                print_success(f"{tool.display_name} upgrade started in the background")
+                print_hint("Run 'shell-configs install' once it completes if needed")
+            elif was_upgraded:
                 upgraded_tools.append(tool)
                 print_success(f"{tool.display_name} upgraded successfully!")
             else:
@@ -128,9 +142,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
     if upgraded_tools:
         console.print()
         console.print("[cyan]Installing updated configurations...[/cyan]")
-        import shutil
-
-        shell_configs_bin = shutil.which("shell-configs")
+        shell_configs_bin = _shutil.which("shell-configs")
         if shell_configs_bin:
             subprocess.run([shell_configs_bin, "install", "--yes", "--force"])
         else:

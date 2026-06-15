@@ -4,6 +4,7 @@ import json
 import logging
 import re
 import subprocess
+import sys
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -181,22 +182,59 @@ def check_github_updates(
         )
 
 
-def perform_github_update(repo_url: str) -> tuple[bool, str, bool]:
+def _spawn_deferred_upgrade(
+    uv_cmd: list[str],
+    post_upgrade_cmd: list[str] | None = None,
+) -> tuple[bool, str, bool]:
+    """Spawn a detached cmd.exe to run the upgrade after the current process exits.
+
+    Used on Windows when upgrading shell-configs itself: the running .exe holds a
+    lock on the Scripts/ directory, so uv cannot replace it while the process is
+    alive. Delaying via a detached shell lets the current process exit first.
+    """
+    parts = ["timeout /t 3 /nobreak >nul", subprocess.list2cmdline(uv_cmd)]
+    if post_upgrade_cmd:
+        parts.append(subprocess.list2cmdline(post_upgrade_cmd))
+
+    subprocess.Popen(
+        ["cmd.exe", "/c", " && ".join(parts)],
+        creationflags=0x00000008 | 0x00000200,  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        close_fds=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+    )
+    return True, "deferred", True
+
+
+def perform_github_update(
+    repo_url: str,
+    is_self: bool = False,
+    post_upgrade_cmd: list[str] | None = None,
+) -> tuple[bool, str, bool]:
     """Upgrade via uv tool install --force from GitHub.
 
     Args:
         repo_url: GitHub repository URL (e.g., git+ssh://git@github.com/owner/repo.git)
+        is_self: True when upgrading the shell-configs binary itself. On Windows,
+            triggers a spawn-and-exit strategy to avoid file-lock errors.
+        post_upgrade_cmd: Optional command to run after the upgrade completes.
+            Only used when is_self=True on Windows (deferred path).
 
     Returns:
         Tuple of (success, message, was_upgraded)
         - success: Whether command succeeded
-        - message: Human-readable status message
+        - message: Human-readable status message; "deferred" when a background
+            upgrade was spawned (Windows self-upgrade)
         - was_upgraded: True if package was actually upgraded (not already up-to-date)
     """
     if not is_command_available("uv"):
         return False, UV_NOT_FOUND_ERROR, False
 
     cmd = ["uv", "tool", "install", "--force", "--reinstall", repo_url]
+
+    if is_self and sys.platform == "win32":
+        return _spawn_deferred_upgrade(cmd, post_upgrade_cmd)
 
     try:
         result = subprocess.run(

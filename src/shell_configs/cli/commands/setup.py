@@ -94,7 +94,8 @@ def setup(
                         tool_install_success = True
                     else:
                         success, msg, _ = perform_github_update(
-                            make_github_install_url(shell_configs_tool.github_repo)
+                            make_github_install_url(shell_configs_tool.github_repo),
+                            is_self=True,
                         )
                         if success:
                             print_success(
