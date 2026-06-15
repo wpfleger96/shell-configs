@@ -198,7 +198,8 @@ def _spawn_deferred_upgrade(
 
     subprocess.Popen(
         ["cmd.exe", "/c", " && ".join(parts)],
-        creationflags=0x00000008 | 0x00000200,  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        creationflags=0x00000008
+        | 0x00000200,  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
         close_fds=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
