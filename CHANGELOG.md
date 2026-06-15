@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.54.3](https://github.com/wpfleger96/shell-configs/compare/v0.54.2...v0.54.3) (2026-06-15)
+
+
+### Bug Fixes
+
+* **windows:** defer self-upgrade via detached process to avoid exe lock ([#96](https://github.com/wpfleger96/shell-configs/issues/96)) ([73522e3](https://github.com/wpfleger96/shell-configs/commit/73522e3698c994cf2b878f0e9740eb9ff3ede8b0))
+
 ## [0.54.2](https://github.com/wpfleger96/shell-configs/compare/v0.54.1...v0.54.2) (2026-06-15)
 
 
