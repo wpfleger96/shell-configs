@@ -276,7 +276,7 @@ class TestWorktreeShell:
         assert "worktree-backport-ai-rules-improvements" not in result.stdout
         assert _read_removals(temp_dir) == [str(managed_path)]
 
-    def test_wt_orphans_only_reports_managed_deleted_branches(self, temp_dir):
+    def test_wt_orphans_reports_all_deleted_branches(self, temp_dir):
         repo_root = temp_dir / "repo"
         state = _make_state(repo_root)
         external_path = (
@@ -313,9 +313,12 @@ class TestWorktreeShell:
 
         assert result.returncode == 0
         assert "  - deleted-branch (branch deleted)" in result.stdout
-        assert "worktree-backport-ai-rules-improvements" not in result.stdout
+        assert (
+            "  - worktree-backport-ai-rules-improvements (branch deleted) [external]"
+            in result.stdout
+        )
 
-    def test_wt_rm_reports_unmanaged_external_worktree(self, temp_dir):
+    def test_wt_rm_removes_external_worktree(self, temp_dir):
         repo_root = temp_dir / "repo"
         state = _make_state(repo_root)
         external_path = (
@@ -342,13 +345,13 @@ class TestWorktreeShell:
             temp_dir, "_wt_rm worktree-backport-ai-rules-improvements", state
         )
 
-        assert result.returncode == 1
+        assert result.returncode == 0
         assert (
-            f"Error: Worktree for 'worktree-backport-ai-rules-improvements' exists outside .worktrees at {external_path}"
-        ) in result.stdout
-        assert "Use 'git worktree remove" in result.stdout
+            "Removed worktree for 'worktree-backport-ai-rules-improvements'"
+            in result.stdout
+        )
 
-    def test_wt_cd_reports_unmanaged_external_worktree(self, temp_dir):
+    def test_wt_cd_navigates_to_external_worktree(self, temp_dir):
         repo_root = temp_dir / "repo"
         state = _make_state(repo_root)
         external_path = (
@@ -375,8 +378,4 @@ class TestWorktreeShell:
             temp_dir, "_wt_cd worktree-backport-ai-rules-improvements", state
         )
 
-        assert result.returncode == 1
-        assert (
-            f"Error: Worktree for 'worktree-backport-ai-rules-improvements' exists outside .worktrees at {external_path}"
-        ) in result.stdout
-        assert f"Use 'cd \"{external_path}\"' to access it directly" in result.stdout
+        assert result.returncode == 0
