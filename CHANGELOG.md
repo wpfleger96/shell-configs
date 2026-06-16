@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [0.54.4](https://github.com/wpfleger96/shell-configs/compare/v0.54.3...v0.54.4) (2026-06-16)
+
+
+### Chores
+
+* sync Justfile ([36dcd70](https://github.com/wpfleger96/shell-configs/commit/36dcd705b6c865a8753b3f4d47a7bc7c5c25448f))
+* sync pre-commit hook ([6665f4c](https://github.com/wpfleger96/shell-configs/commit/6665f4c25248eefa61c2fd5b5ce979dbd7359b85))
+* sync pre-commit hook ([eda957d](https://github.com/wpfleger96/shell-configs/commit/eda957d3f14924525c25e83a05d3894e3a44c439))
+
+
+### Refactoring
+
+* **wt:** make all subcommands location-agnostic ([#99](https://github.com/wpfleger96/shell-configs/issues/99)) ([6ef23f8](https://github.com/wpfleger96/shell-configs/commit/6ef23f8e1e33414800d074d720a31216d2fad98d))
+
 ## [0.54.3](https://github.com/wpfleger96/shell-configs/compare/v0.54.2...v0.54.3) (2026-06-15)
 
 
