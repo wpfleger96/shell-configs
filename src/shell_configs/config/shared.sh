@@ -454,8 +454,15 @@ _wt_add() {
     dir_name=$(_wt_sanitize_dirname "$branch")
     local worktree_path="$repo_root/$WT_DIR/$dir_name"
 
+    local existing_path
+    existing_path=$(_wt_find_worktree_path_by_branch "$branch")
+    if [[ -n "$existing_path" ]]; then
+        echo "Error: Worktree for '$branch' already exists at $existing_path"
+        return 1
+    fi
+
     if [[ -d "$worktree_path" ]]; then
-        echo "Error: Worktree for '$branch' already exists at $worktree_path"
+        echo "Error: Directory already exists at $worktree_path (no git worktree registered)"
         return 1
     fi
 
@@ -488,8 +495,6 @@ _wt_add() {
 
 _wt_rm() {
     local branch="" force=false
-    local external_path=""
-    local remove_command="git worktree remove"
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --force | -f) force=true ;;
@@ -510,15 +515,14 @@ _wt_rm() {
     local worktree_path="$repo_root/$WT_DIR/$dir_name"
 
     if [[ ! -d "$worktree_path" ]]; then
+        local external_path
         external_path=$(_wt_find_worktree_path_by_branch "$branch")
         if [[ -n "$external_path" ]] && [[ "$external_path" != "$repo_root" ]]; then
-            [[ "$force" == true ]] && remove_command="$remove_command --force"
-            echo "Error: Worktree for '$branch' exists outside $WT_DIR at $external_path"
-            echo "Use '$remove_command \"$external_path\"' to manage it directly"
+            worktree_path="$external_path"
+        else
+            echo "Error: Worktree for '$branch' does not exist"
             return 1
         fi
-        echo "Error: Worktree for '$branch' does not exist"
-        return 1
     fi
 
     _wt_remove "$worktree_path" "$force"
@@ -553,15 +557,16 @@ _wt_ls() {
                 status_markers=" [PRUNABLE: $wt_prunable]"
             fi
 
-            if _wt_is_managed_path "$repo_root" "$wt_path"; then
-                branch_status=$(_wt_branch_status "$wt_branch")
-                if [[ -n "$branch_status" ]]; then
-                    status_markers="$status_markers [$branch_status]"
-                fi
-                orphan_reason=$(_wt_is_orphan "$wt_branch" "$wt_path")
-                if [[ -n "$orphan_reason" ]]; then
-                    status_markers="$status_markers [ORPHAN: $orphan_reason]"
-                fi
+            branch_status=$(_wt_branch_status "$wt_branch")
+            if [[ -n "$branch_status" ]]; then
+                status_markers="$status_markers [$branch_status]"
+            fi
+            orphan_reason=$(_wt_is_orphan "$wt_branch" "$wt_path")
+            if [[ -n "$orphan_reason" ]]; then
+                status_markers="$status_markers [ORPHAN: $orphan_reason]"
+            fi
+            if ! _wt_is_managed_path "$repo_root" "$wt_path"; then
+                status_markers="$status_markers [external]"
             fi
 
             echo "  - $wt_branch$status_markers"
@@ -586,9 +591,8 @@ _wt_cd() {
     if [[ ! -d "$worktree_path" ]]; then
         external_path=$(_wt_find_worktree_path_by_branch "$branch")
         if [[ -n "$external_path" ]] && [[ "$external_path" != "$repo_root" ]]; then
-            echo "Error: Worktree for '$branch' exists outside $WT_DIR at $external_path"
-            echo "Use 'cd \"$external_path\"' to access it directly"
-            return 1
+            cd "$external_path" || return 1
+            return 0
         fi
         echo "Error: Worktree for '$branch' does not exist"
         return 1
@@ -630,7 +634,7 @@ _wt_prune() {
         IFS= read -r -d '' wt_branch &&
         IFS= read -r -d '' wt_head &&
         IFS= read -r -d '' wt_prunable; do
-        if [[ "$wt_path" != "$repo_root" ]] && _wt_is_managed_path "$repo_root" "$wt_path"; then
+        if [[ "$wt_path" != "$repo_root" ]]; then
             branch_status=$(_wt_branch_status "$wt_branch")
             if [[ "$branch_status" == "MERGED" ]]; then
                 _wt_remove "$wt_path" "$force"
@@ -653,7 +657,7 @@ _wt_prune() {
             IFS= read -r -d '' wt_branch &&
             IFS= read -r -d '' wt_head &&
             IFS= read -r -d '' wt_prunable; do
-            if [[ "$wt_path" != "$repo_root" ]] && _wt_is_managed_path "$repo_root" "$wt_path"; then
+            if [[ "$wt_path" != "$repo_root" ]]; then
                 orphan_reason=$(_wt_is_orphan "$wt_branch" "$wt_path")
                 if [[ -n "$orphan_reason" ]]; then
                     _wt_remove "$wt_path" "$force"
@@ -688,10 +692,14 @@ _wt_orphans() {
         IFS= read -r -d '' wt_branch &&
         IFS= read -r -d '' wt_head &&
         IFS= read -r -d '' wt_prunable; do
-        if [[ "$wt_path" != "$repo_root" ]] && _wt_is_managed_path "$repo_root" "$wt_path"; then
+        if [[ "$wt_path" != "$repo_root" ]]; then
             orphan_reason=$(_wt_is_orphan "$wt_branch" "$wt_path")
             if [[ -n "$orphan_reason" ]]; then
-                echo "  - $wt_branch ($orphan_reason)"
+                if _wt_is_managed_path "$repo_root" "$wt_path"; then
+                    echo "  - $wt_branch ($orphan_reason)"
+                else
+                    echo "  - $wt_branch ($orphan_reason) [external]"
+                fi
                 found=$((found + 1))
             fi
         fi
