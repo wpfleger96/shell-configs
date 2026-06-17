@@ -1147,35 +1147,71 @@ def _print_discovery_report(items: list[DiscoveryItem], term_width: int) -> None
 # Discovery cleanup
 # ---------------------------------------------------------------------------
 
+_DEFAULT_WORKERS = min(os.cpu_count() or 4, 16)
 
-def _execute_discovery_cleanup(items: list[DiscoveryItem]) -> list[Path]:
-    attempted: list[Path] = []
-    for item in items:
+
+def _execute_discovery_cleanup(
+    items: list[DiscoveryItem], workers: int = _DEFAULT_WORKERS
+) -> list[Path]:
+    print_lock = threading.Lock()
+
+    def _clean_one(item: DiscoveryItem) -> Path | None:
         display = _short_path(item.path)
         try:
             st = item.path.lstat()
         except OSError:
-            console.print(f"  [yellow]Skipping {display} (no longer exists)[/yellow]")
-            continue
+            with print_lock:
+                console.print(
+                    f"  [yellow]Skipping {display} (no longer exists)[/yellow]"
+                )
+            return None
         if not stat.S_ISREG(st.st_mode):
-            console.print(
-                f"  [yellow]Skipping {display} (no longer a regular file)[/yellow]"
-            )
-            continue
+            with print_lock:
+                console.print(
+                    f"  [yellow]Skipping {display} (no longer a regular file)[/yellow]"
+                )
+            return None
         if _allocated_size(st) != item.size_bytes or st.st_mtime != item.mtime:
-            console.print(
-                f"  [yellow]Skipping {display} (file changed since scan)[/yellow]"
-            )
-            continue
-        console.print(f"  Removing {display} ({_human_size(item.size_bytes)})...")
+            with print_lock:
+                console.print(
+                    f"  [yellow]Skipping {display} (file changed since scan)[/yellow]"
+                )
+            return None
+        with print_lock:
+            console.print(f"  Removing {display} ({_human_size(item.size_bytes)})...")
         try:
             item.path.unlink()
         except OSError as e:
-            console.print(
-                f"  [yellow]Warning: could not remove {display}: {e}[/yellow]"
-            )
-            continue
-        attempted.append(item.path)
+            with print_lock:
+                console.print(
+                    f"  [yellow]Warning: could not remove {display}: {e}[/yellow]"
+                )
+            return None
+        return item.path
+
+    if len(items) <= 1:
+        return [p for item in items if (p := _clean_one(item)) is not None]
+
+    from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+
+    attempted: list[Path] = []
+    with ThreadPoolExecutor(max_workers=min(workers, len(items))) as pool:
+        futures: dict[Future[Path | None], DiscoveryItem] = {
+            pool.submit(_clean_one, item): item for item in items
+        }
+        for future in as_completed(futures):
+            try:
+                result = future.result()
+            except Exception as e:
+                item = futures[future]
+                with print_lock:
+                    console.print(
+                        f"  [yellow]Warning: unexpected error removing "
+                        f"{_short_path(item.path)}: {e}[/yellow]"
+                    )
+                continue
+            if result is not None:
+                attempted.append(result)
     return attempted
 
 
@@ -1283,33 +1319,65 @@ def _confirm(prompt: str) -> bool:
     return reply in ("y", "yes")
 
 
-def _execute_cleanup(targets: list[ScanTarget]) -> list[Path]:
-    attempted: list[Path] = []
+def _execute_cleanup(
+    targets: list[ScanTarget], workers: int = _DEFAULT_WORKERS
+) -> list[Path]:
     docker_prune = [t for t in targets if t.label == "docker system"]
     regular = [t for t in targets if t.label != "docker system"]
+    print_lock = threading.Lock()
 
-    for t in regular:
+    def _clean_one(t: ScanTarget) -> Path | None:
         display = _short_path(t.path)
         if t.cleanup_cmd is not None:
             if t.tool_name and not shutil.which(t.tool_name):
+                with print_lock:
+                    console.print(
+                        f"  [yellow]Skipping {display} ({t.tool_name} not found)[/yellow]"
+                    )
+                return None
+            with print_lock:
                 console.print(
-                    f"  [yellow]Skipping {display} ({t.tool_name} not found)[/yellow]"
+                    f"  Running {' '.join(t.cleanup_cmd)} ({display}, {_human_size(t.size_bytes)})..."
                 )
-                continue
-            console.print(
-                f"  Running {' '.join(t.cleanup_cmd)} ({display}, {_human_size(t.size_bytes)})..."
-            )
             try:
                 subprocess.run(t.cleanup_cmd, check=False, timeout=600)
             except subprocess.TimeoutExpired:
-                console.print(
-                    f"  [yellow]Warning: {t.cleanup_cmd[0]} timed out[/yellow]"
-                )
-            attempted.append(t.path)
+                with print_lock:
+                    console.print(
+                        f"  [yellow]Warning: {t.cleanup_cmd[0]} timed out[/yellow]"
+                    )
+            return t.path
         else:
-            console.print(f"  Removing {display} ({_human_size(t.size_bytes)})...")
+            with print_lock:
+                console.print(f"  Removing {display} ({_human_size(t.size_bytes)})...")
             shutil.rmtree(t.path, onerror=lambda *a: None)
-            attempted.append(t.path)
+            return t.path
+
+    if len(regular) <= 1:
+        attempted: list[Path] = [
+            p for t in regular if (p := _clean_one(t)) is not None
+        ]
+    else:
+        from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+
+        attempted = []
+        with ThreadPoolExecutor(max_workers=min(workers, len(regular))) as pool:
+            futures: dict[Future[Path | None], ScanTarget] = {
+                pool.submit(_clean_one, t): t for t in regular
+            }
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                except Exception as e:
+                    t = futures[future]
+                    with print_lock:
+                        console.print(
+                            f"  [yellow]Warning: unexpected error cleaning "
+                            f"{_short_path(t.path)}: {e}[/yellow]"
+                        )
+                    continue
+                if result is not None:
+                    attempted.append(result)
 
     if docker_prune:
         console.print("  Running docker system prune -af ...")
@@ -1589,11 +1657,19 @@ def _run_fix_selected(
     console.print("[bold]=== Cleanup ===[/bold]")
     console.print()
 
-    attempted = _execute_cleanup(targets)
+    attempted: list[Path] = []
+    if targets and discovery_items:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    if discovery_items:
-        discovery_attempted = _execute_discovery_cleanup(discovery_items)
-        attempted.extend(discovery_attempted)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            f_cleanup = pool.submit(_execute_cleanup, targets)
+            f_discovery = pool.submit(_execute_discovery_cleanup, discovery_items)
+            for future in as_completed([f_cleanup, f_discovery]):
+                attempted.extend(future.result())
+    elif targets:
+        attempted = _execute_cleanup(targets)
+    elif discovery_items:
+        attempted = _execute_discovery_cleanup(discovery_items)
 
     if cache is not None and attempted:
         cache.invalidate(attempted)
@@ -1606,8 +1682,6 @@ def _run_fix_selected(
 # ---------------------------------------------------------------------------
 # CLI — update config/{bash/completions.bash,zsh/completions.zsh} when changing flags
 # ---------------------------------------------------------------------------
-
-_DEFAULT_WORKERS = min(os.cpu_count() or 4, 16)
 
 
 def main() -> None:

@@ -21,6 +21,7 @@ STUB_COMMANDS = {
     "curl",
     "cursor",
     "defaults",
+    "docker",
     "gemini",
     "gh",
     "go",
