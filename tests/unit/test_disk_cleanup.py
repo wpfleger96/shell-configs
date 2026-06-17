@@ -1632,3 +1632,248 @@ class TestExecuteDiscoveryCleanup:
         captured = capsys.readouterr()
         out = " ".join(captured.out.split())
         assert "file changed since scan" in out
+
+
+# ---------------------------------------------------------------------------
+# _execute_cleanup — parallel workers
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestExecuteCleanupParallel:
+    def test_parallel_removes_all_directories(self, tmp_path, monkeypatch):
+        import collections
+
+        DiskUsage = collections.namedtuple("DiskUsage", ["total", "used", "free"])
+        monkeypatch.setattr(
+            shutil,
+            "disk_usage",
+            lambda path: DiskUsage(100 * 1024**3, 50 * 1024**3, 50 * 1024**3),
+        )
+
+        dirs = []
+        targets = []
+        for i in range(4):
+            d = tmp_path / f"cache_{i}"
+            d.mkdir()
+            (d / "file.o").write_bytes(b"x" * 512)
+            dirs.append(d)
+            targets.append(
+                mod.ScanTarget(
+                    path=d,
+                    label=str(d),
+                    category="cache",
+                    tier=1,
+                    size_bytes=512,
+                )
+            )
+
+        result = mod._execute_cleanup(targets, workers=4)
+
+        for d in dirs:
+            assert not d.exists()
+        for d in dirs:
+            assert d in result
+
+    def test_parallel_continues_after_rmtree_error(self, tmp_path, monkeypatch):
+        import collections
+
+        DiskUsage = collections.namedtuple("DiskUsage", ["total", "used", "free"])
+        monkeypatch.setattr(
+            shutil,
+            "disk_usage",
+            lambda path: DiskUsage(100 * 1024**3, 50 * 1024**3, 50 * 1024**3),
+        )
+
+        called_cmds = []
+
+        def _mock_run(cmd, *args, **kwargs):
+            called_cmds.append(list(cmd))
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="", stderr=""
+            )
+
+        monkeypatch.setattr(subprocess, "run", _mock_run)
+        monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}")
+
+        d0 = tmp_path / "real_0"
+        d0.mkdir()
+        d1 = tmp_path / "real_1"
+        d1.mkdir()
+        d2 = tmp_path / "cmd_target"
+        d2.mkdir()
+
+        targets = [
+            mod.ScanTarget(
+                path=d0, label=str(d0), category="cache", tier=1, size_bytes=512
+            ),
+            mod.ScanTarget(
+                path=d1, label=str(d1), category="cache", tier=1, size_bytes=512
+            ),
+            mod.ScanTarget(
+                path=d2,
+                label=str(d2),
+                category="cache",
+                tier=1,
+                cleanup_cmd=["echo", "test"],
+                tool_name=None,
+                size_bytes=512,
+            ),
+        ]
+
+        result = mod._execute_cleanup(targets, workers=3)
+
+        assert not d0.exists()
+        assert not d1.exists()
+        assert ["echo", "test"] in called_cmds
+        for d in (d0, d1, d2):
+            assert d in result
+
+    def test_parallel_docker_runs_after_regular(self, tmp_path, monkeypatch):
+        import collections
+
+        DiskUsage = collections.namedtuple("DiskUsage", ["total", "used", "free"])
+        monkeypatch.setattr(
+            shutil,
+            "disk_usage",
+            lambda path: DiskUsage(100 * 1024**3, 50 * 1024**3, 50 * 1024**3),
+        )
+
+        call_log: list[list[str]] = []
+
+        def _mock_run(cmd, *args, **kwargs):
+            call_log.append(list(cmd))
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="", stderr=""
+            )
+
+        monkeypatch.setattr(subprocess, "run", _mock_run)
+
+        d0 = tmp_path / "reg_0"
+        d0.mkdir()
+        d1 = tmp_path / "reg_1"
+        d1.mkdir()
+
+        targets = [
+            mod.ScanTarget(
+                path=d0, label=str(d0), category="cache", tier=1, size_bytes=512
+            ),
+            mod.ScanTarget(
+                path=d1, label=str(d1), category="cache", tier=1, size_bytes=512
+            ),
+            mod.ScanTarget(
+                path=Path("/dev/null"),
+                label="docker system",
+                category="docker",
+                tier=4,
+                cleanup_cmd=["docker", "system", "prune", "-af"],
+                tool_name="docker",
+                size_bytes=1024 * 1024,
+            ),
+        ]
+
+        mod._execute_cleanup(targets, workers=4)
+
+        assert not d0.exists()
+        assert not d1.exists()
+        # docker prune commands must have been submitted via subprocess.run
+        docker_cmds = [c for c in call_log if c and c[0] == "docker"]
+        assert len(docker_cmds) >= 1
+
+
+# ---------------------------------------------------------------------------
+# _execute_discovery_cleanup — parallel workers
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestExecuteDiscoveryCleanupParallel:
+    def test_parallel_deletes_multiple_files(self, tmp_path):
+        files = []
+        items = []
+        for i in range(4):
+            f = tmp_path / f"archive_{i}.zip"
+            f.write_bytes(b"x" * 2048)
+            st = f.lstat()
+            items.append(
+                mod.DiscoveryItem(
+                    path=f,
+                    label=str(f),
+                    category="archives",
+                    size_bytes=mod._allocated_size(st),
+                    mtime=st.st_mtime,
+                )
+            )
+            files.append(f)
+
+        result = mod._execute_discovery_cleanup(items, workers=4)
+
+        for f in files:
+            assert not f.exists()
+        for f in files:
+            assert f in result
+
+
+# ---------------------------------------------------------------------------
+# _run_fix_selected — concurrent cleanup + discovery
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestRunFixSelectedConcurrent:
+    def test_concurrent_cleanup_and_discovery(self, tmp_path, monkeypatch):
+        import collections
+
+        DiskUsage = collections.namedtuple("DiskUsage", ["total", "used", "free"])
+        monkeypatch.setattr(
+            shutil,
+            "disk_usage",
+            lambda path: DiskUsage(100 * 1024**3, 50 * 1024**3, 50 * 1024**3),
+        )
+
+        d0 = tmp_path / "cache_a"
+        d0.mkdir()
+        (d0 / "artifact").write_bytes(b"x" * 256)
+        d1 = tmp_path / "cache_b"
+        d1.mkdir()
+        (d1 / "artifact").write_bytes(b"x" * 256)
+
+        targets = [
+            mod.ScanTarget(
+                path=d0, label=str(d0), category="cache", tier=1, size_bytes=256
+            ),
+            mod.ScanTarget(
+                path=d1, label=str(d1), category="cache", tier=1, size_bytes=256
+            ),
+        ]
+
+        f0 = tmp_path / "stale_0.zip"
+        f0.write_bytes(b"y" * 2048)
+        st0 = f0.lstat()
+        f1 = tmp_path / "stale_1.zip"
+        f1.write_bytes(b"y" * 2048)
+        st1 = f1.lstat()
+
+        discovery_items = [
+            mod.DiscoveryItem(
+                path=f0,
+                label=str(f0),
+                category="archives",
+                size_bytes=mod._allocated_size(st0),
+                mtime=st0.st_mtime,
+            ),
+            mod.DiscoveryItem(
+                path=f1,
+                label=str(f1),
+                category="archives",
+                size_bytes=mod._allocated_size(st1),
+                mtime=st1.st_mtime,
+            ),
+        ]
+
+        mod._run_fix_selected(targets, discovery_items=discovery_items)
+
+        assert not d0.exists()
+        assert not d1.exists()
+        assert not f0.exists()
+        assert not f1.exists()
