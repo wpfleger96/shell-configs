@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.54.5](https://github.com/wpfleger96/shell-configs/compare/v0.54.4...v0.54.5) (2026-06-17)
+
+
+### Refactoring
+
+* **disk-cleanup:** parallelize cleanup I/O operations ([#100](https://github.com/wpfleger96/shell-configs/issues/100)) ([7a58d93](https://github.com/wpfleger96/shell-configs/commit/7a58d93b6aae3dc4a715a7317823523e9ae8b986))
+
 ## [0.54.4](https://github.com/wpfleger96/shell-configs/compare/v0.54.3...v0.54.4) (2026-06-16)
 
 
