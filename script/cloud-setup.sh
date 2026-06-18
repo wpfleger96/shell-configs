@@ -62,6 +62,47 @@ apt_update_once() {
 }
 apt_install() { apt_update_once && $SUDO apt-get install -y "$@" >/dev/null 2>&1; }
 
+# Try apt first, then an optional fallback command (passed as remaining args).
+install_or_fallback() {
+    local tool="$1"
+    shift
+    if have "$tool"; then
+        ok "$tool already present"
+        record skip "$tool"
+        return
+    fi
+    if apt_install "$tool" && have "$tool"; then
+        ok "installed $tool"
+        record ok "$tool"
+        return
+    fi
+    if [ $# -gt 0 ] && "$@" && have "$tool"; then
+        ok "installed $tool (fallback)"
+        record ok "$tool"
+        return
+    fi
+    warn "failed to install $tool"
+    record fail "$tool"
+}
+
+# shellcheck disable=SC2317  # called indirectly via install_or_fallback "$@"
+_shfmt_go() { have go && GOBIN="$LOCAL_BIN" go install mvdan.cc/sh/v3/cmd/shfmt@latest >/dev/null 2>&1; }
+# shellcheck disable=SC2317
+_just_prebuilt() { fetch https://just.systems/install.sh /tmp/just-install.sh && bash /tmp/just-install.sh --to "$LOCAL_BIN" >/dev/null 2>&1; }
+# shellcheck disable=SC2317
+_eza_prebuilt() {
+    fetch https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz /tmp/eza.tgz || return 1
+    local tmp
+    tmp="$(mktemp -d)"
+    local bin
+    tar -xzf /tmp/eza.tgz -C "$tmp" >/dev/null 2>&1
+    bin="$(find "$tmp" -type f -name eza | head -1)"
+    local rc=1
+    [ -n "$bin" ] && install -m 0755 "$bin" "$LOCAL_BIN/eza" && rc=0
+    rm -rf "$tmp"
+    return "$rc"
+}
+
 printf '\033[1mcloud-setup.sh\033[0m — aligning this container with Will'\''s local dev env\n'
 
 # === 1. Bootstrap prerequisites (curl, uv) ====================================================
@@ -114,10 +155,12 @@ elif have uv && uv python install 3.14 >/dev/null 2>&1; then
     record ok "python3.14"
 else
     log "uv route unavailable — trying deadsnakes apt PPA"
-    APT_UPDATED=0
     if apt_install software-properties-common &&
         $SUDO add-apt-repository -y ppa:deadsnakes/ppa >/dev/null 2>&1 &&
-        apt_install python3.14; then
+        {
+            APT_UPDATED=1
+            apt_install python3.14
+        }; then
         ok "installed python3.14 via deadsnakes"
         record ok "python3.14"
     else
@@ -130,30 +173,15 @@ fi
 hdr "CLI tools"
 
 for tool in shellcheck sqlite3 direnv fzf; do
-    if have "$tool"; then
-        ok "$tool already present"
-        record skip "$tool"
-    elif apt_install "$tool"; then
-        ok "installed $tool"
-        record ok "$tool"
-    else
-        warn "failed to install $tool"
-        record fail "$tool"
-    fi
+    install_or_fallback "$tool"
 done
 
 if have bat; then
     ok "bat already present"
     record skip "bat"
-elif have batcat || apt_install bat; then
-    have batcat && ln -sf "$(command -v batcat)" "$LOCAL_BIN/bat"
-    if have bat; then
-        ok "installed bat (batcat → ~/.local/bin/bat)"
-        record ok "bat"
-    else
-        warn "bat installed but not resolvable"
-        record fail "bat"
-    fi
+elif apt_install bat && { have bat || { have batcat && ln -sf "$(command -v batcat)" "$LOCAL_BIN/bat"; }; } && have bat; then
+    ok "installed bat"
+    record ok "bat"
 else
     warn "failed to install bat"
     record fail "bat"
@@ -162,89 +190,27 @@ fi
 if have gh; then
     ok "gh already present"
     record skip "gh"
-elif apt_install gh; then
+elif apt_install gh ||
+    {
+        fetch https://cli.github.com/packages/githubcli-archive-keyring.gpg /tmp/gh.gpg &&
+            $SUDO install -m 0644 /tmp/gh.gpg /usr/share/keyrings/githubcli-archive-keyring.gpg &&
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" |
+            $SUDO tee /etc/apt/sources.list.d/github-cli.list >/dev/null &&
+            {
+                APT_UPDATED=0
+                apt_install gh
+            }
+    }; then
     ok "installed gh"
     record ok "gh"
 else
-    if fetch https://cli.github.com/packages/githubcli-archive-keyring.gpg /tmp/gh.gpg &&
-        $SUDO install -m 0644 /tmp/gh.gpg /usr/share/keyrings/githubcli-archive-keyring.gpg; then
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" |
-            $SUDO tee /etc/apt/sources.list.d/github-cli.list >/dev/null
-        APT_UPDATED=0
-        if apt_install gh; then
-            ok "installed gh (via GitHub apt repo)"
-            record ok "gh"
-        else
-            warn "failed to install gh"
-            record fail "gh"
-        fi
-    else
-        warn "failed to add gh apt repo"
-        record fail "gh"
-    fi
+    warn "failed to install gh"
+    record fail "gh"
 fi
 
-if have shfmt; then
-    ok "shfmt already present"
-    record skip "shfmt"
-elif have go && GOBIN="$LOCAL_BIN" go install mvdan.cc/sh/v3/cmd/shfmt@latest >/dev/null 2>&1 && have shfmt; then
-    ok "installed shfmt (go install)"
-    record ok "shfmt"
-elif apt_install shfmt && have shfmt; then
-    ok "installed shfmt (apt)"
-    record ok "shfmt"
-else
-    warn "failed to install shfmt"
-    record fail "shfmt"
-fi
-
-if have just; then
-    ok "just already present"
-    record skip "just"
-elif apt_install just && have just; then
-    ok "installed just (apt)"
-    record ok "just"
-elif fetch https://just.systems/install.sh /tmp/just-install.sh &&
-    bash /tmp/just-install.sh --to "$LOCAL_BIN" >/dev/null 2>&1 && have just; then
-    ok "installed just (prebuilt)"
-    record ok "just"
-else
-    warn "failed to install just"
-    record fail "just"
-fi
-
-if have eza; then
-    ok "eza already present"
-    record skip "eza"
-elif apt_install eza && have eza; then
-    ok "installed eza (apt)"
-    record ok "eza"
-elif fetch https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz /tmp/eza.tgz; then
-    eza_tmp="$(mktemp -d)"
-    eza_bin=""
-    if tar -xzf /tmp/eza.tgz -C "$eza_tmp" >/dev/null 2>&1; then
-        eza_bin="$(find "$eza_tmp" -type f -name eza | head -1)"
-    fi
-    if [ -n "$eza_bin" ] && install -m 0755 "$eza_bin" "$LOCAL_BIN/eza" && have eza; then
-        ok "installed eza (prebuilt)"
-        record ok "eza"
-    else
-        warn "failed to install eza"
-        record fail "eza"
-    fi
-    rm -rf "$eza_tmp"
-else
-    warn "failed to download eza"
-    record fail "eza"
-fi
-
-if have node || have npx; then
-    ok "difit available on demand via: npx -y difit"
-    record skip "difit(npx)"
-else
-    warn "node/npx missing — difit unavailable"
-    record fail "difit(npx)"
-fi
+install_or_fallback shfmt _shfmt_go
+install_or_fallback just _just_prebuilt
+install_or_fallback eza _eza_prebuilt
 
 # === 4. Git pre-commit hooks path =============================================================
 # Mirror shell-configs' global core.hooksPath so cloud agents run each repo's .hooks/pre-commit.
@@ -284,5 +250,6 @@ hdr "Summary"
 [ ${#INSTALLED[@]} -gt 0 ] && ok "applied:  ${INSTALLED[*]}"
 [ ${#SKIPPED[@]} -gt 0 ] && log "✓ already: ${SKIPPED[*]}"
 [ ${#FAILED[@]} -gt 0 ] && warn "failed:   ${FAILED[*]}"
+log "note: difit is available on demand via 'npx -y difit' if node is present."
 log "re-run after a fresh web session to re-apply tools, hooksPath, and agent config."
 exit 0
