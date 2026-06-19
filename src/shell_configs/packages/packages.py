@@ -1,5 +1,7 @@
 """Package management for shell-configs."""
 
+from __future__ import annotations
+
 import re
 import shutil
 import subprocess
@@ -45,7 +47,7 @@ def _run_pkg_cmd(
             text=True,
             timeout=timeout,
         )
-    except (subprocess.TimeoutExpired):
+    except subprocess.TimeoutExpired:
         return False, timeout_msg
     except Exception as e:
         return False, f"Unexpected error: {e}"
@@ -344,7 +346,7 @@ class HomebrewManager(PackageManager):
                     capture_output=True,
                     timeout=60,
                 )
-            except (subprocess.TimeoutExpired):
+            except subprocess.TimeoutExpired:
                 return False, "Installation timed out after 5 minutes"
             except Exception as e:
                 return False, f"Unexpected error: {e}"
@@ -513,7 +515,7 @@ class LinuxInstaller(PackageManager):
         if install and method == "apt" and config.repo:
             try:
                 self._setup_apt_repo(config.repo)
-            except (subprocess.TimeoutExpired):
+            except subprocess.TimeoutExpired:
                 return False, "Installation timed out after 5 minutes"
             except Exception as e:
                 return False, f"Unexpected error: {e}"

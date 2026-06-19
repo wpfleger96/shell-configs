@@ -285,7 +285,7 @@ class ConfigManager:
             try:
                 backup_file.unlink()
                 removed.append(backup_file)
-            except (OSError):
+            except OSError:
                 pass
 
         return removed
@@ -752,7 +752,7 @@ class ConfigManager:
             if not file_path.exists():
                 return False
             return file_path.read_text(encoding="utf-8") == content
-        except (Exception):
+        except Exception:
             return False
 
     def uninstall_additional_file(
@@ -947,7 +947,7 @@ class ConfigManager:
                     old_lines.append(f"{key}={installed.get(section, key)}\n")
                 new_lines.append(f"{key}={value}\n")
             return unified_diff_text(old_lines, new_lines)
-        except (Exception):
+        except Exception:
             return None
 
     def check_ini_file_synced(self, source_path: Path, config_file: Path) -> bool:
@@ -962,7 +962,7 @@ class ConfigManager:
                 and installed.get(section, key) == value
                 for section, key, value in managed_keys
             )
-        except (Exception):
+        except Exception:
             return False
 
     def install_ini_file(
@@ -1103,7 +1103,7 @@ class ConfigManager:
                             f"Sidecar for {config_file} is malformed; deleted it. Re-run install to repair.",
                         )
                     keys: list[list[str]] = raw
-                except (json.JSONDecodeError):
+                except json.JSONDecodeError:
                     sidecar.unlink()
                     return (
                         OperationResult.ERROR,
@@ -1176,7 +1176,7 @@ class ConfigManager:
                 if src_text != tgt_text:
                     return False
             return True
-        except (Exception):
+        except Exception:
             return False
 
     def diff_xml_guiconfig_file(
@@ -1224,7 +1224,7 @@ class ConfigManager:
                         lines.append(f"[{name}]")
                         lines.extend(attr_diffs)
             return "\n".join(lines) if lines else None
-        except (Exception):
+        except Exception:
             return None
 
     def install_xml_guiconfig_file(
@@ -1410,7 +1410,7 @@ class ConfigManager:
             return file1.read_text(encoding="utf-8") == file2.read_text(
                 encoding="utf-8"
             )
-        except (Exception):
+        except Exception:
             return False
 
     def _atomic_write(self, file_path: Path, content: str) -> None:
@@ -1463,7 +1463,7 @@ class ConfigManager:
                     f"{app_name} is running — "
                     f"preference changes take effect after restart"
                 )
-        except (Exception):
+        except Exception:
             pass
         return None
 
@@ -1688,7 +1688,7 @@ class ConfigManager:
             )
 
             return (exists, synced)
-        except (Exception):
+        except Exception:
             return (False, False)
 
     def diff_preferences_file(self, source_path: Path, domain: str) -> str | None:
@@ -1709,7 +1709,7 @@ class ConfigManager:
             domain_data = self._export_defaults_domain(domain)
 
             return self._build_preferences_diff(managed_prefs, domain_data or {})
-        except (Exception):
+        except Exception:
             return None
 
     def _build_preferences_diff(

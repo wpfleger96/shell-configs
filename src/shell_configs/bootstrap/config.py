@@ -1,5 +1,7 @@
 """Auto-update configuration management."""
 
+from __future__ import annotations
+
 import dataclasses
 import logging
 
