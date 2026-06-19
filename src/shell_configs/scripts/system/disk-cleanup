@@ -42,7 +42,7 @@ def _detect_platform() -> str:
                 v = f.read().lower()
                 if "microsoft" in v or "wsl" in v:
                     return "wsl"
-        except (OSError):
+        except OSError:
             pass
         return "linux"
     return "linux"
@@ -119,7 +119,7 @@ def _docker_raw_size(path: Path) -> int:
             # st_blocks reports 512-byte blocks actually allocated (sparse-file aware)
             return st.st_blocks * 512
         return st.st_size
-    except (OSError):
+    except OSError:
         return 0
 
 
@@ -195,14 +195,14 @@ class SizeCache:
                 json.dump(data, fd)
                 fd.close()
                 os.replace(fd.name, self._path)
-            except (BaseException):
+            except BaseException:
                 fd.close()
                 try:
                     os.unlink(fd.name)
-                except (OSError):
+                except OSError:
                     pass
                 raise
-        except (OSError):
+        except OSError:
             pass
 
 
@@ -675,7 +675,7 @@ def _scan(
                 target = du_futures[future]
                 try:
                     result = future.result()
-                except (Exception):
+                except Exception:
                     result = None
                 if result is not None:
                     target.size_bytes = result
@@ -824,7 +824,7 @@ def _parse_size_arg(s: str) -> int:
         num_part = lower
     try:
         value = float(num_part)
-    except (ValueError):
+    except ValueError:
         raise argparse.ArgumentTypeError(f"Invalid size: {s!r}")
     return int(value * (1024**exp))
 
@@ -866,7 +866,7 @@ def _build_discovery_skip_paths(
             resolved = p.resolve()
             if resolved != Path(""):
                 paths.add(resolved)
-        except (OSError):
+        except OSError:
             pass
 
     return frozenset(paths)
@@ -898,7 +898,7 @@ def _push_file_entry(
 ) -> None:
     try:
         st = entry.stat(follow_symlinks=False)
-    except (OSError):
+    except OSError:
         return
     size = _allocated_size(st)
     if size < min_size_bytes:
@@ -1046,7 +1046,7 @@ def _scan_discovery_walk(
             for future in as_completed(futures):
                 try:
                     h = future.result()
-                except (Exception):
+                except Exception:
                     continue
                 all_heaps.append(h)
 
@@ -1159,7 +1159,7 @@ def _execute_discovery_cleanup(
         display = _short_path(item.path)
         try:
             st = item.path.lstat()
-        except (OSError):
+        except OSError:
             with print_lock:
                 console.print(
                     f"  [yellow]Skipping {display} (no longer exists)[/yellow]"
@@ -1314,7 +1314,7 @@ def _confirm(prompt: str) -> bool:
     console.print(f"[yellow]{prompt}[/yellow]")
     try:
         reply = input("Continue? (y/N) ").strip().lower()
-    except (EOFError):
+    except EOFError:
         return False
     return reply in ("y", "yes")
 
@@ -1341,7 +1341,7 @@ def _execute_cleanup(
                 )
             try:
                 subprocess.run(t.cleanup_cmd, check=False, timeout=600)
-            except (subprocess.TimeoutExpired):
+            except subprocess.TimeoutExpired:
                 with print_lock:
                     console.print(
                         f"  [yellow]Warning: {t.cleanup_cmd[0]} timed out[/yellow]"
@@ -1385,14 +1385,14 @@ def _execute_cleanup(
             subprocess.run(
                 ["docker", "system", "prune", "-af"], check=False, timeout=600
             )
-        except (subprocess.TimeoutExpired):
+        except subprocess.TimeoutExpired:
             console.print("  [yellow]Warning: docker system prune timed out[/yellow]")
         console.print("  Running docker builder prune -af ...")
         try:
             subprocess.run(
                 ["docker", "builder", "prune", "-af"], check=False, timeout=600
             )
-        except (subprocess.TimeoutExpired):
+        except subprocess.TimeoutExpired:
             console.print("  [yellow]Warning: docker builder prune timed out[/yellow]")
 
     return attempted

@@ -225,5 +225,5 @@ def get_tool_version(tool_name: str) -> str | None:
 
         return None
 
-    except (subprocess.TimeoutExpired, Exception):
+    except Exception:
         return None
