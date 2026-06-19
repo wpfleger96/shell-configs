@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.55.0](https://github.com/wpfleger96/shell-configs/compare/v0.54.5...v0.55.0) (2026-06-19)
+
+
+### Features
+
+* add cloud-setup.sh to mirror local dev env in web sessions ([#103](https://github.com/wpfleger96/shell-configs/issues/103)) ([33d95f4](https://github.com/wpfleger96/shell-configs/commit/33d95f4975dfa2a8908aeee1267c52b619a57ce8))
+
+
+### Chores
+
+* downgrade Python 3.14 to 3.13 and fix syntax compatibility ([#105](https://github.com/wpfleger96/shell-configs/issues/105)) ([cefb344](https://github.com/wpfleger96/shell-configs/commit/cefb344f780e1e00235840e3628bb4d766dc5335))
+
 ## [0.54.5](https://github.com/wpfleger96/shell-configs/compare/v0.54.4...v0.54.5) (2026-06-17)
 
 
