@@ -105,8 +105,8 @@ def _resolve_check_path(check_path: str) -> Path | None:
 
 def is_language_installed(lang: Language) -> bool:
     """Return True if the language runtime is present on this machine."""
-    if lang.check_path:
-        return _resolve_check_path(lang.check_path) is not None
+    if lang.check_path and _resolve_check_path(lang.check_path) is not None:
+        return True
     return is_command_available(lang.command)
 
 
