@@ -103,6 +103,14 @@ packages:
       method: script
       install_cmd: "curl -fsSL https://get.pnpm.io/install.sh | sh -"
 
+  - name: ripgrep
+    command: rg
+    description: "Fast recursive grep"
+    macos:
+      method: brew
+    linux:
+      method: apt
+
   - name: powershell
     command: pwsh
     description: "PowerShell runtime"
