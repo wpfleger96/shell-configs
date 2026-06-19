@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [0.56.0](https://github.com/wpfleger96/shell-configs/compare/v0.55.0...v0.56.0) (2026-06-19)
+
+
+### Features
+
+* add flutter and pnpm to managed packages ([#106](https://github.com/wpfleger96/shell-configs/issues/106)) ([fc92efa](https://github.com/wpfleger96/shell-configs/commit/fc92efade728617f42405362d00c5c1cdfe8788b))
+
+
+### Bug Fixes
+
+* flutter cask install + add ripgrep ([5341e70](https://github.com/wpfleger96/shell-configs/commit/5341e70e17e1e268f2876dd3f7b694755c975317))
+* flutter status always shows not-installed after tarball install ([ea9505b](https://github.com/wpfleger96/shell-configs/commit/ea9505b724cbb9e20755f8c2127e77bb3e6e0034))
+
 ## [0.55.0](https://github.com/wpfleger96/shell-configs/compare/v0.54.5...v0.55.0) (2026-06-19)
 
 
