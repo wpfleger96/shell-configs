@@ -1,5 +1,7 @@
 """Auto-update configuration management."""
 
+from __future__ import annotations
+
 import dataclasses
 import logging
 
@@ -71,7 +73,7 @@ def load_auto_update_config(package_name: str = "shell-configs") -> AutoUpdateCo
         with open(config_path, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
         return AutoUpdateConfig.from_dict(data)
-    except yaml.YAMLError, OSError:
+    except (yaml.YAMLError, OSError):
         return AutoUpdateConfig()
 
 

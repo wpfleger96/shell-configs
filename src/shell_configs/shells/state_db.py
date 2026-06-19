@@ -29,7 +29,7 @@ def values_match(current: str, desired: str) -> bool:
     try:
         current_parsed = json.loads(current)
         desired_parsed = json.loads(desired)
-    except json.JSONDecodeError, TypeError:
+    except (json.JSONDecodeError, TypeError):
         return current == desired
 
     if isinstance(desired_parsed, list) and isinstance(current_parsed, list):

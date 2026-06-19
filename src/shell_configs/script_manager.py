@@ -245,7 +245,7 @@ def get_script_status(
 
     try:
         source_bytes = _read_script_bytes(script.rel_path, source_dir)
-    except FileNotFoundError, TypeError:
+    except (FileNotFoundError, TypeError):
         return ScriptStatus.MISSING
 
     source_hash = _hash_bytes(source_bytes)

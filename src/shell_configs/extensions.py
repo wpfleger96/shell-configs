@@ -1,5 +1,7 @@
 """IDE extension management for VSCode and Cursor."""
 
+from __future__ import annotations
+
 import json
 import logging
 import re
@@ -124,7 +126,7 @@ def load_extensions_json(path: Path) -> set[str] | None:
         return None
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except OSError, json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         logger.warning("Failed to parse extensions manifest: %s", path)
         return None
     extensions: set[str] = set()
@@ -133,7 +135,7 @@ def load_extensions_json(path: Path) -> set[str] | None:
             ext_id = entry["identifier"]["id"].lower().strip()
             if _EXTENSION_ID_RE.match(ext_id):
                 extensions.add(ext_id)
-        except KeyError, AttributeError:
+        except (KeyError, AttributeError):
             continue
     return extensions
 

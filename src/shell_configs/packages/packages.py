@@ -1,5 +1,7 @@
 """Package management for shell-configs."""
 
+from __future__ import annotations
+
 import re
 import shutil
 import subprocess
@@ -69,7 +71,7 @@ def _is_pwsh_module_installed(name: str) -> bool:
             timeout=10,
         )
         return name in result.stdout
-    except subprocess.TimeoutExpired, FileNotFoundError:
+    except (subprocess.TimeoutExpired, FileNotFoundError):
         return False
 
 
@@ -249,7 +251,7 @@ class HomebrewManager(PackageManager):
             )
             if result.returncode == 0:
                 return set(result.stdout.strip().split("\n"))
-        except subprocess.TimeoutExpired, FileNotFoundError:
+        except (subprocess.TimeoutExpired, FileNotFoundError):
             pass
         return set()
 
@@ -454,7 +456,7 @@ class LinuxInstaller(PackageManager):
                     timeout=10,
                 )
                 return result.returncode == 0
-            except subprocess.TimeoutExpired, FileNotFoundError:
+            except (subprocess.TimeoutExpired, FileNotFoundError):
                 return False
 
         return False
@@ -624,7 +626,7 @@ class WingetManager(PackageManager):
                     timeout=10,
                 )
                 return result.returncode == 0 and config.package in result.stdout
-            except subprocess.TimeoutExpired, FileNotFoundError:
+            except (subprocess.TimeoutExpired, FileNotFoundError):
                 pass
         return False
 

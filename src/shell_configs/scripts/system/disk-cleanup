@@ -107,7 +107,7 @@ def _du_size_bytes(path: Path) -> int | None:
         )
         if result.returncode == 0:
             return int(result.stdout.split()[0]) * 1024
-    except subprocess.TimeoutExpired, ValueError, IndexError, OSError:
+    except (subprocess.TimeoutExpired, ValueError, IndexError, OSError):
         pass
     return None
 
@@ -150,7 +150,7 @@ class SizeCache:
                 and isinstance(v.get("size_bytes"), int)
                 and now - v.get("ts", 0) <= self._ttl
             }
-        except OSError, json.JSONDecodeError, KeyError, TypeError, AttributeError:
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, AttributeError):
             self._data = {}
 
     def get(self, path: Path) -> int | None:
@@ -223,7 +223,7 @@ def _scan_dev_tree(
             continue
         try:
             entries = list(os.scandir(current))
-        except PermissionError, OSError:
+        except (PermissionError, OSError):
             continue
 
         if current.name == "target":
@@ -426,7 +426,7 @@ def _wsl_caches() -> list[ScanTarget]:
                         ),
                     ]
                 )
-    except subprocess.TimeoutExpired, OSError:
+    except (subprocess.TimeoutExpired, OSError):
         pass  # WSL path resolution failure is non-fatal
 
     return targets
@@ -481,7 +481,7 @@ def _docker_targets() -> list[ScanTarget]:
         )
         if result.returncode != 0:
             return []
-    except subprocess.TimeoutExpired, OSError:
+    except (subprocess.TimeoutExpired, OSError):
         return []
 
     # Sentinel target — no path, handled specially in report and fix
