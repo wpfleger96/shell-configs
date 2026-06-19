@@ -45,7 +45,7 @@ def _run_pkg_cmd(
             text=True,
             timeout=timeout,
         )
-    except subprocess.TimeoutExpired:
+    except (subprocess.TimeoutExpired):
         return False, timeout_msg
     except Exception as e:
         return False, f"Unexpected error: {e}"
@@ -69,7 +69,7 @@ def _is_pwsh_module_installed(name: str) -> bool:
             timeout=10,
         )
         return name in result.stdout
-    except subprocess.TimeoutExpired, FileNotFoundError:
+    except (subprocess.TimeoutExpired, FileNotFoundError):
         return False
 
 
@@ -249,7 +249,7 @@ class HomebrewManager(PackageManager):
             )
             if result.returncode == 0:
                 return set(result.stdout.strip().split("\n"))
-        except subprocess.TimeoutExpired, FileNotFoundError:
+        except (subprocess.TimeoutExpired, FileNotFoundError):
             pass
         return set()
 
@@ -344,7 +344,7 @@ class HomebrewManager(PackageManager):
                     capture_output=True,
                     timeout=60,
                 )
-            except subprocess.TimeoutExpired:
+            except (subprocess.TimeoutExpired):
                 return False, "Installation timed out after 5 minutes"
             except Exception as e:
                 return False, f"Unexpected error: {e}"
@@ -454,7 +454,7 @@ class LinuxInstaller(PackageManager):
                     timeout=10,
                 )
                 return result.returncode == 0
-            except subprocess.TimeoutExpired, FileNotFoundError:
+            except (subprocess.TimeoutExpired, FileNotFoundError):
                 return False
 
         return False
@@ -513,7 +513,7 @@ class LinuxInstaller(PackageManager):
         if install and method == "apt" and config.repo:
             try:
                 self._setup_apt_repo(config.repo)
-            except subprocess.TimeoutExpired:
+            except (subprocess.TimeoutExpired):
                 return False, "Installation timed out after 5 minutes"
             except Exception as e:
                 return False, f"Unexpected error: {e}"
@@ -624,7 +624,7 @@ class WingetManager(PackageManager):
                     timeout=10,
                 )
                 return result.returncode == 0 and config.package in result.stdout
-            except subprocess.TimeoutExpired, FileNotFoundError:
+            except (subprocess.TimeoutExpired, FileNotFoundError):
                 pass
         return False
 

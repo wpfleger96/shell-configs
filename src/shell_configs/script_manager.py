@@ -17,7 +17,7 @@ from pathlib import Path
 
 try:
     import tomllib
-except ModuleNotFoundError:
+except (ModuleNotFoundError):
     import tomli as tomllib  # type: ignore[no-redef]
 
 from shell_configs.fsio import atomic_write_text
@@ -144,7 +144,7 @@ def _load_platform_exceptions(
             raw = (source_dir / "scripts.toml").read_bytes()
         else:
             raw = files("shell_configs.scripts").joinpath("scripts.toml").read_bytes()
-    except FileNotFoundError:
+    except (FileNotFoundError):
         return {}
 
     data = tomllib.loads(raw.decode())
@@ -245,7 +245,7 @@ def get_script_status(
 
     try:
         source_bytes = _read_script_bytes(script.rel_path, source_dir)
-    except FileNotFoundError, TypeError:
+    except (FileNotFoundError, TypeError):
         return ScriptStatus.MISSING
 
     source_hash = _hash_bytes(source_bytes)
@@ -277,7 +277,7 @@ def install_script(
 
     try:
         source_bytes = _read_script_bytes(script.rel_path, source_dir)
-    except FileNotFoundError:
+    except (FileNotFoundError):
         return (
             InstallResult.ERROR,
             f"{script.name}: source not found: {script.rel_path}",
@@ -314,7 +314,7 @@ def install_script(
     except Exception as e:
         try:
             os.unlink(temp_path)
-        except OSError:
+        except (OSError):
             pass
         return InstallResult.ERROR, f"{script.name}: {e}"
 

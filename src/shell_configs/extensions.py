@@ -107,7 +107,7 @@ def load_extension_file(path: Path) -> set[str]:
 
     try:
         content = path.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError):
         return set()
 
     extensions: set[str] = set()
@@ -124,7 +124,7 @@ def load_extensions_json(path: Path) -> set[str] | None:
         return None
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except OSError, json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         logger.warning("Failed to parse extensions manifest: %s", path)
         return None
     extensions: set[str] = set()
@@ -133,7 +133,7 @@ def load_extensions_json(path: Path) -> set[str] | None:
             ext_id = entry["identifier"]["id"].lower().strip()
             if _EXTENSION_ID_RE.match(ext_id):
                 extensions.add(ext_id)
-        except KeyError, AttributeError:
+        except (KeyError, AttributeError):
             continue
     return extensions
 
@@ -224,10 +224,10 @@ class ExtensionManager:
                 if stripped and _EXTENSION_ID_RE.match(stripped):
                     installed.add(stripped)
             return installed
-        except FileNotFoundError:
+        except (FileNotFoundError):
             logger.warning("%s not found in PATH", invoker.display_name)
             return None
-        except subprocess.TimeoutExpired:
+        except (subprocess.TimeoutExpired):
             logger.warning("%s --list-extensions timed out", invoker.display_name)
             return None
 
@@ -336,7 +336,7 @@ class ExtensionManager:
                                 status=ExtensionResultStatus.FAILED,
                             )
                         )
-            except FileNotFoundError:
+            except (FileNotFoundError):
                 results.append(
                     ExtensionResult(
                         ext_id,
@@ -346,7 +346,7 @@ class ExtensionManager:
                     )
                 )
                 break
-            except subprocess.TimeoutExpired:
+            except (subprocess.TimeoutExpired):
                 results.append(
                     ExtensionResult(
                         ext_id,
@@ -403,7 +403,7 @@ class ExtensionManager:
                             status=ExtensionResultStatus.FAILED,
                         )
                     )
-            except FileNotFoundError:
+            except (FileNotFoundError):
                 results.append(
                     ExtensionResult(
                         ext_id,
@@ -413,7 +413,7 @@ class ExtensionManager:
                     )
                 )
                 break
-            except subprocess.TimeoutExpired:
+            except (subprocess.TimeoutExpired):
                 results.append(
                     ExtensionResult(
                         ext_id,

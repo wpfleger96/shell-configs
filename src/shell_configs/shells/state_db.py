@@ -29,7 +29,7 @@ def values_match(current: str, desired: str) -> bool:
     try:
         current_parsed = json.loads(current)
         desired_parsed = json.loads(desired)
-    except json.JSONDecodeError, TypeError:
+    except (json.JSONDecodeError, TypeError):
         return current == desired
 
     if isinstance(desired_parsed, list) and isinstance(current_parsed, list):
@@ -46,7 +46,7 @@ def read_state_db_value(db_path: Path, key: str) -> str | None:
                 "SELECT value FROM ItemTable WHERE key = ?", (key,)
             ).fetchone()
         return row[0] if row else None
-    except sqlite3.OperationalError:
+    except (sqlite3.OperationalError):
         return None
 
 
@@ -79,7 +79,7 @@ def write_state_db_value(
             )
             return (OperationResult.CREATED, f"Created: {db_path.name}: {key}")
 
-    except sqlite3.OperationalError:
+    except (sqlite3.OperationalError):
         return (
             OperationResult.ERROR,
             f"Database locked (editor may be open): {db_path}",
