@@ -94,6 +94,15 @@ packages:
       method: script
       install_cmd: "curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin"
 
+  - name: pnpm
+    command: pnpm
+    description: "Fast, disk space efficient Node.js package manager"
+    macos:
+      method: brew
+    linux:
+      method: script
+      install_cmd: "curl -fsSL https://get.pnpm.io/install.sh | sh -"
+
   - name: powershell
     command: pwsh
     description: "PowerShell runtime"
