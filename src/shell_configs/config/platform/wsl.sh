@@ -32,3 +32,40 @@ fi
 
 unset _ssh_agent_env
 unset -f _start_ssh_agent
+
+export ENPASS_VAULT_PATH="/mnt/c/Users/Will Pfleger/Documents/Enpass/Vaults/primary"
+
+load-tf-secrets() {
+    if ! command -v enpass-cli >/dev/null 2>&1; then
+        echo "Error: enpass-cli not found. Build from ~/Development/enpass-cli." >&2
+        return 1
+    fi
+    if [[ -z "$ENPASS_VAULT_PATH" ]]; then
+        echo "Error: ENPASS_VAULT_PATH not set." >&2
+        return 1
+    fi
+
+    # Prompt once — exported so all enpass-cli calls below can run non-interactively.
+    read -rs -p "Enpass master password: " MASTERPW && echo
+    export MASTERPW
+
+    # Homelab / Proxmox (4) — TODO: fill in Enpass entry titles and field labels
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_proxmox_api_key_id="ENTRY_TITLE")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_proxmox02_api_key_secret="ENTRY_TITLE")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_container_user_password="ENTRY_TITLE")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_ssh_public_key="ENTRY_TITLE")"
+
+    # AWS (1) — TODO: fill in Enpass entry title and field label
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_alert_email="ENTRY_TITLE")"
+
+    # GCP (4) — TODO: fill in Enpass entry titles and field labels
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_gcp_project_id="ENTRY_TITLE")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_gcp_project_number="ENTRY_TITLE")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_gcp_billing_account_id="ENTRY_TITLE")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_gcp_alert_email="ENTRY_TITLE")"
+
+    # Cloudflare (1) — TODO: fill in Enpass entry title and field label
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_cloudflare_account_id="ENTRY_TITLE")"
+
+    unset MASTERPW
+}
