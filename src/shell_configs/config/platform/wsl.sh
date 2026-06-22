@@ -49,23 +49,24 @@ load-tf-secrets() {
     read -rs -p "Enpass master password: " MASTERPW && echo
     export MASTERPW
 
-    # Homelab / Proxmox (4) — TODO: fill in Enpass entry titles and field labels
-    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_proxmox_api_key_id="ENTRY_TITLE")"
-    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_proxmox02_api_key_secret="ENTRY_TITLE")"
-    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_container_user_password="ENTRY_TITLE")"
-    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_ssh_public_key="ENTRY_TITLE")"
+    # Homelab / Proxmox (4)
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "Homelab Consoles" TF_VAR_proxmox_api_key_id="Proxmox API Key ID")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "Homelab Consoles" TF_VAR_proxmox01_api_key_secret="Proxmox01 API Key Secret")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "Homelab Consoles" TF_VAR_proxmox02_api_key_secret="Proxmox02 API Key Secret")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "Homelab Consoles" TF_VAR_container_user_password="Container User Password")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "Homelab Consoles" TF_VAR_ssh_public_key="SSH Public Key")"
 
-    # AWS (1) — TODO: fill in Enpass entry title and field label
-    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_alert_email="ENTRY_TITLE")"
+    # AWS (1)
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "AWS" TF_VAR_alert_email="Email Address")"
 
-    # GCP (4) — TODO: fill in Enpass entry titles and field labels
-    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_gcp_project_id="ENTRY_TITLE")"
-    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_gcp_project_number="ENTRY_TITLE")"
-    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_gcp_billing_account_id="ENTRY_TITLE")"
-    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_gcp_alert_email="ENTRY_TITLE")"
+    # GCP (4)
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "Gmail Main/GCP Homelab" TF_VAR_gcp_project_id="GCP Project ID")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "Gmail Main/GCP Homelab" TF_VAR_gcp_project_number="GCP Project Number")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "Gmail Main/GCP Homelab" TF_VAR_gcp_billing_account_id="GCP Billing Account ID")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "Gmail Main/GCP Homelab" TF_VAR_gcp_alert_email="E-mail")"
 
-    # Cloudflare (1) — TODO: fill in Enpass entry title and field label
-    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "FIELD_LABEL" TF_VAR_cloudflare_account_id="ENTRY_TITLE")"
+    # Cloudflare (1)
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive env -field "Cloudflare" TF_VAR_cloudflare_account_id="Account Number")"
 
     unset MASTERPW
 }
