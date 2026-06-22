@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.57.0](https://github.com/wpfleger96/shell-configs/compare/v0.56.0...v0.57.0) (2026-06-22)
+
+
+### Features
+
+* **wsl:** add enpass-cli package and load-tf-secrets function ([#108](https://github.com/wpfleger96/shell-configs/issues/108)) ([6a2aa81](https://github.com/wpfleger96/shell-configs/commit/6a2aa81d01e566b4c21e807da7ece5cab73c6d90))
+
 ## [0.56.0](https://github.com/wpfleger96/shell-configs/compare/v0.55.0...v0.56.0) (2026-06-19)
 
 
