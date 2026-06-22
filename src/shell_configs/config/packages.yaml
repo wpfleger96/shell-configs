@@ -161,6 +161,14 @@ packages:
       method: script
       install_cmd: "curl -sS https://webi.sh/delta | sh"
 
+  - name: enpass-cli
+    command: enpass-cli
+    description: "Enpass vault CLI for password and secret retrieval"
+    wsl_only: true
+    linux:
+      method: script
+      install_cmd: "set -e && tmp=$(mktemp -d) && gh release download --repo hazcod/enpass-cli --pattern '*linux_amd64*' -D \"$tmp\" && unzip -qo \"$tmp\"/*.zip -d \"$tmp\" && find \"$tmp\" -name enpasscli -exec install -m 755 {} ~/.local/bin/enpass-cli \\; && rm -rf \"$tmp\""
+
   - name: direnv
     command: direnv
     description: "Auto-loads/unloads env vars when entering directories with .envrc"

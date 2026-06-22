@@ -37,7 +37,7 @@ export ENPASS_VAULT_PATH="/mnt/c/Users/Will Pfleger/Documents/Enpass/Vaults/prim
 
 load-tf-secrets() {
     if ! command -v enpass-cli >/dev/null 2>&1; then
-        echo "Error: enpass-cli not found. Build from ~/Development/enpass-cli." >&2
+        echo "Error: enpass-cli not found. Run: shell-configs packages install" >&2
         return 1
     fi
     if [[ -z "$ENPASS_VAULT_PATH" ]]; then
