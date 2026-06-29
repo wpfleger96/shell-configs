@@ -30,6 +30,17 @@ def _validate_package_name(name: str) -> str:
     return name
 
 
+def _inject_signed_by(source: str, key_path: str) -> str:
+    """Inject signed-by= into the options bracket of a deb source line.
+
+    Modern apt requires signed-by= to trust a keyring stored in
+    /usr/share/keyrings/ rather than the legacy /etc/apt/trusted.gpg.d/.
+    """
+    if "signed-by=" in source:
+        return source
+    return re.sub(r"^(deb\s+)\[([^\]]*)\]", rf"\1[\2 signed-by={key_path}]", source)
+
+
 def _run_pkg_cmd(
     cmd: list[str] | str,
     *,
@@ -53,7 +64,7 @@ def _run_pkg_cmd(
         return False, f"Unexpected error: {e}"
     if result.returncode == 0:
         return True, success_msg
-    return False, result.stderr.strip() or failure_msg
+    return False, result.stderr.strip() or result.stdout.strip() or failure_msg
 
 
 def _is_pwsh_module_installed(name: str) -> bool:
@@ -540,19 +551,24 @@ class LinuxInstaller(PackageManager):
         """Setup a custom apt repository."""
         key_path = f"/usr/share/keyrings/{repo.name}-archive-keyring.gpg"
         sources_path = f"/etc/apt/sources.list.d/{repo.name}.list"
+        source_line = _inject_signed_by(repo.source, key_path)
 
-        if Path(key_path).exists() and Path(sources_path).exists():
-            return
+        sources_file = Path(sources_path)
+        if Path(key_path).exists() and sources_file.exists():
+            existing = sources_file.read_text(encoding="utf-8").strip()
+            if existing == source_line:
+                return  # Already configured correctly
+
+        if not Path(key_path).exists():
+            subprocess.run(
+                f"curl -fsSL {repo.key_url} | sudo gpg --dearmor -o {key_path}",
+                shell=True,
+                check=True,
+                timeout=60,
+            )
 
         subprocess.run(
-            f"curl -fsSL {repo.key_url} | sudo gpg --dearmor -o {key_path}",
-            shell=True,
-            check=True,
-            timeout=60,
-        )
-
-        subprocess.run(
-            f'echo "{repo.source}" | sudo tee {sources_path}',
+            f'echo "{source_line}" | sudo tee {sources_path}',
             shell=True,
             check=True,
             timeout=10,

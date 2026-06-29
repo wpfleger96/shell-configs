@@ -2,6 +2,13 @@
 # Packages required for development environment
 
 packages:
+  # System utilities
+  - name: bzip2
+    command: bzip2
+    description: "Block-sorting file compressor (required for .tar.bz2 extraction)"
+    linux:
+      method: apt
+
   # Shell tools
   - name: expect
     command: unbuffer
@@ -55,7 +62,7 @@ packages:
 
   # Configuration Management
   - name: ansible
-    command: ansible
+    command: ansible-community
     description: "Configuration management tool"
     macos:
       method: brew
@@ -123,7 +130,7 @@ packages:
       repo:
         name: microsoft
         key_url: https://packages.microsoft.com/keys/microsoft.asc
-        source: "deb [arch=amd64] https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(lsb_release -cs) main"
+        source: "deb [arch=amd64] https://packages.microsoft.com/ubuntu/24.04/prod noble main"
 
   # PowerShell Modules
   - name: PSScriptAnalyzer
@@ -143,6 +150,37 @@ packages:
     linux:
       method: apt
       package: sqlite3
+
+  # Editors
+  - name: code
+    command: code
+    description: "Visual Studio Code editor"
+    macos:
+      method: brew
+      cask: true
+    linux:
+      method: apt
+      package: code
+      repo:
+        name: vscode
+        key_url: https://packages.microsoft.com/keys/microsoft.asc
+        source: "deb [arch=amd64] https://packages.microsoft.com/repos/code stable main"
+
+  - name: cursor
+    command: cursor
+    description: "Cursor AI code editor"
+    macos:
+      method: brew
+      cask: true
+    linux:
+      method: script
+      install_cmd: >-
+        set -e &&
+        tmp=$(mktemp -d) &&
+        deb_url=$(curl -fsSL "https://cursor.com/api/download?platform=linux-x64&releaseTrack=stable" | python3 -c "import sys,json; print(json.load(sys.stdin)['debUrl'])") &&
+        curl -fsSL "$deb_url" -o "$tmp/cursor.deb" &&
+        sudo dpkg -i "$tmp/cursor.deb" &&
+        rm -rf "$tmp"
 
   - name: wslu
     command: wslview
