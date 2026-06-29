@@ -3,7 +3,7 @@
 
 set dotenv-load := false
 
-# Run quick quality checks (no tests)
+# Run all quality checks without tests
 default: sync type-check lint-python-check lint-shell-check format-python-check format-shell-check
 
 # Setup & Dependencies
@@ -64,7 +64,7 @@ check: sync type-check lint-check format-check
 check-all: check test
     @echo "All quality checks and tests passed"
 
-# Run pre-commit suite: lint, format, type-check, and test
+# Sync, type-check, auto-fix lint/format, and run tests
 pre-commit: sync type-check lint-python lint-shell-check format-python format-shell test
     @echo "Pre-commit checks passed"
 
