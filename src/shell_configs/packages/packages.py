@@ -555,7 +555,8 @@ class LinuxInstaller(PackageManager):
 
         sources_file = Path(sources_path)
         if Path(key_path).exists() and sources_file.exists():
-            if "signed-by=" in sources_file.read_text(encoding="utf-8"):
+            existing = sources_file.read_text(encoding="utf-8").strip()
+            if existing == source_line:
                 return  # Already configured correctly
 
         if not Path(key_path).exists():
