@@ -62,7 +62,7 @@ packages:
 
   # Configuration Management
   - name: ansible
-    command: ansible
+    command: ansible-community
     description: "Configuration management tool"
     macos:
       method: brew
