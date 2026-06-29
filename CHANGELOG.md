@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## [0.58.0](https://github.com/wpfleger96/shell-configs/compare/v0.57.0...v0.58.0) (2026-06-29)
+
+
+### Features
+
+* add vim and nano to managed packages ([#112](https://github.com/wpfleger96/shell-configs/issues/112)) ([be78879](https://github.com/wpfleger96/shell-configs/commit/be788790d70f0d2c4842abaffe6902888aeec253))
+* add VS Code and Cursor as managed packages ([#114](https://github.com/wpfleger96/shell-configs/issues/114)) ([1d7e2c5](https://github.com/wpfleger96/shell-configs/commit/1d7e2c5c49de39e6e70a540a406abbc529207f7e))
+
+
+### Bug Fixes
+
+* repair Linux install failures for terraform, powershell, and goose ([#113](https://github.com/wpfleger96/shell-configs/issues/113)) ([f1b8bca](https://github.com/wpfleger96/shell-configs/commit/f1b8bca1426a28d1c535e4a370d0775c8dd0b80c))
+
+
+### Chores
+
+* **deps:** Update actions/checkout action to v7 ([#110](https://github.com/wpfleger96/shell-configs/issues/110)) ([ce6d4d6](https://github.com/wpfleger96/shell-configs/commit/ce6d4d614fba8246072ad1d6945c59ed30c5ee0d))
+
+
+### Continuous Integration
+
+* sync CI workflow ([21c260a](https://github.com/wpfleger96/shell-configs/commit/21c260a4674f2e528d7acddca7f5723fb4d65947))
+* sync CI workflow ([cb436b4](https://github.com/wpfleger96/shell-configs/commit/cb436b4e0351aa7903b5d9316f2ccffffe5c5529))
+* sync CI workflow ([53b8ed9](https://github.com/wpfleger96/shell-configs/commit/53b8ed93f6d15f0553afde11efe15713ab0c86c9))
+* sync release workflow ([fd56ae4](https://github.com/wpfleger96/shell-configs/commit/fd56ae4be3f9d8a626a0daf0bc1974a860972bba))
+
 ## [0.57.0](https://github.com/wpfleger96/shell-configs/compare/v0.56.0...v0.57.0) (2026-06-22)
 
 
