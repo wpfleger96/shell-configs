@@ -176,3 +176,20 @@ packages:
       method: brew
     linux:
       method: apt
+
+  # Text Editors
+  - name: vim
+    command: vim
+    description: "Vim text editor"
+    macos:
+      method: brew
+    linux:
+      method: apt
+
+  - name: nano
+    command: nano
+    description: "Nano text editor"
+    macos:
+      method: brew
+    linux:
+      method: apt
