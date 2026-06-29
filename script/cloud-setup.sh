@@ -19,6 +19,7 @@
 # Re-run safe. After a fresh web session, re-running re-applies everything (the harness may
 # regenerate ~/.gitconfig and ~/.claude on session start).
 
+# shellcheck disable=SC2317  # callback functions invoked indirectly via install_or_fallback "$@"
 set -uo pipefail
 
 log() { printf '  %s\n' "$*"; }
@@ -85,11 +86,8 @@ install_or_fallback() {
     record fail "$tool"
 }
 
-# shellcheck disable=SC2317  # called indirectly via install_or_fallback "$@"
 _shfmt_go() { have go && GOBIN="$LOCAL_BIN" go install mvdan.cc/sh/v3/cmd/shfmt@latest >/dev/null 2>&1; }
-# shellcheck disable=SC2317
 _just_prebuilt() { fetch https://just.systems/install.sh /tmp/just-install.sh && bash /tmp/just-install.sh --to "$LOCAL_BIN" >/dev/null 2>&1; }
-# shellcheck disable=SC2317
 _eza_prebuilt() {
     fetch https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz /tmp/eza.tgz || return 1
     local tmp

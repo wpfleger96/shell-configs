@@ -23,9 +23,8 @@ lint-python-check:
     uvx ruff check .
 
 # Run ShellCheck on shell scripts
-# SC2329: shellcheck 0.11+ renamed SC2317 but inline disable is broken for this rule
 lint-shell-check:
-    shfmt -f . | grep -v git-prompt.sh | grep -v iterm2-shell-integration | grep -v 'src/shell_configs/scripts/' | xargs shellcheck -e SC2329
+    shfmt -f . | grep -v git-prompt.sh | grep -v iterm2-shell-integration | grep -v 'src/shell_configs/scripts/' | xargs shellcheck
 
 # Run Python formatter in check mode (no changes)
 format-python-check:
