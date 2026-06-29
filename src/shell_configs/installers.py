@@ -89,7 +89,8 @@ def _run_step(
     if result.returncode == 0:
         suffix = f" via {via}" if via else ""
         return True, f"{verb.capitalize()}ed {name}{suffix}"
-    return False, f"Failed to {verb} {name}: {result.stderr.strip()}"
+    error_detail = result.stderr.strip() or result.stdout.strip()
+    return False, f"Failed to {verb} {name}: {error_detail}"
 
 
 def install_npm(name: str, package: str, dry_run: bool) -> tuple[bool, str]:

@@ -294,3 +294,69 @@ class TestWingetManager:
         success, msg = manager.install(pkg, dry_run=False)
         assert success is False
         assert "timed out" in msg
+
+
+class TestInjectSignedBy:
+    """Tests for _inject_signed_by."""
+
+    def setup_method(self):
+        from shell_configs.packages.packages import _inject_signed_by
+
+        self.inject = _inject_signed_by
+
+    def test_adds_signed_by_inside_bracket(self):
+        source = "deb [arch=amd64] https://example.com stable main"
+        result = self.inject(source, "/usr/share/keyrings/test.gpg")
+        assert "signed-by=/usr/share/keyrings/test.gpg" in result
+        assert result.startswith("deb [arch=amd64 signed-by=")
+
+    def test_noop_when_signed_by_already_present(self):
+        source = "deb [arch=amd64 signed-by=/usr/share/keyrings/test.gpg] https://example.com stable main"
+        assert self.inject(source, "/other/path.gpg") == source
+
+    def test_preserves_url_and_suite(self):
+        source = "deb [arch=amd64] https://apt.releases.hashicorp.com resolute main"
+        result = self.inject(
+            source, "/usr/share/keyrings/hashicorp-archive-keyring.gpg"
+        )
+        assert "https://apt.releases.hashicorp.com resolute main" in result
+
+
+class TestRunPkgCmdFallback:
+    """Tests for _run_pkg_cmd stdout/stderr fallback chain."""
+
+    def _run(
+        self, monkeypatch: pytest.MonkeyPatch, stdout: str, stderr: str
+    ) -> tuple[bool, str]:
+        import subprocess as sp
+
+        from shell_configs.packages.packages import _run_pkg_cmd
+
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.subprocess.run",
+            lambda *a, **kw: sp.CompletedProcess(
+                args=[], returncode=1, stdout=stdout, stderr=stderr
+            ),
+        )
+        return _run_pkg_cmd(
+            ["cmd"],
+            timeout=10,
+            success_msg="ok",
+            failure_msg="generic",
+            timeout_msg="timeout",
+        )
+
+    def test_stderr_preferred(self, monkeypatch):
+        ok, msg = self._run(monkeypatch, stdout="stdout msg", stderr="stderr msg")
+        assert not ok
+        assert msg == "stderr msg"
+
+    def test_stdout_fallback_when_stderr_empty(self, monkeypatch):
+        ok, msg = self._run(monkeypatch, stdout="error on stdout", stderr="")
+        assert not ok
+        assert msg == "error on stdout"
+
+    def test_generic_fallback_when_both_empty(self, monkeypatch):
+        ok, msg = self._run(monkeypatch, stdout="", stderr="")
+        assert not ok
+        assert msg == "generic"

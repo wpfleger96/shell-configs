@@ -2,6 +2,13 @@
 # Packages required for development environment
 
 packages:
+  # System utilities
+  - name: bzip2
+    command: bzip2
+    description: "Block-sorting file compressor (required for .tar.bz2 extraction)"
+    linux:
+      method: apt
+
   # Shell tools
   - name: expect
     command: unbuffer

@@ -433,6 +433,12 @@ class TestAgentsComponent:
         with (
             patch("shell_configs.agents.get_config_dir", return_value=tmp_path),
             patch("shell_configs.agents.is_agent_installed", return_value=True),
+            # Isolate from the real installed_agents.json so orphaned detection
+            # doesn't pick up agents installed on this machine.
+            patch(
+                "shell_configs.agent_manifest.get_default_agent_manifest_path",
+                return_value=tmp_path / "installed_agents.json",
+            ),
         ):
             plan = AgentsComponent().plan(self._make_ctx())
 
@@ -972,3 +978,38 @@ class TestUninstallAgentByManifestEntry:
         ):
             ok, msg = uninstall_agent_by_manifest_entry("test", "cmd", "brew", None)
         assert not ok
+
+
+class TestRunStepStdoutFallback:
+    """Tests for _run_step stdout/stderr fallback in installers."""
+
+    def _run(self, stdout: str, stderr: str) -> tuple[bool, str]:
+        with patch("shell_configs.installers.subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=1, stdout=stdout, stderr=stderr
+            )
+            from shell_configs.installers import _run_step
+
+            return _run_step(
+                ["failing-cmd"],
+                name="test",
+                verb="install",
+                via="test",
+                dry_run=False,
+                would_msg="",
+            )
+
+    def test_stderr_preferred_over_stdout(self):
+        ok, msg = self._run(stdout="stdout msg", stderr="stderr msg")
+        assert not ok
+        assert "stderr msg" in msg
+
+    def test_stdout_used_when_stderr_empty(self):
+        ok, msg = self._run(stdout="error on stdout", stderr="")
+        assert not ok
+        assert "error on stdout" in msg
+
+    def test_empty_both_yields_blank_detail(self):
+        ok, msg = self._run(stdout="", stderr="")
+        assert not ok
+        assert "Failed to install test: " in msg
