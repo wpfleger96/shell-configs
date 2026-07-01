@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [0.59.0](https://github.com/wpfleger96/shell-configs/compare/v0.58.0...v0.59.0) (2026-07-01)
+
+
+### Features
+
+* **shell:** accept human-readable durations in nosleep ([#117](https://github.com/wpfleger96/shell-configs/issues/117)) ([659ecf8](https://github.com/wpfleger96/shell-configs/commit/659ecf8e58aba22a4a21af68b2ad6b778ae660d3))
+
+
+### Bug Fixes
+
+* **lint:** use file-level shellcheck disable for SC2317 callbacks ([#115](https://github.com/wpfleger96/shell-configs/issues/115)) ([5b6a534](https://github.com/wpfleger96/shell-configs/commit/5b6a53461d99e6dfebe94758d1e211f2bfe75491))
+
+
+### Chores
+
+* sync pre-commit hook ([3aaadda](https://github.com/wpfleger96/shell-configs/commit/3aaadda6eb3258bad6d81d4cc4275d2a631f5709))
+
 ## [0.58.0](https://github.com/wpfleger96/shell-configs/compare/v0.57.0...v0.58.0) (2026-06-29)
 
 
