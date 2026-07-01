@@ -30,5 +30,7 @@ chrome() {
 }
 
 nosleep() {
-    caffeinate -disu -t "${1:-86400}"
+    local seconds
+    seconds=$(_parse_duration_seconds "${1:-24h}") || return 1
+    caffeinate -disu -t "$seconds"
 }
