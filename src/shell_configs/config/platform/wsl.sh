@@ -70,3 +70,9 @@ load-tf-secrets() {
 
     unset MASTERPW
 }
+
+nosleep() {
+    local seconds
+    seconds=$(_parse_duration_seconds "${1:-24h}") || return 1
+    systemd-inhibit --what=idle --who=nosleep --why="Preventing sleep" sleep "$seconds"
+}
