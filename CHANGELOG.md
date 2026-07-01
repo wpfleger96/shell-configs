@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.59.1](https://github.com/wpfleger96/shell-configs/compare/v0.59.0...v0.59.1) (2026-07-01)
+
+
+### Bug Fixes
+
+* **shell:** use portable parameter expansion in nosleep duration parser ([#118](https://github.com/wpfleger96/shell-configs/issues/118)) ([7647062](https://github.com/wpfleger96/shell-configs/commit/7647062b7ddd4d892d033a683c9960c10bc038e2))
+
 ## [0.59.0](https://github.com/wpfleger96/shell-configs/compare/v0.58.0...v0.59.0) (2026-07-01)
 
 
