@@ -44,13 +44,11 @@ class TestParseDurationSeconds:
             ("60", "60"),
         ],
     )
-    def test_valid_input(
-        self, installed_home, run_shell, shell, input_val, expected
-    ):
+    def test_valid_input(self, installed_home, run_shell, shell, input_val, expected):
         _skip_unless(shell)
         result = run_shell(
             shell,
-            f'{_source_cmd(shell)}; _parse_duration_seconds {input_val}',
+            f"{_source_cmd(shell)}; _parse_duration_seconds {input_val}",
         )
         assert result.returncode == 0, result.stderr
         assert result.stdout.strip() == expected
@@ -61,7 +59,7 @@ class TestParseDurationSeconds:
         _skip_unless(shell)
         result = run_shell(
             shell,
-            f'{_source_cmd(shell)}; _parse_duration_seconds {input_val}',
+            f"{_source_cmd(shell)}; _parse_duration_seconds {input_val}",
         )
         assert result.returncode != 0
 
@@ -88,9 +86,7 @@ class TestWtSanitizeDirname:
             ("already-clean", "already-clean"),
         ],
     )
-    def test_sanitizes(
-        self, installed_home, run_shell, shell, input_val, expected
-    ):
+    def test_sanitizes(self, installed_home, run_shell, shell, input_val, expected):
         _skip_unless(shell)
         result = run_shell(
             shell,
