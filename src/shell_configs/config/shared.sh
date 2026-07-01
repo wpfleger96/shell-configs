@@ -960,14 +960,12 @@ _parse_duration_seconds() {
     if [[ -z "$input" ]]; then
         return 1
     fi
-    local number suffix
-    if [[ "$input" =~ ^([0-9]+)([smhd])?$ ]]; then
-        number="${BASH_REMATCH[1]}"
-        suffix="${BASH_REMATCH[2]}"
-    else
+    if [[ ! "$input" =~ ^[0-9]+[smhd]?$ ]]; then
         echo "Error: invalid duration '$input' (use e.g. 60s, 10m, 24h, 1d)" >&2
         return 1
     fi
+    local number="${input%[smhd]}"
+    local suffix="${input##*[0-9]}"
     case "$suffix" in
         s | '') echo "$number" ;;
         m) echo "$((number * 60))" ;;
