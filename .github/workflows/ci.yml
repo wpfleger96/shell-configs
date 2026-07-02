@@ -18,8 +18,21 @@ permissions:
   contents: read
 
 jobs:
-  lint:
+  check:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: lint
+            recipe: lint-python-check lint-shell-check
+          - name: format
+            recipe: format-python-check format-shell-check
+          - name: type-check
+            recipe: type-check
+          - name: test
+            recipe: test
 
     steps:
       - name: Checkout
@@ -41,115 +54,23 @@ jobs:
 
       - name: Install shfmt
         uses: mfinelli/setup-shfmt@v4
+        if: contains(matrix.recipe, 'shell')
 
       - name: Install dependencies
         run: just sync
 
-      - name: Run Python linter
-        run: just lint-python-check
-
-      - name: Run shell linter
-        run: just lint-shell-check
-
-  format:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version-file: .python-version
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
-        with:
-          version: "latest"
-          enable-cache: true
-
-      - name: Install just
-        uses: extractions/setup-just@v4
-
-      - name: Install shfmt
-        uses: mfinelli/setup-shfmt@v4
-
-      - name: Install dependencies
-        run: just sync
-
-      - name: Run Python formatter
-        run: just format-python-check
-
-      - name: Run shell formatter
-        run: just format-shell-check
-
-  type-check:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version-file: .python-version
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
-        with:
-          version: "latest"
-          enable-cache: true
-
-      - name: Install just
-        uses: extractions/setup-just@v4
-
-      - name: Install dependencies
-        run: just sync
-
-      - name: Run type checks
-        run: just type-check
-
-  test:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version-file: .python-version
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
-        with:
-          version: "latest"
-          enable-cache: true
-
-      - name: Install just
-        uses: extractions/setup-just@v4
-
-      - name: Install dependencies
-        run: just sync
-
-      - name: Run tests
-        run: just test
+      - name: Run ${{ matrix.name }}
+        run: just ${{ matrix.recipe }}
 
   checks:
     if: always()
-    needs: [lint, format, type-check, test]
+    needs: [check]
     runs-on: ubuntu-latest
 
     steps:
       - name: Verify all checks passed
         run: |
-          if [[ "${{ needs.lint.result }}" != "success" || \
-                "${{ needs.format.result }}" != "success" || \
-                "${{ needs['type-check'].result }}" != "success" || \
-                "${{ needs.test.result }}" != "success" ]]; then
+          if [[ "${{ needs.check.result }}" != "success" ]]; then
             echo "One or more checks failed"
             exit 1
           fi
