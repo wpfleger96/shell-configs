@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.60.0](https://github.com/wpfleger96/shell-configs/compare/v0.59.1...v0.60.0) (2026-07-03)
+
+
+### Features
+
+* add build-essential to managed packages ([#121](https://github.com/wpfleger96/shell-configs/issues/121)) ([430f6aa](https://github.com/wpfleger96/shell-configs/commit/430f6aae6f77af1fc8c8fe1594d307ea8e7f30e0))
+
+
+### Continuous Integration
+
+* sync CI workflow ([86f0393](https://github.com/wpfleger96/shell-configs/commit/86f0393ce36f72b3af90b475edcb0093535fe048))
+
 ## [0.59.1](https://github.com/wpfleger96/shell-configs/compare/v0.59.0...v0.59.1) (2026-07-01)
 
 
