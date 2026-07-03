@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -16,6 +17,35 @@ from shell_configs.config import get_config_dir
 
 # Validates owner/repo format — rejects URLs, bare names, and paths.
 _EXTENSION_RE = re.compile(r"^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$")
+
+# Repo-scoped git env vars (`git rev-parse --local-env-vars`). Git exports
+# GIT_DIR/GIT_INDEX_FILE to hook processes, and any inherited value redirects
+# subprocess git operations at the invoking repo — a temp `git clone` would
+# write its checkout entries into that repo's real index.
+_GIT_REPO_ENV_VARS = frozenset(
+    {
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_COMMON_DIR",
+        "GIT_CONFIG",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_DIR",
+        "GIT_GRAFT_FILE",
+        "GIT_IMPLICIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_INTERNAL_SUPER_PREFIX",
+        "GIT_NO_REPLACE_OBJECTS",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_PREFIX",
+        "GIT_REPLACE_REF_BASE",
+        "GIT_SHALLOW_FILE",
+        "GIT_WORK_TREE",
+    }
+)
+
+
+def _subprocess_env() -> dict[str, str]:
+    """Process environment with repo-scoped git variables removed."""
+    return {k: v for k, v in os.environ.items() if k not in _GIT_REPO_ENV_VARS}
 
 
 @dataclass(frozen=True)
@@ -63,6 +93,7 @@ def list_installed() -> dict[str, str | None]:
         result = subprocess.run(
             ["gh", "extension", "list"],
             capture_output=True,
+            env=_subprocess_env(),
             text=True,
             timeout=30,
         )
@@ -102,6 +133,7 @@ def _remove_extension(cmd_name: str) -> bool:
         result = subprocess.run(
             ["gh", "extension", "remove", cmd_name],
             capture_output=True,
+            env=_subprocess_env(),
             text=True,
             timeout=30,
         )
@@ -116,6 +148,7 @@ def _get_extensions_dir() -> Path:
         result = subprocess.run(
             ["gh", "config", "get", "extensions_dir"],
             capture_output=True,
+            env=_subprocess_env(),
             text=True,
             timeout=10,
         )
@@ -155,6 +188,7 @@ def install_from_source(
         clone_result = subprocess.run(
             clone_cmd,
             capture_output=True,
+            env=_subprocess_env(),
             text=True,
             timeout=120,
         )
@@ -167,6 +201,7 @@ def install_from_source(
         build_result = subprocess.run(
             ["go", "build", "-trimpath", "-o", str(staged_binary), build_path],
             capture_output=True,
+            env=_subprocess_env(),
             text=True,
             cwd=clone_dir,
             timeout=300,
@@ -212,7 +247,9 @@ def install_extension(
     if pin:
         cmd += ["--pin", pin]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(
+            cmd, capture_output=True, env=_subprocess_env(), text=True, timeout=30
+        )
     except FileNotFoundError:
         return False, f"Failed to install {name}: gh CLI not found"
     except subprocess.TimeoutExpired:
@@ -225,7 +262,9 @@ def install_extension(
     if "already" in result.stderr and "provides" in result.stderr:
         _remove_extension(cmd_name)
         try:
-            retry = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            retry = subprocess.run(
+                cmd, capture_output=True, env=_subprocess_env(), text=True, timeout=30
+            )
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return (
                 False,
