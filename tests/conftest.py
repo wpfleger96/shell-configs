@@ -10,6 +10,8 @@ import pytest
 
 from click.testing import CliRunner
 
+from shell_configs.gh_extensions import _GIT_REPO_ENV_VARS
+
 PASSTHROUGH_COMMANDS = {"bash", "git", "zsh"}
 
 STUB_COMMANDS = {
@@ -87,6 +89,18 @@ def guard_subprocess(monkeypatch):
         )
 
     monkeypatch.setattr(subprocess, "run", _guarded_run)
+
+
+@pytest.fixture(autouse=True)
+def isolate_git_env(monkeypatch):
+    """Strip repo-scoped git env vars inherited from a parent git process.
+
+    Running the suite from a pre-commit hook exports GIT_DIR/GIT_INDEX_FILE
+    (absolute paths for linked-worktree commits); passthrough git subprocesses
+    would otherwise operate on the real repo index instead of test repos.
+    """
+    for var in _GIT_REPO_ENV_VARS:
+        monkeypatch.delenv(var, raising=False)
 
 
 @pytest.fixture(autouse=True)

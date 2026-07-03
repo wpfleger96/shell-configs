@@ -1,7 +1,7 @@
 """Tests for gh CLI extension management."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -343,6 +343,7 @@ class TestInstallExtension:
         mock_run.assert_called_once_with(
             ["gh", "extension", "install", "babarot/gh-infra"],
             capture_output=True,
+            env=ANY,
             text=True,
             timeout=30,
         )
@@ -357,6 +358,7 @@ class TestInstallExtension:
         mock_run.assert_called_once_with(
             ["gh", "extension", "install", "babarot/gh-infra", "--pin", "v0.13.0"],
             capture_output=True,
+            env=ANY,
             text=True,
             timeout=30,
         )
@@ -529,6 +531,7 @@ class TestGhExtensionsComponent:
         mock_run.assert_called_once_with(
             ["gh", "extension", "install", "babarot/gh-infra"],
             capture_output=True,
+            env=ANY,
             text=True,
             timeout=30,
         )
@@ -706,3 +709,40 @@ class TestGhExtensionsComponent:
         mock_source.assert_called_once_with(
             "wpfleger96/gh-infra", "./cmd/gh-infra/", pin=None, dry_run=False
         )
+
+
+@pytest.mark.unit
+class TestGitEnvIsolation:
+    """Subprocesses must not inherit repo-scoped git env vars.
+
+    A pre-commit hook exports GIT_DIR/GIT_INDEX_FILE; if the temp `git clone`
+    inherited them, its checkout would be written into the invoking repo's
+    real index (with blobs in the soon-deleted clone dir), corrupting it.
+    """
+
+    def test_clone_env_excludes_repo_scoped_git_vars(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("GIT_INDEX_FILE", "/victim/.git/worktrees/wt/index")
+        monkeypatch.setenv("GIT_DIR", "/victim/.git/worktrees/wt")
+        clone_fail = MagicMock(returncode=1, stdout="", stderr="stop after clone")
+        with (
+            patch("shell_configs.gh_extensions._get_extensions_dir") as mock_dir,
+            patch(
+                "shell_configs.gh_extensions.shutil.which", return_value="/usr/bin/go"
+            ),
+            patch(
+                "shell_configs.gh_extensions.tempfile.mkdtemp",
+                return_value="/tmp/gh-ext-build-xxx",
+            ),
+            patch(
+                "shell_configs.gh_extensions.subprocess.run", return_value=clone_fail
+            ) as mock_run,
+            patch("shell_configs.gh_extensions.shutil.rmtree"),
+        ):
+            mock_dir.return_value = Path("/fake/extensions")
+            install_from_source("wpfleger96/gh-infra", "./cmd/gh-infra/")
+        env = mock_run.call_args.kwargs["env"]
+        assert "GIT_INDEX_FILE" not in env
+        assert "GIT_DIR" not in env
+        assert "PATH" in env
