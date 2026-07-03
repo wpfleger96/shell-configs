@@ -9,6 +9,12 @@ packages:
     linux:
       method: apt
 
+  - name: build-essential
+    command: gcc
+    description: "GCC/g++/make toolchain for compiling native packages (e.g. Python sdists with C extensions)"
+    linux:
+      method: apt
+
   # Shell tools
   - name: expect
     command: unbuffer
