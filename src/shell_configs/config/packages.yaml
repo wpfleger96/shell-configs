@@ -15,6 +15,12 @@ packages:
     linux:
       method: apt
 
+  - name: wl-clipboard
+    command: wl-copy
+    description: "Wayland clipboard command-line utilities (wl-copy / wl-paste)"
+    linux:
+      method: apt
+
   # Shell tools
   - name: expect
     command: unbuffer
@@ -65,6 +71,17 @@ packages:
     linux:
       method: script
       install_cmd: "curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash"
+
+  - name: docker
+    command: docker
+    description: "Docker container runtime"
+    linux:
+      method: apt
+      package: docker-ce
+      repo:
+        name: docker
+        key_url: https://download.docker.com/linux/ubuntu/gpg
+        source: "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
 
   # Configuration Management
   - name: ansible
