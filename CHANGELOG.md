@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## [0.61.0](https://github.com/wpfleger96/shell-configs/compare/v0.60.0...v0.61.0) (2026-07-04)
+
+
+### Features
+
+* make load-tf-secrets and enpass-cli available on native Linux ([#124](https://github.com/wpfleger96/shell-configs/issues/124)) ([50fb96b](https://github.com/wpfleger96/shell-configs/commit/50fb96b1e1a5fa9db8616c92d3558cb8d6aa6126))
+
+
+### Bug Fixes
+
+* stop inherited git env from corrupting the repo index ([#122](https://github.com/wpfleger96/shell-configs/issues/122)) ([b22e39e](https://github.com/wpfleger96/shell-configs/commit/b22e39e2d48c8f03248a3ddcfabae103d1899425)), closes [#121](https://github.com/wpfleger96/shell-configs/issues/121)
+
+
+### Chores
+
+* sync pre-commit hook ([c44bf2e](https://github.com/wpfleger96/shell-configs/commit/c44bf2efd4008f02e06b3f92579ab0572afe2558))
+
+
+### Continuous Integration
+
+* sync CI workflow ([c2047a2](https://github.com/wpfleger96/shell-configs/commit/c2047a2a52c581858e94fd0f0f060f0a60a6e6dd))
+
 ## [0.60.0](https://github.com/wpfleger96/shell-configs/compare/v0.59.1...v0.60.0) (2026-07-03)
 
 
