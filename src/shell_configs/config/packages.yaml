@@ -15,6 +15,12 @@ packages:
     linux:
       method: apt
 
+  - name: wl-clipboard
+    command: wl-copy
+    description: "Wayland clipboard command-line utilities (wl-copy / wl-paste)"
+    linux:
+      method: apt
+
   # Shell tools
   - name: expect
     command: unbuffer
