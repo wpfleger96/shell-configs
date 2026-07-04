@@ -98,6 +98,17 @@ def test_platform_detection() -> None:
     assert isinstance(result, Platform)
 
 
+def test_enpass_cli_available_on_linux(monkeypatch: pytest.MonkeyPatch) -> None:
+    """enpass-cli must not be wsl_only — it should be installable on native Linux."""
+    monkeypatch.setattr(
+        "shell_configs.packages.packages.is_platform",
+        lambda p: p == Platform.LINUX,
+    )
+    packages = load_packages()
+    names = [p.name for p in packages]
+    assert "enpass-cli" in names
+
+
 def test_load_packages_returns_list(tmp_path: Path) -> None:
     """Test that load_packages parses YAML and returns list of packages."""
     manifest_content = """

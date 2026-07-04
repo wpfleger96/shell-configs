@@ -6,7 +6,7 @@ from importlib.resources import files as resource_files
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from shell_configs.platform import detect_platform
+from shell_configs.platform import Platform, detect_platform
 
 if TYPE_CHECKING:
     from shell_configs.profiles.profile import Profile
@@ -115,16 +115,17 @@ class ConfigReader:
         content = base_path.read_text(encoding="utf-8").rstrip("\n")
 
         platform = detect_platform()
-        overlay_path = (
-            self.config_dir
-            / "platform"
-            / f"{platform.value}{shell.shared_config_suffix}"
-        )
-
-        if overlay_path.exists():
-            overlay = overlay_path.read_text(encoding="utf-8").rstrip("\n")
-            if overlay:
-                content = f"{content}\n\n### Platform-Specific ({platform.display_name}) ###\n{overlay}"
+        for pval in platform.overlay_chain:
+            overlay_path = (
+                self.config_dir / "platform" / f"{pval}{shell.shared_config_suffix}"
+            )
+            if overlay_path.exists():
+                overlay = overlay_path.read_text(encoding="utf-8").rstrip("\n")
+                if overlay:
+                    display = Platform(pval).display_name
+                    content = (
+                        f"{content}\n\n### Platform-Specific ({display}) ###\n{overlay}"
+                    )
 
         export_line = shell.format_config_dir_export(self.config_dir)
         if export_line:

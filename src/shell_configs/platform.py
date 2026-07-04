@@ -29,6 +29,12 @@ class Platform(Enum):
     def is_unix_like(self) -> bool:
         return self in (Platform.MACOS, Platform.LINUX, Platform.WSL)
 
+    @property
+    def overlay_chain(self) -> list[str]:
+        if self == Platform.WSL:
+            return [Platform.LINUX.value, Platform.WSL.value]
+        return [self.value]
+
 
 @lru_cache(maxsize=1)
 def detect_platform() -> Platform:
