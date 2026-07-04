@@ -68,3 +68,18 @@ class TestDetectPlatform:
             "shell_configs.platform._platform.system", lambda: "FreeBSD"
         )
         assert detect_platform() == Platform.LINUX
+
+
+@pytest.mark.unit
+class TestOverlayChain:
+    def test_linux_chain(self):
+        assert Platform.LINUX.overlay_chain == ["linux"]
+
+    def test_wsl_chain(self):
+        assert Platform.WSL.overlay_chain == ["linux", "wsl"]
+
+    def test_macos_chain(self):
+        assert Platform.MACOS.overlay_chain == ["macos"]
+
+    def test_windows_chain(self):
+        assert Platform.WINDOWS.overlay_chain == ["windows"]
