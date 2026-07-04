@@ -205,6 +205,22 @@ packages:
       method: script
       install_cmd: "curl -sS https://webi.sh/delta | sh"
 
+  - name: enpass
+    command: Enpass
+    description: "Enpass password manager (desktop app for browser extension)"
+    linux:
+      method: apt
+      package: enpass
+      extra_packages:
+        - libxcb-icccm4
+        - libxcb-image0
+        - libxcb-keysyms1
+        - libxcb-render-util0
+      repo:
+        name: enpass
+        key_url: https://apt.enpass.io/keys/enpass-linux.key
+        source: "deb https://apt.enpass.io/ stable main"
+
   - name: enpass-cli
     command: enpass-cli
     description: "Enpass vault CLI for password and secret retrieval"
