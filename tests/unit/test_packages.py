@@ -371,3 +371,127 @@ class TestRunPkgCmdFallback:
         ok, msg = self._run(monkeypatch, stdout="", stderr="")
         assert not ok
         assert msg == "generic"
+
+
+class TestExtraPackages:
+    def test_load_packages_parses_extra_packages(self, tmp_path: Path) -> None:
+        manifest_content = """\
+packages:
+  - name: myapp
+    linux:
+      method: apt
+      package: myapp
+      extra_packages:
+        - libfoo
+        - libbar
+"""
+        manifest_path = tmp_path / "packages.yaml"
+        manifest_path.write_text(manifest_content)
+
+        packages = load_packages(manifest_path)
+
+        assert len(packages) == 1
+        config = packages[0].linux
+        assert config is not None
+        assert config.extra_packages == ["libfoo", "libbar"]
+
+    def test_install_dry_run_mentions_extra_packages(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: "/usr/bin/apt" if name == "apt" else None,
+        )
+        installer = LinuxInstaller()
+        monkeypatch.setattr(installer, "is_installed", lambda pkg: False)
+        pkg = Package(
+            name="myapp",
+            linux=InstallConfig(
+                method="apt", package="myapp", extra_packages=["libfoo", "libbar"]
+            ),
+        )
+        success, msg = installer.install(pkg, dry_run=True)
+        assert success is True
+        assert "libfoo" in msg
+        assert "libbar" in msg
+
+    def test_install_includes_extra_packages_in_apt_command(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: "/usr/bin/apt" if name == "apt" else None,
+        )
+        installer = LinuxInstaller()
+        monkeypatch.setattr(installer, "is_installed", lambda pkg: False)
+        captured: list[list[str]] = []
+
+        def fake_run(*a, **kw):
+            captured.append(a[0])
+            return subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="", stderr=""
+            )
+
+        monkeypatch.setattr("shell_configs.packages.packages.subprocess.run", fake_run)
+        pkg = Package(
+            name="myapp",
+            linux=InstallConfig(
+                method="apt", package="myapp", extra_packages=["libfoo", "libbar"]
+            ),
+        )
+        installer.install(pkg)
+        assert len(captured) == 1
+        cmd = captured[0]
+        assert "myapp" in cmd
+        assert "libfoo" in cmd
+        assert "libbar" in cmd
+
+    def test_uninstall_includes_extra_packages_in_apt_command(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: "/usr/bin/apt" if name == "apt" else None,
+        )
+        installer = LinuxInstaller()
+        monkeypatch.setattr(installer, "is_installed", lambda pkg: True)
+        captured: list[list[str]] = []
+
+        def fake_run(*a, **kw):
+            captured.append(a[0])
+            return subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="", stderr=""
+            )
+
+        monkeypatch.setattr("shell_configs.packages.packages.subprocess.run", fake_run)
+        pkg = Package(
+            name="myapp",
+            linux=InstallConfig(
+                method="apt", package="myapp", extra_packages=["libfoo", "libbar"]
+            ),
+        )
+        installer.uninstall(pkg)
+        assert len(captured) == 1
+        cmd = captured[0]
+        assert "myapp" in cmd
+        assert "libfoo" in cmd
+        assert "libbar" in cmd
+
+    def test_extra_packages_ignored_for_non_apt_method(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: "/usr/bin/uv" if name == "uv" else None,
+        )
+        installer = LinuxInstaller()
+        monkeypatch.setattr(installer, "is_installed", lambda pkg: False)
+        pkg = Package(
+            name="myapp",
+            linux=InstallConfig(
+                method="uv_tool", package="myapp", extra_packages=["libfoo"]
+            ),
+        )
+        success, msg = installer.install(pkg, dry_run=True)
+        assert success is True
+        assert "libfoo" not in msg

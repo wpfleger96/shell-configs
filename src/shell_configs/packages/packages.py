@@ -179,6 +179,7 @@ class InstallConfig(BaseModel):
     tap: str | None = None
     cask: bool = False
     repo: AptRepo | None = None
+    extra_packages: list[str] | None = None
     install_cmd: str | None = None
 
 
@@ -521,6 +522,8 @@ class LinuxInstaller(PackageManager):
             msg = f"Would {verb} {name} via {m.label}"
             if install and method == "apt" and config.repo:
                 msg += f" (with {config.repo.name} repo)"
+            if method == "apt" and config.extra_packages:
+                msg += f" (+ {', '.join(config.extra_packages)})"
             return True, msg
 
         if install and method == "apt" and config.repo:
@@ -532,15 +535,23 @@ class LinuxInstaller(PackageManager):
                 return False, f"Unexpected error: {e}"
 
         if install:
+            cmd = m.install_cmd(name)
+            if method == "apt" and config.extra_packages:
+                for ep in config.extra_packages:
+                    _validate_package_name(ep)
+                cmd.extend(config.extra_packages)
             return _run_pkg_cmd(
-                m.install_cmd(name),
+                cmd,
                 timeout=300,
                 success_msg=f"Successfully installed {name}",
                 failure_msg="Installation failed",
                 timeout_msg="Installation timed out after 5 minutes",
             )
+        cmd = m.uninstall_cmd(name)
+        if method == "apt" and config.extra_packages:
+            cmd.extend(config.extra_packages)
         return _run_pkg_cmd(
-            m.uninstall_cmd(name),
+            cmd,
             timeout=120,
             success_msg=f"Successfully uninstalled {name}",
             failure_msg="Uninstall failed",
