@@ -85,7 +85,17 @@ wsl_ensure_mount() {
 discover_sd_card() {
     local candidates=()
 
-    if [[ "$PLATFORM" == "wsl" ]]; then
+    # Test seam: colon-separated list of base dirs to scan for SD card subdirectories
+    if [[ -n "${BACKUP_RESMED_SCAN_DIRS:-}" ]]; then
+        IFS=':' read -ra scan_bases <<< "$BACKUP_RESMED_SCAN_DIRS"
+        for base in "${scan_bases[@]}"; do
+            for dir in "$base"/*/; do
+                if [[ -f "$dir/STR.edf" ]]; then
+                    candidates+=("${dir%/}")
+                fi
+            done
+        done
+    elif [[ "$PLATFORM" == "wsl" ]]; then
         for drive in /mnt/[d-z]; do
             if [[ -f "$drive/STR.edf" ]]; then
                 candidates+=("$drive")
@@ -111,6 +121,13 @@ discover_sd_card() {
                 done
             fi
         fi
+    elif [[ "$PLATFORM" == "linux" ]]; then
+        local user="${USER:-$(id -un)}"
+        for vol in "/run/media/$user/"* "/media/$user/"*; do
+            if [[ -f "$vol/STR.edf" ]]; then
+                candidates+=("$vol")
+            fi
+        done
     else
         for vol in /Volumes/*; do
             if [[ -f "$vol/STR.edf" ]]; then
@@ -199,10 +216,10 @@ archive_str_edf() {
     local backup_dir="$dest/STR_Backup"
 
     local mtime
-    if [[ "$PLATFORM" == "wsl" ]]; then
-        mtime=$(stat -c '%Y' "$str_dest" 2>/dev/null)
-    else
+    if [[ "$PLATFORM" == "macos" ]]; then
         mtime=$(stat -f '%m' "$str_dest" 2>/dev/null)
+    else
+        mtime=$(stat -c '%Y' "$str_dest" 2>/dev/null)
     fi
     local date_str
     date_str=$(date -d "@$mtime" '+%Y-%m-%d' 2>/dev/null || date -r "$mtime" '+%Y-%m-%d' 2>/dev/null)
@@ -313,7 +330,8 @@ show_help() {
     echo -e "${CYAN}Examples:${NC}"
     echo "    $0                                    # Auto-detect everything"
     echo "    $0 --dry-run                          # Preview without copying"
-    echo "    $0 --source /mnt/f                    # Specify SD card path"
+    echo "    $0 --source /mnt/f                    # Specify SD card path (WSL)"
+    echo "    $0 --source /run/media/\$USER/XXXX-XXXX  # Specify SD card path (Linux)"
     echo "    $0 --dest ~/Dropbox/Medical/BiPAP\\ Raw\\ Data  # Specify destination"
 }
 
