@@ -50,6 +50,20 @@ read_device_name() {
     fi
 }
 
+read_serial() {
+    local id_file="$1/Identification.json"
+    if [[ ! -f "$id_file" ]]; then
+        echo ""
+        return
+    fi
+
+    if command -v jq &>/dev/null; then
+        jq -r '.FlowGenerator.IdentificationProfiles.Product.SerialNumber // empty' "$id_file" 2>/dev/null
+    else
+        grep -o '"SerialNumber":"[^"]*"' "$id_file" 2>/dev/null | head -1 | cut -d'"' -f4
+    fi
+}
+
 wsl_ensure_mount() {
     local letter="$1"
     local mount_point="/mnt/$letter"
@@ -293,6 +307,8 @@ show_help() {
     echo "    Metadata (overwrite):  STR.edf, Identification.json, Identification.crc, SETTINGS/"
     echo "    DATALOG (incremental): Only new files are copied, existing files are never overwritten"
     echo "    STR.edf archival:      Previous STR.edf is saved to STR_Backup/ before overwriting"
+    echo "    Serial guard:          Source and destination device serials are compared; a mismatch"
+    echo "                           requires explicit typed confirmation ('yes') before proceeding"
     echo ""
     echo -e "${CYAN}Examples:${NC}"
     echo "    $0                                    # Auto-detect everything"
@@ -375,6 +391,32 @@ main() {
     fi
 
     echo -e "Destination: ${CYAN}${DEST}${NC}"
+
+    # Guard against backing up one device's SD card into a different device's archive
+    local src_serial dest_serial
+    src_serial=$(read_serial "$SOURCE")
+    dest_serial=$(read_serial "$DEST")
+
+    if [[ -z "$dest_serial" ]]; then
+        echo -e "${CYAN}ℹ First backup to this destination (no Identification.json found).${NC}"
+    elif [[ -n "$src_serial" && "$src_serial" != "$dest_serial" ]]; then
+        local dest_device
+        dest_device=$(read_device_name "$DEST")
+        echo ""
+        echo -e "${RED}WARNING: Device serial mismatch!${NC}"
+        echo -e "  Source:      ${YELLOW}${device_info}${NC}"
+        echo -e "  Destination: ${YELLOW}${dest_device}${NC}"
+        echo ""
+        if [[ "$DRY_RUN" == "true" ]]; then
+            echo -e "${YELLOW}[DRY RUN] Serial mismatch detected — would require typed confirmation to proceed.${NC}"
+        else
+            read -rp "These are different devices. Type 'yes' to proceed anyway: " confirm
+            if [[ "$confirm" != "yes" ]]; then
+                echo -e "${RED}Aborted: serial mismatch.${NC}" >&2
+                exit 1
+            fi
+        fi
+    fi
 
     if [[ "$DRY_RUN" == "true" ]]; then
         echo ""
