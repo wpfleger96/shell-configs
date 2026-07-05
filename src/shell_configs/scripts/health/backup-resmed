@@ -186,7 +186,7 @@ discover_dest() {
     elif [[ ${#candidates[@]} -gt 1 ]]; then
         echo -e "${CYAN}Select backup destination:${NC}" >&2
         for i in "${!candidates[@]}"; do
-            echo -e "  $((i + 1))) $(basename "${candidates[$i]}")" >&2
+            echo -e "  $((i + 1))) ${candidates[$i]}" >&2
         done
         read -rp "Select destination (1-${#candidates[@]}): " choice
         if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#candidates[@]} )); then
