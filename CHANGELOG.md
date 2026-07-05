@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [0.62.0](https://github.com/wpfleger96/shell-configs/compare/v0.61.0...v0.62.0) (2026-07-05)
+
+
+### Features
+
+* add docker to Linux auto-installed packages ([#127](https://github.com/wpfleger96/shell-configs/issues/127)) ([7189317](https://github.com/wpfleger96/shell-configs/commit/7189317f5932d944ff70da62214028cda7c5d512))
+* **health:** guard backup-resmed against card/destination serial mismatch ([#128](https://github.com/wpfleger96/shell-configs/issues/128)) ([de044ed](https://github.com/wpfleger96/shell-configs/commit/de044ed8b208bccc79dc5ff6ef2311da63ff6d30))
+* **packages:** add Enpass desktop app with extra_packages support ([#125](https://github.com/wpfleger96/shell-configs/issues/125)) ([0bfbff8](https://github.com/wpfleger96/shell-configs/commit/0bfbff80f7eead7d72daf9b454169ef9444db5a0))
+
+
+### Bug Fixes
+
+* **health:** show full destination paths in backup-resmed menu ([#130](https://github.com/wpfleger96/shell-configs/issues/130)) ([e891356](https://github.com/wpfleger96/shell-configs/commit/e891356227c6aef69a05fb95a72165bd6b173bb6))
+* **health:** support SD autodetect and STR archiving on vanilla Linux ([#129](https://github.com/wpfleger96/shell-configs/issues/129)) ([6e92147](https://github.com/wpfleger96/shell-configs/commit/6e92147efac825cae99973231d3313f69a1dce30))
+
 ## [0.61.0](https://github.com/wpfleger96/shell-configs/compare/v0.60.0...v0.61.0) (2026-07-04)
 
 
