@@ -834,5 +834,4 @@ def load_packages(manifest_path: Path | None = None) -> list[Package]:
         data = yaml.safe_load(f) or {}
 
     all_packages = [Package(**item) for item in data.get("packages", [])]
-    # Manager methods access pkg.linux directly, bypassing get_config_for_platform()
-    return [p for p in all_packages if not p.wsl_only or is_platform(Platform.WSL)]
+    return [p for p in all_packages if p.get_config_for_platform() is not None]
