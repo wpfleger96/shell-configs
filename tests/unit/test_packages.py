@@ -131,7 +131,14 @@ def test_linux_only_packages_excluded_on_macos(
     )
     packages = load_packages()
     names = [p.name for p in packages]
-    for pkg in ("wl-clipboard", "enpass", "enpass-cli", "bzip2", "build-essential", "docker"):
+    for pkg in (
+        "wl-clipboard",
+        "enpass",
+        "enpass-cli",
+        "bzip2",
+        "build-essential",
+        "docker",
+    ):
         assert pkg not in names
 
 
