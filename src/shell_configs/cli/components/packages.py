@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from shell_configs.cli.context import (
     Component,
     ComponentPlan,
@@ -10,6 +12,20 @@ from shell_configs.cli.context import (
     RequiredPackagesPlan,
     expect_plan,
 )
+
+if TYPE_CHECKING:
+    from shell_configs.packages.packages import Package
+
+
+def _any_pkg_needs_sudo(packages: list[Package]) -> bool:
+    """True when any package in the list would invoke sudo on the current platform."""
+    from shell_configs.platform import Platform, is_platform
+
+    if not (is_platform(Platform.LINUX) or is_platform(Platform.WSL)):
+        return False
+    from shell_configs.packages.packages import _linux_needs_sudo
+
+    return any(_linux_needs_sudo(p) for p in packages)
 
 
 class RequiredPackagesComponent(Component):
@@ -35,6 +51,10 @@ class RequiredPackagesComponent(Component):
             return RequiredPackagesPlan(has_changes=False)
 
         return RequiredPackagesPlan(has_changes=bool(missing), missing=missing)
+
+    def needs_sudo(self, ctx: Context, plan: ComponentPlan) -> bool:
+        plan = expect_plan(plan, RequiredPackagesPlan)
+        return bool(plan.missing) and _any_pkg_needs_sudo(plan.missing)
 
     def display_plan(self, plan: ComponentPlan) -> None:
         plan = expect_plan(plan, RequiredPackagesPlan)
@@ -103,6 +123,10 @@ class OptionalPackagesComponent(Component):
         return OptionalPackagesPlan(
             has_changes=bool(missing), total=packages, missing=missing
         )
+
+    def needs_sudo(self, ctx: Context, plan: ComponentPlan) -> bool:
+        plan = expect_plan(plan, OptionalPackagesPlan)
+        return bool(plan.missing) and _any_pkg_needs_sudo(plan.missing)
 
     def display_plan(self, plan: ComponentPlan) -> None:
         plan = expect_plan(plan, OptionalPackagesPlan)

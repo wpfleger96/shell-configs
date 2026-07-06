@@ -308,7 +308,7 @@ class TestInstallLanguage:
             ok, msg = install_language(lang)
         assert ok
         called_cmd = mock_run.call_args[0][0]
-        assert called_cmd == ["sudo", "apt-get", "install", "-y", "golang"]
+        assert called_cmd == ["sudo", "-n", "apt-get", "install", "-y", "golang"]
 
     def test_script_install_fallback(self, monkeypatch):
         monkeypatch.setattr(

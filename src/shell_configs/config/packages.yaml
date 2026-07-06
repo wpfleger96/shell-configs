@@ -225,6 +225,7 @@ packages:
   - name: enpass
     command: Enpass
     description: "Enpass password manager (desktop app for browser extension)"
+    wsl_exclude: true
     linux:
       method: apt
       package: enpass
@@ -236,7 +237,7 @@ packages:
       repo:
         name: enpass
         key_url: https://apt.enpass.io/keys/enpass-linux.key
-        source: "deb https://apt.enpass.io/ stable main"
+        source: "deb [arch=amd64] https://apt.enpass.io/ stable main"
 
   - name: enpass-cli
     command: enpass-cli

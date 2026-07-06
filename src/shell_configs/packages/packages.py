@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
+import sys
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -31,14 +33,18 @@ def _validate_package_name(name: str) -> str:
 
 
 def _inject_signed_by(source: str, key_path: str) -> str:
-    """Inject signed-by= into the options bracket of a deb source line.
+    """Inject signed-by= into a deb source line.
 
     Modern apt requires signed-by= to trust a keyring stored in
     /usr/share/keyrings/ rather than the legacy /etc/apt/trusted.gpg.d/.
+    If the source already has an options bracket, signed-by= is inserted
+    into it; otherwise a new bracket is prepended after 'deb '.
     """
     if "signed-by=" in source:
         return source
-    return re.sub(r"^(deb\s+)\[([^\]]*)\]", rf"\1[\2 signed-by={key_path}]", source)
+    if re.match(r"^deb\s+\[", source):
+        return re.sub(r"^(deb\s+)\[([^\]]*)\]", rf"\1[\2 signed-by={key_path}]", source)
+    return re.sub(r"^(deb\s+)", rf"\1[signed-by={key_path}] ", source)
 
 
 def _run_pkg_cmd(
@@ -57,6 +63,7 @@ def _run_pkg_cmd(
             capture_output=True,
             text=True,
             timeout=timeout,
+            stdin=subprocess.DEVNULL,
         )
     except subprocess.TimeoutExpired:
         return False, timeout_msg
@@ -65,6 +72,41 @@ def _run_pkg_cmd(
     if result.returncode == 0:
         return True, success_msg
     return False, result.stderr.strip() or result.stdout.strip() or failure_msg
+
+
+def ensure_sudo_auth() -> tuple[bool, str]:
+    """Cache sudo credentials so captured sudo calls never block invisibly.
+
+    Returns (True, "") when credentials are cached or not needed.
+    Returns (False, reason) when auth fails or no TTY is available.
+    """
+    if os.geteuid() == 0 or shutil.which("sudo") is None:
+        return True, ""
+
+    try:
+        probe = subprocess.run(["sudo", "-n", "-v"], capture_output=True, timeout=10)
+    except subprocess.TimeoutExpired:
+        probe = None
+
+    if probe is not None and probe.returncode == 0:
+        return True, ""
+
+    if sys.stdin.isatty():
+        from shell_configs.display import print_info
+
+        print_info(
+            "Administrator access needed to install packages"
+            " — you may be prompted for your sudo password"
+        )
+        result = subprocess.run(["sudo", "-v"])
+        if result.returncode == 0:
+            return True, ""
+        return False, "sudo authentication failed"
+
+    return (
+        False,
+        "sudo authentication required but no TTY is available; run 'sudo -v' first",
+    )
 
 
 def _is_pwsh_module_installed(name: str) -> bool:
@@ -145,8 +187,8 @@ _LINUX_METHODS: dict[str, _LinuxMethod] = {
     "apt": _LinuxMethod(
         tool="apt",
         label="apt",
-        install_cmd=lambda n: ["sudo", "apt-get", "install", "-y", n],
-        uninstall_cmd=lambda n: ["sudo", "apt-get", "remove", "-y", n],
+        install_cmd=lambda n: ["sudo", "-n", "apt-get", "install", "-y", n],
+        uninstall_cmd=lambda n: ["sudo", "-n", "apt-get", "remove", "-y", n],
     ),
     "pip": _LinuxMethod(
         tool="pip",
@@ -191,6 +233,9 @@ class Package(BaseModel):
     description: str = ""
     required: bool = False
     wsl_only: bool = False
+    # Setting both wsl_only and wsl_exclude is contradictory (package would
+    # never be available on any platform) and must not be done.
+    wsl_exclude: bool = False
     macos: InstallConfig | None = None
     linux: InstallConfig | None = None
     windows: InstallConfig | None = None
@@ -203,11 +248,29 @@ class Package(BaseModel):
         """Get install config for current platform."""
         if self.wsl_only and not is_platform(Platform.WSL):
             return None
+        if self.wsl_exclude and is_platform(Platform.WSL):
+            return None
         if is_platform(Platform.MACOS):
             return self.macos
         if is_platform(Platform.WINDOWS):
             return self.windows
         return self.linux
+
+
+def _linux_needs_sudo(pkg: Package) -> bool:
+    """True if installing/uninstalling this package on Linux invokes sudo."""
+    config = pkg.linux
+    if config is None:
+        return False
+    if config.method == "apt":
+        return True
+    if (
+        config.method == "script"
+        and config.install_cmd
+        and "sudo" in config.install_cmd
+    ):
+        return True
+    return False
 
 
 class PackageManager(ABC):
@@ -585,11 +648,20 @@ class LinuxInstaller(PackageManager):
             timeout=10,
         )
 
-        subprocess.run(
-            ["sudo", "apt-get", "update"],
+        update_result = subprocess.run(
+            ["sudo", "-n", "apt-get", "update"],
             capture_output=True,
+            text=True,
             timeout=120,
         )
+        if update_result.returncode != 0:
+            from shell_configs.display import print_warning
+
+            stderr_tail = "\n".join(update_result.stderr.strip().splitlines()[-5:])
+            print_warning(
+                f"apt-get update failed for repo '{repo.name}'; "
+                f"the following install result is definitive.\n{stderr_tail}"
+            )
 
     def _install_script(
         self, pkg: Package, config: InstallConfig, dry_run: bool

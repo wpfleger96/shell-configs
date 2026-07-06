@@ -31,6 +31,21 @@ class LanguagesComponent(Component):
             status_only=status_only,
         )
 
+    def needs_sudo(self, ctx: Context, plan: ComponentPlan) -> bool:
+        plan = expect_plan(plan, LanguagesPlan)
+        if not plan.missing:
+            return False
+        from shell_configs.platform import Platform, is_platform
+
+        if not (is_platform(Platform.LINUX) or is_platform(Platform.WSL)):
+            return False
+        for lang in plan.missing:
+            if lang.linux and lang.linux.method == "apt":
+                return True
+            if not lang.linux and lang.install_cmd and "sudo" in lang.install_cmd:
+                return True
+        return False
+
     def display_plan(self, plan: ComponentPlan) -> None:
         plan = expect_plan(plan, LanguagesPlan)
         if not plan.has_changes:
