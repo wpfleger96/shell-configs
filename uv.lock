@@ -469,7 +469,7 @@ wheels = [
 
 [[package]]
 name = "shell-configs"
-version = "0.62.0"
+version = "0.62.1"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

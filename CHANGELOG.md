@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [0.62.1](https://github.com/wpfleger96/shell-configs/compare/v0.62.0...v0.62.1) (2026-07-06)
+
+
+### Bug Fixes
+
+* **packages:** filter out packages with no config for current platform ([#131](https://github.com/wpfleger96/shell-configs/issues/131)) ([84e8a10](https://github.com/wpfleger96/shell-configs/commit/84e8a101be2a5c7ddceccf98388f5dece22b017f))
+* **packages:** pre-authorize sudo installs and exclude enpass on WSL ([#133](https://github.com/wpfleger96/shell-configs/issues/133)) ([ac72368](https://github.com/wpfleger96/shell-configs/commit/ac72368dfb97740c8f0b9a4c1632579cabb4200f))
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#102](https://github.com/wpfleger96/shell-configs/issues/102)) ([ca68e27](https://github.com/wpfleger96/shell-configs/commit/ca68e276f7c6a2510bc4461199484c4acd568825))
+
 ## [0.62.0](https://github.com/wpfleger96/shell-configs/compare/v0.61.0...v0.62.0) (2026-07-05)
 
 
