@@ -91,6 +91,49 @@ packages:
         assert "git" in names
         assert "wslu" not in names
 
+    def test_load_packages_filters_linux_only_on_macos(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        manifest_content = """\
+packages:
+  - name: git
+    command: git
+    macos:
+      method: brew
+    linux:
+      method: apt
+  - name: wl-clipboard
+    command: wl-copy
+    linux:
+      method: apt
+"""
+        manifest_path = tmp_path / "packages.yaml"
+        manifest_path.write_text(manifest_content)
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.is_platform",
+            lambda p: p == Platform.MACOS,
+        )
+
+        packages = load_packages(manifest_path)
+
+        names = [p.name for p in packages]
+        assert "git" in names
+        assert "wl-clipboard" not in names
+
+
+def test_linux_only_packages_excluded_on_macos(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Linux-only packages must not appear in the macOS package list."""
+    monkeypatch.setattr(
+        "shell_configs.packages.packages.is_platform",
+        lambda p: p == Platform.MACOS,
+    )
+    packages = load_packages()
+    names = [p.name for p in packages]
+    for pkg in ("wl-clipboard", "enpass", "enpass-cli", "bzip2", "build-essential", "docker"):
+        assert pkg not in names
+
 
 def test_platform_detection() -> None:
     """Test that platform detection returns a Platform enum."""
