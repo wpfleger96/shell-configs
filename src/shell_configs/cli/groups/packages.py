@@ -96,6 +96,21 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
             print_info("Installation cancelled")
             return
 
+    if not dry_run and to_install:
+        from shell_configs.packages.packages import (
+            LinuxInstaller,
+            _linux_needs_sudo,
+            ensure_sudo_auth,
+        )
+
+        if isinstance(manager, LinuxInstaller) and any(
+            _linux_needs_sudo(p) for p in to_install
+        ):
+            ok, msg = ensure_sudo_auth()
+            if not ok:
+                print_error(f"Cannot install packages: {msg}")
+                sys.exit(1)
+
     console.print()
     total = len(to_install)
     for i, pkg in enumerate(to_install, start=1):
@@ -273,6 +288,21 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
         if not click.confirm("\nUninstall these packages?", default=False):
             print_info("Uninstall cancelled")
             return
+
+    if not dry_run and to_uninstall:
+        from shell_configs.packages.packages import (
+            LinuxInstaller,
+            _linux_needs_sudo,
+            ensure_sudo_auth,
+        )
+
+        if isinstance(manager, LinuxInstaller) and any(
+            _linux_needs_sudo(p) for p in to_uninstall
+        ):
+            ok, msg = ensure_sudo_auth()
+            if not ok:
+                print_error(f"Cannot uninstall packages: {msg}")
+                sys.exit(1)
 
     console.print()
     total = len(to_uninstall)

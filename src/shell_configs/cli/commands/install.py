@@ -76,6 +76,17 @@ def install(
     if ctx.dry_run:
         return
 
+    if any(
+        comp.needs_sudo(ctx, plans[comp])
+        for comp in INSTALL_COMPONENTS
+        if plans[comp].has_changes or force
+    ):
+        from shell_configs.packages import ensure_sudo_auth
+
+        ok, msg = ensure_sudo_auth()
+        if not ok:
+            print_warning(f"{msg} — installs requiring sudo will fail fast")
+
     def _apply_sequential(stage: str) -> None:
         for comp in INSTALL_COMPONENTS:
             if comp.apply_stage == stage and (plans[comp].has_changes or force):

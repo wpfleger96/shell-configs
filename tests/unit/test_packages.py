@@ -1,5 +1,6 @@
 """Tests for package management functionality."""
 
+import io
 import shutil
 import subprocess
 
@@ -382,6 +383,19 @@ class TestInjectSignedBy:
         )
         assert "https://apt.releases.hashicorp.com resolute main" in result
 
+    def test_bracket_less_source_gets_signed_by(self):
+        source = "deb https://apt.enpass.io/ stable main"
+        result = self.inject(source, "/usr/share/keyrings/enpass-archive-keyring.gpg")
+        assert result.startswith(
+            "deb [signed-by=/usr/share/keyrings/enpass-archive-keyring.gpg]"
+        )
+        assert "https://apt.enpass.io/ stable main" in result
+
+    def test_bracket_less_noop_when_signed_by_already_present(self):
+        # A bracket-less line that already contains signed-by= must be left alone.
+        source = "deb signed-by=/usr/share/keyrings/enpass.gpg https://apt.enpass.io/ stable main"
+        assert self.inject(source, "/other/path.gpg") == source
+
 
 class TestRunPkgCmdFallback:
     """Tests for _run_pkg_cmd stdout/stderr fallback chain."""
@@ -545,3 +559,244 @@ packages:
         success, msg = installer.install(pkg, dry_run=True)
         assert success is True
         assert "libfoo" not in msg
+
+
+class TestWslExclude:
+    """Tests for wsl_exclude package filtering (mirror of TestPackageWslOnly)."""
+
+    def test_wsl_exclude_returns_none_on_wsl(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.is_platform",
+            lambda p: p == Platform.WSL,
+        )
+        pkg = Package(
+            name="enpass",
+            command="Enpass",
+            wsl_exclude=True,
+            linux=InstallConfig(method="apt"),
+        )
+        assert pkg.get_config_for_platform() is None
+
+    def test_wsl_exclude_returns_config_on_native_linux(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.is_platform",
+            lambda p: p == Platform.LINUX,
+        )
+        linux_config = InstallConfig(method="apt")
+        pkg = Package(
+            name="enpass",
+            command="Enpass",
+            wsl_exclude=True,
+            linux=linux_config,
+        )
+        assert pkg.get_config_for_platform() is linux_config
+
+    def test_wsl_exclude_does_not_affect_macos(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.is_platform",
+            lambda p: p == Platform.MACOS,
+        )
+        macos_config = InstallConfig(method="brew")
+        pkg = Package(
+            name="enpass",
+            command="Enpass",
+            wsl_exclude=True,
+            macos=macos_config,
+        )
+        assert pkg.get_config_for_platform() is macos_config
+
+    def test_load_packages_filters_wsl_exclude_on_wsl(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        manifest_content = """\
+packages:
+  - name: git
+    command: git
+    linux:
+      method: apt
+  - name: enpass
+    command: Enpass
+    wsl_exclude: true
+    linux:
+      method: apt
+"""
+        manifest_path = tmp_path / "packages.yaml"
+        manifest_path.write_text(manifest_content)
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.is_platform",
+            lambda p: p == Platform.WSL,
+        )
+
+        packages = load_packages(manifest_path)
+
+        names = [p.name for p in packages]
+        assert "git" in names
+        assert "enpass" not in names
+
+
+class TestEnsureSudoAuth:
+    """Tests for ensure_sudo_auth()."""
+
+    def _call(self) -> tuple[bool, str]:
+        from shell_configs.packages.packages import ensure_sudo_auth
+
+        return ensure_sudo_auth()
+
+    def test_root_user_returns_true(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("shell_configs.packages.packages.os.geteuid", lambda: 0)
+        ok, msg = self._call()
+        assert ok is True
+        assert msg == ""
+
+    def test_no_sudo_binary_returns_true(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("shell_configs.packages.packages.os.geteuid", lambda: 1000)
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which", lambda name: None
+        )
+        ok, msg = self._call()
+        assert ok is True
+        assert msg == ""
+
+    def test_cached_credentials_returns_true(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("shell_configs.packages.packages.os.geteuid", lambda: 1000)
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: "/usr/bin/sudo" if name == "sudo" else None,
+        )
+        probe_cmds: list[list[str]] = []
+
+        def fake_run(*args, **kwargs):
+            probe_cmds.append(list(args[0]))
+            return subprocess.CompletedProcess(args=args[0], returncode=0)
+
+        monkeypatch.setattr("shell_configs.packages.packages.subprocess.run", fake_run)
+        ok, msg = self._call()
+        assert ok is True
+        assert msg == ""
+        assert probe_cmds[0] == ["sudo", "-n", "-v"]
+
+    def test_no_cached_no_tty_returns_false(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("shell_configs.packages.packages.os.geteuid", lambda: 1000)
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: "/usr/bin/sudo" if name == "sudo" else None,
+        )
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.subprocess.run",
+            lambda *a, **kw: subprocess.CompletedProcess(args=a[0], returncode=1),
+        )
+        monkeypatch.setattr("shell_configs.packages.packages.sys.stdin", io.StringIO())
+        ok, msg = self._call()
+        assert ok is False
+        assert "TTY" in msg
+
+    def test_no_cached_tty_interactive_success(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("shell_configs.packages.packages.os.geteuid", lambda: 1000)
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: "/usr/bin/sudo" if name == "sudo" else None,
+        )
+
+        calls: list[tuple[list[str], dict]] = []
+
+        def fake_run(*args, **kwargs):
+            cmd = list(args[0])
+            calls.append((cmd, kwargs))
+            # Probe returns rc=1 (not cached); interactive sudo -v succeeds.
+            if cmd == ["sudo", "-n", "-v"]:
+                return subprocess.CompletedProcess(args=cmd, returncode=1)
+            return subprocess.CompletedProcess(args=cmd, returncode=0)
+
+        monkeypatch.setattr("shell_configs.packages.packages.subprocess.run", fake_run)
+
+        class _FakeTTYStdin:
+            def isatty(self) -> bool:
+                return True
+
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.sys.stdin", _FakeTTYStdin()
+        )
+        ok, msg = self._call()
+        assert ok is True
+        assert msg == ""
+        assert len(calls) == 2
+        assert calls[1][0] == ["sudo", "-v"]
+        # Interactive call must not capture output.
+        assert not calls[1][1].get("capture_output", False)
+
+
+class TestLinuxNeedsSudo:
+    """Tests for _linux_needs_sudo()."""
+
+    def setup_method(self):
+        from shell_configs.packages.packages import _linux_needs_sudo
+
+        self._needs_sudo = _linux_needs_sudo
+
+    def test_apt_method_needs_sudo(self) -> None:
+        pkg = Package(name="git", linux=InstallConfig(method="apt"))
+        assert self._needs_sudo(pkg) is True
+
+    def test_script_with_sudo_in_cmd_needs_sudo(self) -> None:
+        pkg = Package(
+            name="enpass-cli",
+            linux=InstallConfig(
+                method="script", install_cmd="sudo dpkg -i /tmp/pkg.deb"
+            ),
+        )
+        assert self._needs_sudo(pkg) is True
+
+    def test_script_without_sudo_does_not_need_sudo(self) -> None:
+        pkg = Package(
+            name="enpass-cli",
+            linux=InstallConfig(
+                method="script", install_cmd="curl -sS https://webi.sh/delta | sh"
+            ),
+        )
+        assert self._needs_sudo(pkg) is False
+
+    def test_pip_method_does_not_need_sudo(self) -> None:
+        pkg = Package(name="myapp", linux=InstallConfig(method="pip"))
+        assert self._needs_sudo(pkg) is False
+
+    def test_uv_tool_method_does_not_need_sudo(self) -> None:
+        pkg = Package(name="myapp", linux=InstallConfig(method="uv_tool"))
+        assert self._needs_sudo(pkg) is False
+
+    def test_no_linux_config_does_not_need_sudo(self) -> None:
+        pkg = Package(name="git", macos=InstallConfig(method="brew"))
+        assert self._needs_sudo(pkg) is False
+
+
+def test_enpass_absent_on_wsl(monkeypatch: pytest.MonkeyPatch) -> None:
+    """enpass must not appear in the WSL package list (wsl_exclude=true)."""
+    monkeypatch.setattr(
+        "shell_configs.packages.packages.is_platform",
+        lambda p: p == Platform.WSL,
+    )
+    packages = load_packages()
+    names = [p.name for p in packages]
+    assert "enpass" not in names
+
+
+def test_enpass_present_on_native_linux(monkeypatch: pytest.MonkeyPatch) -> None:
+    """enpass must appear in the native Linux package list."""
+    monkeypatch.setattr(
+        "shell_configs.packages.packages.is_platform",
+        lambda p: p == Platform.LINUX,
+    )
+    packages = load_packages()
+    names = [p.name for p in packages]
+    assert "enpass" in names

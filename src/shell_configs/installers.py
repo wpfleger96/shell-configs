@@ -82,6 +82,7 @@ def _run_step(
             capture_output=True,
             text=True,
             timeout=timeout,
+            stdin=subprocess.DEVNULL,
         )
     except subprocess.TimeoutExpired:
         what = via or f"{verb} script"
@@ -169,7 +170,7 @@ def install_apt(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
     if not is_command_available("apt"):
         return False, "apt is not available"
     return _run_step(
-        ["sudo", "apt-get", "install", "-y", package],
+        ["sudo", "-n", "apt-get", "install", "-y", package],
         name=name,
         verb="install",
         via="apt",

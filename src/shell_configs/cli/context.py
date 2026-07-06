@@ -170,5 +170,9 @@ class Component:
     def status(self, ctx: Context) -> None:
         """Display current status (read-only)."""
 
+    def needs_sudo(self, ctx: Context, plan: ComponentPlan) -> bool:
+        """Whether applying this plan may invoke sudo (install pre-authorizes once)."""
+        return False
+
     def uninstall(self, ctx: Context) -> None:
         """Remove everything this component installed (used by the uninstall command)."""
