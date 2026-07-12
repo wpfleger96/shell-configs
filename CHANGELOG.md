@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.62.3](https://github.com/wpfleger96/shell-configs/compare/v0.62.2...v0.62.3) (2026-07-12)
+
+
+### Bug Fixes
+
+* **zsh:** pin compdef stub preamble to top of zshrc ([#140](https://github.com/wpfleger96/shell-configs/issues/140)) ([3737858](https://github.com/wpfleger96/shell-configs/commit/373785867a4a168d49aee93ca2d4d830fe180b7a))
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#135](https://github.com/wpfleger96/shell-configs/issues/135)) ([c94fe18](https://github.com/wpfleger96/shell-configs/commit/c94fe187c457e2076b962f9ea197a51050fa7c44))
+
 ## [0.62.2](https://github.com/wpfleger96/shell-configs/compare/v0.62.1...v0.62.2) (2026-07-12)
 
 
