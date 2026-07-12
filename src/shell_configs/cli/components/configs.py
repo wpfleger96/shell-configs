@@ -388,6 +388,7 @@ class ConfigsComponent(Component):
                     dry_run=ctx.dry_run,
                     shared_content=shared_content,
                     force=ctx.force,
+                    preamble=shell.get_managed_preamble(),
                 )
                 print_operation_result(result, message)
                 if diff_text and result == OperationResult.UPDATED:

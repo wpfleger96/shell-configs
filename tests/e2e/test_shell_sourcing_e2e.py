@@ -106,3 +106,36 @@ class TestZshSourcing:
         result = run_shell("zsh", f'source "$HOME/.zshrc"; whence -w {func}')
         assert result.returncode == 0, f"{func} not defined"
         assert "function" in result.stdout
+
+    def test_compdef_before_compinit_no_error(self, e2e_home, run_cli, run_shell):
+        """Regression: compdef call placed above the managed section (e.g. by
+        ai-agent-rules) must NOT produce 'command not found: compdef'.
+
+        The preamble block is pinned to the very top of ~/.zshrc so the stub
+        is defined before any foreign compdef call in the file body.
+        """
+        home_dir, _ = e2e_home
+        zshrc = home_dir / ".zshrc"
+        # Simulate a tool that wrote a compdef call before shell-configs installs
+        zshrc.write_text("compdef _foo foo\n", encoding="utf-8")
+
+        result = run_cli(["configs", "install", "--shells", "zsh", "-y"])
+        assert result.returncode == 0, f"configs install failed: {result.stderr}"
+
+        text = zshrc.read_text()
+        preamble_pos = text.find("shell-configs Preamble")
+        compdef_call_pos = text.find("compdef _foo foo")
+        assert preamble_pos != -1, "Preamble block not found in zshrc"
+        assert compdef_call_pos != -1, "Pre-existing compdef call disappeared"
+        assert preamble_pos < compdef_call_pos, (
+            "Preamble block must appear before the pre-existing compdef call"
+        )
+
+        result = run_shell("zsh", 'source "$HOME/.zshrc"')
+        assert result.returncode == 0, result.stderr
+        compdef_errors = [
+            line
+            for line in result.stderr.splitlines()
+            if "command not found" in line.lower() and "compdef" in line.lower()
+        ]
+        assert not compdef_errors, f"Unexpected compdef error(s):\n{result.stderr}"

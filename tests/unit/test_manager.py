@@ -348,6 +348,211 @@ class TestConfigManagerSharedConfig:
 
 
 @pytest.mark.unit
+class TestConfigManagerPreamble:
+    """Test preamble block pinned at the top of a config file."""
+
+    PREAMBLE = (
+        "# compdef stub\nif (( ! ${+functions[compdef]} )); then\n  compdef() { : }\nfi"
+    )
+    CONTENT = "alias ll='ls -la'"
+
+    def _preamble_markers(self, manager: ConfigManager) -> tuple[str, str, str]:
+        return manager._build_preamble_markers("#")
+
+    def test_fresh_file_block_order(self, temp_dir):
+        """After first install, preamble block appears before the main managed section."""
+        manager = ConfigManager()
+        config_file = temp_dir / ".zshrc"
+
+        result, _, _ = manager.install_section(
+            config_file, self.CONTENT, preamble=self.PREAMBLE
+        )
+
+        assert result == OperationResult.CREATED
+        text = config_file.read_text()
+        _, p_start, p_end = self._preamble_markers(manager)
+        _, m_start, m_end = manager._build_markers("#")
+        assert p_start in text
+        assert m_start in text
+        assert text.index(p_start) < text.index(m_start), (
+            "Preamble block must appear before main managed section"
+        )
+        # Preamble content is inside the preamble block
+        p_section = manager._extract_preamble_section(config_file)
+        assert p_section is not None
+        assert p_section.content.strip() == self.PREAMBLE.strip()
+
+    def test_foreign_content_above_gets_preamble_prepended(self, temp_dir):
+        """Pre-existing file content ends up BELOW the preamble block."""
+        manager = ConfigManager()
+        config_file = temp_dir / ".zshrc"
+        config_file.write_text("compdef _foo foo\n# some user stuff\n")
+
+        manager.install_section(config_file, self.CONTENT, preamble=self.PREAMBLE)
+
+        text = config_file.read_text()
+        _, p_start, _ = self._preamble_markers(manager)
+        preamble_pos = text.index(p_start)
+        compdef_call_pos = text.index("compdef _foo foo")
+        assert preamble_pos < compdef_call_pos, (
+            "Preamble block must be above pre-existing foreign content"
+        )
+
+    def test_idempotency(self, temp_dir):
+        """Second install with same content returns ALREADY_SYNCED; file unchanged."""
+        manager = ConfigManager()
+        config_file = temp_dir / ".zshrc"
+
+        manager.install_section(config_file, self.CONTENT, preamble=self.PREAMBLE)
+        first_bytes = config_file.read_bytes()
+
+        result, _, _ = manager.install_section(
+            config_file, self.CONTENT, preamble=self.PREAMBLE
+        )
+
+        assert result == OperationResult.ALREADY_SYNCED
+        assert config_file.read_bytes() == first_bytes
+
+    def test_preamble_deleted_restores_on_next_install(self, temp_dir):
+        """If the preamble block is manually deleted, the next install re-creates it."""
+        manager = ConfigManager()
+        config_file = temp_dir / ".zshrc"
+
+        manager.install_section(config_file, self.CONTENT, preamble=self.PREAMBLE)
+
+        # Simulate user removing the preamble block by keeping only main section content
+        _, m_start, m_end = manager._build_markers("#")
+        main_section = manager.extract_managed_section(config_file)
+        assert main_section is not None
+        decoration = "#" * 40
+        config_file.write_text(
+            f"{decoration}\n{m_start}\n{decoration}\n"
+            f"{self.CONTENT}\n"
+            f"{decoration}\n{m_end}\n{decoration}\n"
+        )
+
+        result, message, _ = manager.install_section(
+            config_file, self.CONTENT, preamble=self.PREAMBLE
+        )
+
+        assert result == OperationResult.UPDATED
+        assert "preamble" in message.lower()
+        assert manager._extract_preamble_section(config_file) is not None
+
+    def test_old_layout_migration(self, temp_dir):
+        """A file with the stub INSIDE the managed section gets migrated: stub moves to
+        preamble block and the managed section no longer contains it."""
+        manager = ConfigManager()
+        config_file = temp_dir / ".zshrc"
+
+        # Build a file in the OLD layout: stub embedded at start of managed section
+        decoration = "#" * 40
+        _, m_start, m_end = manager._build_markers("#")
+        old_managed_content = f"{self.PREAMBLE}\n\n{self.CONTENT}"
+        config_file.write_text(
+            f"{decoration}\n{m_start}\n{decoration}\n"
+            f"{old_managed_content}\n"
+            f"{decoration}\n{m_end}\n{decoration}\n"
+        )
+
+        # One install with the new preamble kwarg and the stub-free content
+        result, _, _ = manager.install_section(
+            config_file, self.CONTENT, preamble=self.PREAMBLE
+        )
+
+        assert result != OperationResult.ALREADY_SYNCED
+        # Preamble block now exists at top
+        p_section = manager._extract_preamble_section(config_file)
+        assert p_section is not None
+        assert p_section.content.strip() == self.PREAMBLE.strip()
+        # Main managed section no longer embeds the stub
+        main_section = manager.extract_managed_section(config_file)
+        assert main_section is not None
+        assert main_section.content.strip() == self.CONTENT.strip()
+
+    def test_uninstall_removes_both_blocks(self, temp_dir):
+        """uninstall_section removes both the preamble block and the main section."""
+        manager = ConfigManager()
+        config_file = temp_dir / ".zshrc"
+        config_file.write_text("# user content\n")
+
+        manager.install_section(config_file, self.CONTENT, preamble=self.PREAMBLE)
+        result, _ = manager.uninstall_section(config_file)
+
+        assert result == OperationResult.REMOVED
+        text = config_file.read_text()
+        _, p_start, p_end = self._preamble_markers(manager)
+        _, m_start, m_end = manager._build_markers("#")
+        assert p_start not in text
+        assert m_start not in text
+        assert "# user content" in text
+
+    def test_no_preamble_shell_unaffected(self, temp_dir):
+        """install_section with preamble=None (non-zsh shells) behaves as before."""
+        manager = ConfigManager()
+        config_file = temp_dir / "test.conf"
+        content = "alias test='echo test'"
+
+        result, _, _ = manager.install_section(config_file, content, preamble=None)
+
+        assert result == OperationResult.CREATED
+        assert manager._extract_preamble_section(config_file) is None
+        assert manager.has_managed_section(config_file)
+
+        result2, _, _ = manager.install_section(config_file, content, preamble=None)
+        assert result2 == OperationResult.ALREADY_SYNCED
+
+    def test_dry_run_with_preamble_no_write(self, temp_dir):
+        """dry_run=True with preamble on a new file: CREATED returned, no bytes written."""
+        manager = ConfigManager()
+        config_file = temp_dir / ".zshrc"
+
+        result, _, _ = manager.install_section(
+            config_file, self.CONTENT, dry_run=True, preamble=self.PREAMBLE
+        )
+
+        assert result == OperationResult.CREATED
+        assert not config_file.exists()
+
+    def test_only_preamble_changed_updates_preamble_not_section(self, temp_dir):
+        """When only the preamble differs, the managed section bytes are untouched."""
+        manager = ConfigManager()
+        config_file = temp_dir / ".zshrc"
+
+        manager.install_section(config_file, self.CONTENT, preamble=self.PREAMBLE)
+        section_before = manager.extract_managed_section(config_file)
+        assert section_before is not None
+
+        new_preamble = self.PREAMBLE + "\n# extra line"
+        result, message, diff = manager.install_section(
+            config_file, self.CONTENT, preamble=new_preamble
+        )
+
+        assert result == OperationResult.UPDATED
+        assert "preamble" in message.lower()
+        assert diff is None
+
+        section_after = manager.extract_managed_section(config_file)
+        assert section_after is not None
+        assert section_after.content == section_before.content
+
+    def test_json_content_bypasses_preamble(self, temp_dir):
+        """Non-None preamble with JSON content: no preamble markers written."""
+        manager = ConfigManager()
+        config_file = temp_dir / "settings.json"
+        json_content = '{\n    "key": "value"\n}'
+
+        result, _, _ = manager.install_section(
+            config_file, json_content, preamble=self.PREAMBLE
+        )
+
+        assert result == OperationResult.CREATED
+        text = config_file.read_text()
+        _, p_start, _ = manager._build_preamble_markers("#")
+        assert p_start not in text
+
+
+@pytest.mark.unit
 class TestConfigManagerIniMerge:
     """Test ConfigManager INI merge methods."""
 

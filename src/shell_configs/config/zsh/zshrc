@@ -50,12 +50,20 @@ bindkey '^W' backward-kill-word        # Ctrl+W
 autoload -Uz compinit
 compinit
 
-if (( ${#_sc_compdef_queue} )); then
-    local _def
-    for _def in "${_sc_compdef_queue[@]}"; do
-        eval "compdef $_def"
-    done
-    unset _sc_compdef_queue
+if (( ${+functions[compdef]} )); then
+    # compinit succeeded — replay any calls queued before it ran
+    if (( ${#_sc_compdef_queue} )); then
+        local _def
+        for _def in "${_sc_compdef_queue[@]}"; do
+            eval "compdef $_def"
+        done
+        unset _sc_compdef_queue
+    fi
+else
+    # compinit aborted (e.g. insecure dirs with no tty) — real compdef was never
+    # defined; re-install the queueing stub so later compdef calls degrade silently
+    # rather than cascading errors through completions.zsh and any tool blocks below.
+    compdef() { _sc_compdef_queue+=("${(j: :)${(q)@}}") }
 fi
 
 [[ -f ~/.zsh/completions.zsh ]] && source ~/.zsh/completions.zsh
