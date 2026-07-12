@@ -63,7 +63,7 @@ else
     # compinit aborted (e.g. insecure dirs with no tty) — real compdef was never
     # defined; re-install the queueing stub so later compdef calls degrade silently
     # rather than cascading errors through completions.zsh and any tool blocks below.
-    compdef() { _sc_compdef_queue+=("${(j: :)@}") }
+    compdef() { _sc_compdef_queue+=("${(j: :)${(q)@}}") }
 fi
 
 [[ -f ~/.zsh/completions.zsh ]] && source ~/.zsh/completions.zsh

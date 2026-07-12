@@ -92,6 +92,58 @@ class ConfigManager:
         end_marker = f"{prefix * 5} End shell-configs Preamble {prefix * 5}"
         return decoration, start_marker, end_marker
 
+    def _locate_block(
+        self, lines: list[str], start_marker: str, end_marker: str
+    ) -> tuple[int, int] | None:
+        """Scan lines for a marker block.
+
+        Args:
+            lines: File lines (keepends or not)
+            start_marker: Text that must appear in the start line
+            end_marker: Text that must appear in the end line
+
+        Returns:
+            (start_idx, end_idx) of the marker lines, or None if not found
+        """
+        start_idx = None
+        for i, line in enumerate(lines):
+            if start_marker in line:
+                start_idx = i
+            elif end_marker in line and start_idx is not None:
+                return start_idx, i
+        return None
+
+    def _block_boundaries(
+        self,
+        lines: list[str],
+        start_idx: int,
+        end_idx: int,
+        decoration: str,
+    ) -> tuple[int, int]:
+        """Widen (start_idx, end_idx) to include adjacent decoration lines.
+
+        Uses exact strip-match so a user line that merely contains the
+        decoration substring is never incorrectly consumed.
+
+        Args:
+            lines: File lines
+            start_idx: Line index of the start marker
+            end_idx: Line index of the end marker
+            decoration: Exact decoration string (e.g. '#' * 40)
+
+        Returns:
+            (start_boundary, end_boundary) — indices to include in replace/remove
+        """
+        start_boundary = start_idx
+        if start_idx > 0 and lines[start_idx - 1].strip() == decoration:
+            start_boundary = start_idx - 1
+
+        end_boundary = end_idx
+        if end_idx < len(lines) - 1 and lines[end_idx + 1].strip() == decoration:
+            end_boundary = end_idx + 1
+
+        return start_boundary, end_boundary
+
     def _extract_preamble_section(
         self, config_file: Path, comment_prefix: str = "#"
     ) -> ManagedSection | None:
@@ -111,25 +163,18 @@ class ConfigManager:
             comment_prefix
         )
         lines = config_file.read_text(encoding="utf-8").splitlines(keepends=True)
-        start_idx = None
-        end_idx = None
 
-        for i, line in enumerate(lines):
-            if start_marker in line:
-                start_idx = i
-            elif end_marker in line and start_idx is not None:
-                end_idx = i
-                break
-
-        if start_idx is None or end_idx is None:
+        loc = self._locate_block(lines, start_marker, end_marker)
+        if loc is None:
             return None
+        start_idx, end_idx = loc
 
         content_start = start_idx + 1
-        if content_start < len(lines) and decoration in lines[content_start]:
+        if content_start < len(lines) and lines[content_start].strip() == decoration:
             content_start += 1
 
         content_end = end_idx
-        if content_end > 0 and decoration in lines[content_end - 1]:
+        if content_end > 0 and lines[content_end - 1].strip() == decoration:
             content_end -= 1
 
         content_lines = lines[content_start:content_end]
@@ -175,26 +220,14 @@ class ConfigManager:
             comment_prefix
         )
         lines = config_file.read_text(encoding="utf-8").splitlines(keepends=True)
-        start_idx = None
-        end_idx = None
 
-        for i, line in enumerate(lines):
-            if start_marker in line:
-                start_idx = i
-            elif end_marker in line and start_idx is not None:
-                end_idx = i
-                break
-
-        if start_idx is None or end_idx is None:
+        loc = self._locate_block(lines, start_marker, end_marker)
+        if loc is None:
             raise ValueError("Preamble section markers not found")
-
-        start_boundary = start_idx
-        if start_idx > 0 and decoration in lines[start_idx - 1]:
-            start_boundary = start_idx - 1
-
-        end_boundary = end_idx
-        if end_idx < len(lines) - 1 and decoration in lines[end_idx + 1]:
-            end_boundary = end_idx + 1
+        start_idx, end_idx = loc
+        start_boundary, end_boundary = self._block_boundaries(
+            lines, start_idx, end_idx, decoration
+        )
 
         new_section = [
             f"{decoration}\n",
@@ -221,26 +254,14 @@ class ConfigManager:
             comment_prefix
         )
         lines = config_file.read_text(encoding="utf-8").splitlines(keepends=True)
-        start_idx = None
-        end_idx = None
 
-        for i, line in enumerate(lines):
-            if start_marker in line:
-                start_idx = i
-            elif end_marker in line and start_idx is not None:
-                end_idx = i
-                break
-
-        if start_idx is None or end_idx is None:
+        loc = self._locate_block(lines, start_marker, end_marker)
+        if loc is None:
             return
-
-        start_boundary = start_idx
-        if start_idx > 0 and decoration in lines[start_idx - 1]:
-            start_boundary = start_idx - 1
-
-        end_boundary = end_idx
-        if end_idx < len(lines) - 1 and decoration in lines[end_idx + 1]:
-            end_boundary = end_idx + 1
+        start_idx, end_idx = loc
+        start_boundary, end_boundary = self._block_boundaries(
+            lines, start_idx, end_idx, decoration
+        )
 
         # Also consume the blank separator line that follows the preamble block
         remove_end = end_boundary + 1
@@ -348,25 +369,18 @@ class ConfigManager:
 
         decoration, start_marker, end_marker = self._build_markers(comment_prefix)
         lines = config_file.read_text(encoding="utf-8").splitlines(keepends=True)
-        start_idx = None
-        end_idx = None
 
-        for i, line in enumerate(lines):
-            if start_marker in line:
-                start_idx = i
-            elif end_marker in line and start_idx is not None:
-                end_idx = i
-                break
-
-        if start_idx is None or end_idx is None:
+        loc = self._locate_block(lines, start_marker, end_marker)
+        if loc is None:
             return None
+        start_idx, end_idx = loc
 
         content_start = start_idx + 1
-        if content_start < len(lines) and decoration in lines[content_start]:
+        if content_start < len(lines) and lines[content_start].strip() == decoration:
             content_start += 1
 
         content_end = end_idx
-        if content_end > 0 and decoration in lines[content_end - 1]:
+        if content_end > 0 and lines[content_end - 1].strip() == decoration:
             content_end -= 1
 
         content_lines = lines[content_start:content_end]
@@ -506,21 +520,23 @@ class ConfigManager:
                 else None
             )
 
-            if (
-                not force
-                and existing_section
-                and self.managed_content_matches(
+            section_changed = (
+                force
+                or existing_section is None
+                or not self.managed_content_matches(
                     existing_section.content, final_content
                 )
+            )
+            preamble_needs_sync = (
+                use_preamble
+                and preamble is not None
                 and (
-                    preamble is None
-                    or not use_preamble
-                    or (
-                        preamble_section is not None
-                        and preamble_section.content.strip() == preamble.strip()
-                    )
+                    preamble_section is None
+                    or preamble_section.content.strip() != preamble.strip()
                 )
-            ):
+            )
+
+            if not section_changed and not preamble_needs_sync:
                 return (
                     OperationResult.ALREADY_SYNCED,
                     f"{config_file} is already synced",
@@ -528,20 +544,26 @@ class ConfigManager:
                 )
 
             if dry_run:
-                if existing_section:
+                if not existing_section:
+                    return (
+                        OperationResult.CREATED,
+                        f"Would create managed section in {config_file}",
+                        None,
+                    )
+                if section_changed:
                     return (
                         OperationResult.UPDATED,
                         f"Would update managed section in {config_file}",
                         None,
                     )
                 return (
-                    OperationResult.CREATED,
-                    f"Would create managed section in {config_file}",
+                    OperationResult.UPDATED,
+                    f"Would update preamble block in {config_file}",
                     None,
                 )
 
             diff_text = None
-            if existing_section:
+            if existing_section and section_changed:
                 diff_text = unified_diff_text(
                     existing_section.content,
                     self.strip_json_outer_brackets(final_content),
@@ -559,26 +581,70 @@ class ConfigManager:
                 backup_msg = ""
                 config_file.parent.mkdir(parents=True, exist_ok=True)
 
-            if existing_section:
+            if not existing_section:
+                # Creation: for preamble-enabled shells, build the full file in one write
+                # to close the crash window between section-create and preamble-prepend.
+                if use_preamble:
+                    assert preamble is not None
+                    decoration, start_marker, end_marker = self._build_markers(
+                        comment_prefix
+                    )
+                    p_dec, p_start, p_end = self._build_preamble_markers(comment_prefix)
+                    preamble_block = (
+                        f"{p_dec}\n{p_start}\n{p_dec}\n{preamble}\n"
+                        f"{p_dec}\n{p_end}\n{p_dec}\n"
+                    )
+                    existing_text = (
+                        config_file.read_text(encoding="utf-8")
+                        if config_file.exists()
+                        else ""
+                    )
+                    if existing_text and not existing_text.endswith("\n"):
+                        existing_text += "\n"
+                    section_block = (
+                        f"\n{decoration}\n{start_marker}\n{decoration}\n"
+                        f"{final_content}\n"
+                        f"{decoration}\n{end_marker}\n{decoration}\n"
+                    )
+                    new_content = (
+                        preamble_block + "\n" + existing_text + section_block
+                        if existing_text
+                        else preamble_block + section_block
+                    )
+                    self._atomic_write(config_file, new_content)
+                else:
+                    self._create_section(config_file, final_content, comment_prefix)
+                return (
+                    OperationResult.CREATED,
+                    f"Created managed section in {config_file}{backup_msg}",
+                    None,
+                )
+
+            # Existing section — update section and/or preamble
+            if section_changed:
                 self._update_section(config_file, final_content, comment_prefix)
-                result = OperationResult.UPDATED
-                message = f"Updated managed section in {config_file}{backup_msg}"
+                if preamble_needs_sync:
+                    assert preamble is not None
+                    if preamble_section is None:
+                        self._prepend_preamble(config_file, preamble, comment_prefix)
+                    else:
+                        self._update_preamble(config_file, preamble, comment_prefix)
+                return (
+                    OperationResult.UPDATED,
+                    f"Updated managed section in {config_file}{backup_msg}",
+                    diff_text,
+                )
+
+            # Only preamble needs sync — do not rewrite the section
+            assert preamble is not None
+            if preamble_section is None:
+                self._prepend_preamble(config_file, preamble, comment_prefix)
             else:
-                self._create_section(config_file, final_content, comment_prefix)
-                result = OperationResult.CREATED
-                message = f"Created managed section in {config_file}{backup_msg}"
-
-            if use_preamble:
-                assert preamble is not None
-                if preamble_section is None:
-                    self._prepend_preamble(config_file, preamble, comment_prefix)
-                elif preamble_section.content.strip() != preamble.strip():
-                    self._update_preamble(config_file, preamble, comment_prefix)
-
+                self._update_preamble(config_file, preamble, comment_prefix)
             return (
-                result,
-                message,
-                diff_text if result == OperationResult.UPDATED else None,
+                OperationResult.UPDATED,
+                f"Updated preamble block in {config_file}{backup_msg}",
+                None,
             )
 
         except Exception as e:
@@ -693,26 +759,14 @@ class ConfigManager:
         """
         decoration, start_marker, end_marker = self._build_markers(comment_prefix)
         lines = config_file.read_text(encoding="utf-8").splitlines(keepends=True)
-        start_idx = None
-        end_idx = None
 
-        for i, line in enumerate(lines):
-            if start_marker in line:
-                start_idx = i
-            elif end_marker in line and start_idx is not None:
-                end_idx = i
-                break
-
-        if start_idx is None or end_idx is None:
+        loc = self._locate_block(lines, start_marker, end_marker)
+        if loc is None:
             raise ValueError("Managed section markers not found")
-
-        start_boundary = start_idx
-        if start_idx > 0 and decoration in lines[start_idx - 1]:
-            start_boundary = start_idx - 1
-
-        end_boundary = end_idx
-        if end_idx < len(lines) - 1 and decoration in lines[end_idx + 1]:
-            end_boundary = end_idx + 1
+        start_idx, end_idx = loc
+        start_boundary, end_boundary = self._block_boundaries(
+            lines, start_idx, end_idx, decoration
+        )
 
         if self._is_json_content(content):
             content_lines = content.splitlines()
@@ -816,7 +870,28 @@ class ConfigManager:
             backup_msg = self.backup_with_note(config_file)
             lines = config_file.read_text(encoding="utf-8").splitlines(keepends=True)
 
-            new_lines = lines[: section.start_line] + lines[section.end_line + 1 :]
+            # Find the preamble block (if present) for a single-pass removal
+            p_decoration, p_start_marker, p_end_marker = self._build_preamble_markers(
+                comment_prefix
+            )
+            p_loc = self._locate_block(lines, p_start_marker, p_end_marker)
+
+            if p_loc is not None:
+                p_start_idx, p_end_idx = p_loc
+                p_start_boundary, p_end_boundary = self._block_boundaries(
+                    lines, p_start_idx, p_end_idx, p_decoration
+                )
+                p_remove_end = p_end_boundary + 1
+                if p_remove_end < len(lines) and lines[p_remove_end].strip() == "":
+                    p_remove_end += 1
+                # Remove preamble and managed section in one pass
+                new_lines = (
+                    lines[:p_start_boundary]
+                    + lines[p_remove_end : section.start_line]
+                    + lines[section.end_line + 1 :]
+                )
+            else:
+                new_lines = lines[: section.start_line] + lines[section.end_line + 1 :]
 
             while new_lines and new_lines[-1].strip() == "":
                 new_lines.pop()
@@ -824,11 +899,7 @@ class ConfigManager:
             if new_lines:
                 new_lines[-1] = new_lines[-1].rstrip("\n") + "\n"
 
-            new_content = "".join(new_lines)
-            self._atomic_write(config_file, new_content)
-
-            if self._extract_preamble_section(config_file, comment_prefix):
-                self._remove_preamble_from_file(config_file, comment_prefix)
+            self._atomic_write(config_file, "".join(new_lines))
 
             return (
                 OperationResult.REMOVED,

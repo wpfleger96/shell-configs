@@ -431,11 +431,12 @@ class TestConfigManagerPreamble:
             f"{decoration}\n{m_end}\n{decoration}\n"
         )
 
-        result, _, _ = manager.install_section(
+        result, message, _ = manager.install_section(
             config_file, self.CONTENT, preamble=self.PREAMBLE
         )
 
-        assert result != OperationResult.ALREADY_SYNCED
+        assert result == OperationResult.UPDATED
+        assert "preamble" in message.lower()
         assert manager._extract_preamble_section(config_file) is not None
 
     def test_old_layout_migration(self, temp_dir):
@@ -500,6 +501,55 @@ class TestConfigManagerPreamble:
 
         result2, _, _ = manager.install_section(config_file, content, preamble=None)
         assert result2 == OperationResult.ALREADY_SYNCED
+
+    def test_dry_run_with_preamble_no_write(self, temp_dir):
+        """dry_run=True with preamble on a new file: CREATED returned, no bytes written."""
+        manager = ConfigManager()
+        config_file = temp_dir / ".zshrc"
+
+        result, _, _ = manager.install_section(
+            config_file, self.CONTENT, dry_run=True, preamble=self.PREAMBLE
+        )
+
+        assert result == OperationResult.CREATED
+        assert not config_file.exists()
+
+    def test_only_preamble_changed_updates_preamble_not_section(self, temp_dir):
+        """When only the preamble differs, the managed section bytes are untouched."""
+        manager = ConfigManager()
+        config_file = temp_dir / ".zshrc"
+
+        manager.install_section(config_file, self.CONTENT, preamble=self.PREAMBLE)
+        section_before = manager.extract_managed_section(config_file)
+        assert section_before is not None
+
+        new_preamble = self.PREAMBLE + "\n# extra line"
+        result, message, diff = manager.install_section(
+            config_file, self.CONTENT, preamble=new_preamble
+        )
+
+        assert result == OperationResult.UPDATED
+        assert "preamble" in message.lower()
+        assert diff is None
+
+        section_after = manager.extract_managed_section(config_file)
+        assert section_after is not None
+        assert section_after.content == section_before.content
+
+    def test_json_content_bypasses_preamble(self, temp_dir):
+        """Non-None preamble with JSON content: no preamble markers written."""
+        manager = ConfigManager()
+        config_file = temp_dir / "settings.json"
+        json_content = '{\n    "key": "value"\n}'
+
+        result, _, _ = manager.install_section(
+            config_file, json_content, preamble=self.PREAMBLE
+        )
+
+        assert result == OperationResult.CREATED
+        text = config_file.read_text()
+        _, p_start, _ = manager._build_preamble_markers("#")
+        assert p_start not in text
 
 
 @pytest.mark.unit

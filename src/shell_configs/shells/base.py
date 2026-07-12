@@ -378,7 +378,8 @@ class Shell(ABC):
         return f'export SHELL_CONFIGS_DIR="{config_dir}"'
 
     def get_managed_preamble(self) -> str | None:
-        """Shell-specific content injected at the very start of the managed section."""
+        """Shell-specific content pinned in its own marker block at the very top of the
+        config file, above any user content and the managed section."""
         return None
 
     @property
