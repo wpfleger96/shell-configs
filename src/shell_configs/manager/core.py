@@ -78,6 +78,184 @@ class ConfigManager:
         end_marker = f"{prefix * 5} End shell-configs Managed Config {prefix * 5}"
         return decoration, start_marker, end_marker
 
+    def _build_preamble_markers(self, prefix: str) -> tuple[str, str, str]:
+        """Build preamble marker strings with given comment prefix.
+
+        Args:
+            prefix: Comment prefix to use (e.g., '#', '//')
+
+        Returns:
+            Tuple of (decoration, start_marker, end_marker)
+        """
+        decoration = prefix * 40
+        start_marker = f"{prefix * 5} shell-configs Preamble {prefix * 5}"
+        end_marker = f"{prefix * 5} End shell-configs Preamble {prefix * 5}"
+        return decoration, start_marker, end_marker
+
+    def _extract_preamble_section(
+        self, config_file: Path, comment_prefix: str = "#"
+    ) -> ManagedSection | None:
+        """Extract the preamble section from a config file.
+
+        Args:
+            config_file: Path to the config file
+            comment_prefix: Comment prefix to use for markers
+
+        Returns:
+            ManagedSection if found, None otherwise
+        """
+        if not config_file.exists():
+            return None
+
+        decoration, start_marker, end_marker = self._build_preamble_markers(
+            comment_prefix
+        )
+        lines = config_file.read_text(encoding="utf-8").splitlines(keepends=True)
+        start_idx = None
+        end_idx = None
+
+        for i, line in enumerate(lines):
+            if start_marker in line:
+                start_idx = i
+            elif end_marker in line and start_idx is not None:
+                end_idx = i
+                break
+
+        if start_idx is None or end_idx is None:
+            return None
+
+        content_start = start_idx + 1
+        if content_start < len(lines) and decoration in lines[content_start]:
+            content_start += 1
+
+        content_end = end_idx
+        if content_end > 0 and decoration in lines[content_end - 1]:
+            content_end -= 1
+
+        content_lines = lines[content_start:content_end]
+        content = "".join(content_lines).rstrip("\n")
+
+        return ManagedSection(content=content, start_line=start_idx, end_line=end_idx)
+
+    def _prepend_preamble(
+        self, config_file: Path, preamble: str, comment_prefix: str = "#"
+    ) -> None:
+        """Prepend a preamble block to the very beginning of a config file.
+
+        Args:
+            config_file: Path to the config file
+            preamble: Content to place in the preamble block
+            comment_prefix: Comment prefix to use for markers
+        """
+        decoration, start_marker, end_marker = self._build_preamble_markers(
+            comment_prefix
+        )
+        preamble_block = (
+            f"{decoration}\n{start_marker}\n{decoration}\n"
+            f"{preamble}\n"
+            f"{decoration}\n{end_marker}\n{decoration}\n"
+        )
+        existing = (
+            config_file.read_text(encoding="utf-8") if config_file.exists() else ""
+        )
+        new_content = f"{preamble_block}\n{existing}" if existing else preamble_block
+        self._atomic_write(config_file, new_content)
+
+    def _update_preamble(
+        self, config_file: Path, preamble: str, comment_prefix: str = "#"
+    ) -> None:
+        """Update the existing preamble block in a config file.
+
+        Args:
+            config_file: Path to the config file
+            preamble: New preamble content
+            comment_prefix: Comment prefix to use for markers
+        """
+        decoration, start_marker, end_marker = self._build_preamble_markers(
+            comment_prefix
+        )
+        lines = config_file.read_text(encoding="utf-8").splitlines(keepends=True)
+        start_idx = None
+        end_idx = None
+
+        for i, line in enumerate(lines):
+            if start_marker in line:
+                start_idx = i
+            elif end_marker in line and start_idx is not None:
+                end_idx = i
+                break
+
+        if start_idx is None or end_idx is None:
+            raise ValueError("Preamble section markers not found")
+
+        start_boundary = start_idx
+        if start_idx > 0 and decoration in lines[start_idx - 1]:
+            start_boundary = start_idx - 1
+
+        end_boundary = end_idx
+        if end_idx < len(lines) - 1 and decoration in lines[end_idx + 1]:
+            end_boundary = end_idx + 1
+
+        new_section = [
+            f"{decoration}\n",
+            f"{start_marker}\n",
+            f"{decoration}\n",
+            f"{preamble}\n",
+            f"{decoration}\n",
+            f"{end_marker}\n",
+            f"{decoration}\n",
+        ]
+        new_lines = lines[:start_boundary] + new_section + lines[end_boundary + 1 :]
+        self._atomic_write(config_file, "".join(new_lines))
+
+    def _remove_preamble_from_file(
+        self, config_file: Path, comment_prefix: str = "#"
+    ) -> None:
+        """Remove the preamble block from a config file.
+
+        Args:
+            config_file: Path to the config file
+            comment_prefix: Comment prefix to use for markers
+        """
+        decoration, start_marker, end_marker = self._build_preamble_markers(
+            comment_prefix
+        )
+        lines = config_file.read_text(encoding="utf-8").splitlines(keepends=True)
+        start_idx = None
+        end_idx = None
+
+        for i, line in enumerate(lines):
+            if start_marker in line:
+                start_idx = i
+            elif end_marker in line and start_idx is not None:
+                end_idx = i
+                break
+
+        if start_idx is None or end_idx is None:
+            return
+
+        start_boundary = start_idx
+        if start_idx > 0 and decoration in lines[start_idx - 1]:
+            start_boundary = start_idx - 1
+
+        end_boundary = end_idx
+        if end_idx < len(lines) - 1 and decoration in lines[end_idx + 1]:
+            end_boundary = end_idx + 1
+
+        # Also consume the blank separator line that follows the preamble block
+        remove_end = end_boundary + 1
+        if remove_end < len(lines) and lines[remove_end].strip() == "":
+            remove_end += 1
+
+        new_lines = lines[:start_boundary] + lines[remove_end:]
+
+        while new_lines and new_lines[-1].strip() == "":
+            new_lines.pop()
+        if new_lines:
+            new_lines[-1] = new_lines[-1].rstrip("\n") + "\n"
+
+        self._atomic_write(config_file, "".join(new_lines))
+
     def _is_json_content(self, content: str) -> bool:
         """Check if content appears to be JSON/JSONC format.
 
@@ -298,6 +476,7 @@ class ConfigManager:
         shared_content: str | None = None,
         comment_prefix: str = "#",
         force: bool = False,
+        preamble: str | None = None,
     ) -> tuple[OperationResult, str, str | None]:
         """Install or update a managed section in a config file.
 
@@ -307,20 +486,39 @@ class ConfigManager:
             dry_run: If True, don't actually modify the file
             shared_content: Optional shared content to include before shell-specific content
             comment_prefix: Comment prefix to use for markers
+            force: If True, force update even if content matches
+            preamble: Optional shell preamble to pin at the very top of the file in its
+                      own marker block (ignored for JSON content files)
 
         Returns:
             Tuple of (result, message, diff_text)
         """
         try:
             final_content = self.combine_content(shared_content, content)
+            use_preamble = preamble is not None and not self._is_json_content(
+                final_content
+            )
 
             existing_section = self.extract_managed_section(config_file, comment_prefix)
+            preamble_section = (
+                self._extract_preamble_section(config_file, comment_prefix)
+                if use_preamble
+                else None
+            )
 
             if (
                 not force
                 and existing_section
                 and self.managed_content_matches(
                     existing_section.content, final_content
+                )
+                and (
+                    preamble is None
+                    or not use_preamble
+                    or (
+                        preamble_section is not None
+                        and preamble_section.content.strip() == preamble.strip()
+                    )
                 )
             ):
                 return (
@@ -363,17 +561,24 @@ class ConfigManager:
 
             if existing_section:
                 self._update_section(config_file, final_content, comment_prefix)
-                return (
-                    OperationResult.UPDATED,
-                    f"Updated managed section in {config_file}{backup_msg}",
-                    diff_text,
-                )
+                result = OperationResult.UPDATED
+                message = f"Updated managed section in {config_file}{backup_msg}"
+            else:
+                self._create_section(config_file, final_content, comment_prefix)
+                result = OperationResult.CREATED
+                message = f"Created managed section in {config_file}{backup_msg}"
 
-            self._create_section(config_file, final_content, comment_prefix)
+            if use_preamble:
+                assert preamble is not None
+                if preamble_section is None:
+                    self._prepend_preamble(config_file, preamble, comment_prefix)
+                elif preamble_section.content.strip() != preamble.strip():
+                    self._update_preamble(config_file, preamble, comment_prefix)
+
             return (
-                OperationResult.CREATED,
-                f"Created managed section in {config_file}{backup_msg}",
-                None,
+                result,
+                message,
+                diff_text if result == OperationResult.UPDATED else None,
             )
 
         except Exception as e:
@@ -621,6 +826,9 @@ class ConfigManager:
 
             new_content = "".join(new_lines)
             self._atomic_write(config_file, new_content)
+
+            if self._extract_preamble_section(config_file, comment_prefix):
+                self._remove_preamble_from_file(config_file, comment_prefix)
 
             return (
                 OperationResult.REMOVED,
