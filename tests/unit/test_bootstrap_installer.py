@@ -54,7 +54,7 @@ class TestInstallTool:
         assert "uv" in call_args
         assert "tool" in call_args
         assert "install" in call_args
-        assert "git+ssh://git@github.com/wpfleger96/shell-configs.git" in call_args
+        assert "git+https://github.com/wpfleger96/shell-configs.git" in call_args
 
     def test_install_with_force_flag(self, monkeypatch):
         monkeypatch.setattr(

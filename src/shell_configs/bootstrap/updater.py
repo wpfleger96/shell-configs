@@ -216,7 +216,7 @@ def perform_github_update(
     """Upgrade via uv tool install --force from GitHub.
 
     Args:
-        repo_url: GitHub repository URL (e.g., git+ssh://git@github.com/owner/repo.git)
+        repo_url: GitHub repository URL (e.g., git+https://github.com/owner/repo.git)
         is_self: True when upgrading the shell-configs binary itself. On Windows,
             triggers a spawn-and-exit strategy to avoid file-lock errors.
         post_upgrade_cmd: Optional command to run after the upgrade completes.

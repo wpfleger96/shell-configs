@@ -22,7 +22,7 @@ Manage shell configuration files across machines with version control.
 Install from GitHub to get the latest development code:
 
 ```bash
-uv tool install git+ssh://git@github.com/wpfleger96/shell-configs.git
+uv tool install git+https://github.com/wpfleger96/shell-configs.git
 ```
 
 **From Cloned Repository**
