@@ -50,6 +50,14 @@ bindkey '^W' backward-kill-word        # Ctrl+W
 autoload -Uz compinit
 compinit
 
+if (( ${#_sc_compdef_queue} )); then
+    local _def
+    for _def in "${_sc_compdef_queue[@]}"; do
+        eval "compdef $_def"
+    done
+    unset _sc_compdef_queue
+fi
+
 [[ -f ~/.zsh/completions.zsh ]] && source ~/.zsh/completions.zsh
 
 ### Prompt ###

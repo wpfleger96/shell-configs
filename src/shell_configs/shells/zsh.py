@@ -52,3 +52,12 @@ class ZshShell(Shell):
     def supports_shared_config(self) -> bool:
         """Zsh supports shared configuration."""
         return True
+
+    def get_managed_preamble(self) -> str | None:
+        return (
+            "# compdef stub — queues calls made before compinit runs\n"
+            "if (( ! ${+functions[compdef]} )); then\n"
+            "    typeset -ga _sc_compdef_queue\n"
+            '    compdef() { _sc_compdef_queue+=("${(j: :)@}") }\n'
+            "fi"
+        )

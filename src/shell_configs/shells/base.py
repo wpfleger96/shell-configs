@@ -377,6 +377,10 @@ class Shell(ABC):
         """
         return f'export SHELL_CONFIGS_DIR="{config_dir}"'
 
+    def get_managed_preamble(self) -> str | None:
+        """Shell-specific content injected at the very start of the managed section."""
+        return None
+
     @property
     def supports_profile_shared_overrides(self) -> bool:
         """Whether profile 'shared' overrides should be appended."""

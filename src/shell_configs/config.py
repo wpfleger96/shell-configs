@@ -131,6 +131,10 @@ class ConfigReader:
         if export_line:
             content = f"{export_line}\n\n{content}"
 
+        preamble = shell.get_managed_preamble()
+        if preamble:
+            content = f"{preamble}\n\n{content}"
+
         if (
             shell.supports_profile_shared_overrides
             and profile
