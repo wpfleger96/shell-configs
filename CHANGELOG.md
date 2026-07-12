@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.62.2](https://github.com/wpfleger96/shell-configs/compare/v0.62.1...v0.62.2) (2026-07-12)
+
+
+### Bug Fixes
+
+* **setup:** repair Homebrew package names and install via HTTPS ([#138](https://github.com/wpfleger96/shell-configs/issues/138)) ([5796a8a](https://github.com/wpfleger96/shell-configs/commit/5796a8a5d4b1eb31606fb8f4cdcc41feba4448c0))
+* **zsh:** queue compdef calls before compinit; add iterm2 and discord packages ([#136](https://github.com/wpfleger96/shell-configs/issues/136)) ([454768a](https://github.com/wpfleger96/shell-configs/commit/454768a34dc08ae5bcd36ef7f065e1cfdb601ba5))
+
 ## [0.62.1](https://github.com/wpfleger96/shell-configs/compare/v0.62.0...v0.62.1) (2026-07-06)
 
 
