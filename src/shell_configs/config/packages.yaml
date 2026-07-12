@@ -68,6 +68,8 @@ packages:
     description: "Terraform linter"
     macos:
       method: brew
+      tap: terraform-linters/tap
+      package: terraform-linters/tap/tflint
     linux:
       method: script
       install_cmd: "curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash"
@@ -146,7 +148,6 @@ packages:
     description: "PowerShell runtime"
     macos:
       method: brew
-      cask: true
     linux:
       method: apt
       package: powershell
@@ -181,6 +182,7 @@ packages:
     macos:
       method: brew
       cask: true
+      package: visual-studio-code
     linux:
       method: apt
       package: code

@@ -33,9 +33,9 @@ def make_github_install_url(repo: str) -> str:
         repo: GitHub repository in format "owner/repo"
 
     Returns:
-        Full git+ssh URL for uv tool install
+        Full git+https URL for uv tool install
     """
-    return f"git+ssh://git@github.com/{repo}.git"
+    return f"git+https://github.com/{repo}.git"
 
 
 def _validate_package_name(package_name: str) -> bool:

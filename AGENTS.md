@@ -217,7 +217,7 @@ uv run pytest -v                     # Verbose output
 
 5. **Type checking:** mypy strict mode enabled - full type hints required
 
-6. **Installation method:** Package is private - install via `uv tool install git+ssh://git@github.com/wpfleger96/shell-configs.git` (not PyPI)
+6. **Installation method:** Package installs from GitHub via `uv tool install git+https://github.com/wpfleger96/shell-configs.git` (not PyPI)
 
 7. **Shell linting:** `shellcheck` and `shfmt` both exclude `git-prompt.sh` automatically via justfile grep filter
 
