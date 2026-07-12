@@ -205,6 +205,28 @@ packages:
         sudo dpkg -i "$tmp/cursor.deb" &&
         rm -rf "$tmp"
 
+  # Apps
+  - name: iterm2
+    description: "iTerm2 terminal emulator"
+    macos:
+      method: brew
+      cask: true
+
+  - name: discord
+    description: "Discord voice and text chat"
+    wsl_exclude: true
+    macos:
+      method: brew
+      cask: true
+    linux:
+      method: script
+      install_cmd: >-
+        set -e &&
+        tmp=$(mktemp -d) &&
+        curl -fsSL "https://discord.com/api/download?platform=linux&format=deb" -o "$tmp/discord.deb" &&
+        sudo dpkg -i "$tmp/discord.deb" &&
+        rm -rf "$tmp"
+
   - name: wslu
     command: wslview
     description: "WSL utilities for browser integration"
