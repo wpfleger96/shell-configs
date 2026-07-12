@@ -58,6 +58,6 @@ class ZshShell(Shell):
             "# compdef stub — queues calls made before compinit runs\n"
             "if (( ! ${+functions[compdef]} )); then\n"
             "    typeset -ga _sc_compdef_queue\n"
-            '    compdef() { _sc_compdef_queue+=("${(j: :)@}") }\n'
+            '    compdef() { _sc_compdef_queue+=("${(j: :)${(qq)@}}") }\n'
             "fi"
         )

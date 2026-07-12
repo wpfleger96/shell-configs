@@ -51,11 +51,10 @@ autoload -Uz compinit
 compinit
 
 if (( ${#_sc_compdef_queue} )); then
-    local _def
-    for _def in "${_sc_compdef_queue[@]}"; do
-        eval "compdef $_def"
+    for _sc_compdef_queue_entry in "${_sc_compdef_queue[@]}"; do
+        eval "compdef $_sc_compdef_queue_entry"
     done
-    unset _sc_compdef_queue
+    unset _sc_compdef_queue _sc_compdef_queue_entry
 fi
 
 [[ -f ~/.zsh/completions.zsh ]] && source ~/.zsh/completions.zsh
