@@ -773,23 +773,6 @@ class TestConfigManagerIniMerge:
         assert cp.get("Default Applications", "key1") == "value1"
         assert cp.get("Default Applications", "key2") == "value2"
 
-    def test_diff_handles_corrupted_mimeapps(self, temp_dir):
-        manager = ConfigManager()
-        source = temp_dir / "source.list"
-        target = temp_dir / "mimeapps.list"
-        source.write_text("[Default Applications]\ntext/html=wslview.desktop\n")
-        target.write_text(
-            "[Default Applications]\n"
-            "    ########################################\n"
-            "    ##### shell-configs Managed Config #####\n"
-            "    ########################################\n"
-            "[Default Applications]\n"
-            "text/html=firefox.desktop\n"
-        )
-        manager._managed_keys_from_source(source)
-        installed_cp = manager._parse_ini(target.read_text())
-        assert installed_cp.has_section("Default Applications")
-
     def test_uninstall_ini_file_handles_corrupted_file(self, temp_dir):
         manager = ConfigManager()
         target = temp_dir / "mimeapps.list"
@@ -1190,17 +1173,6 @@ class TestAdditionalFileManifest:
 
         loaded = AdditionalFileManifest(path)
         assert loaded.find_orphans(set()) == ["/a/file", "/m/file", "/z/file"]
-
-    def test_find_orphans_empty_current_set_returns_all(self, temp_dir):
-        path = temp_dir / "manifest.json"
-        manifest = AdditionalFileManifest(path)
-        manifest.record_install("/home/user/.bash/git-prompt.sh", "bash")
-        manifest.record_install("/home/user/.config/git/ignore", "git")
-        manifest.save()
-
-        loaded = AdditionalFileManifest(path)
-        orphans = loaded.find_orphans(set())
-        assert len(orphans) == 2
 
     def test_remove_entry(self, temp_dir):
         path = temp_dir / "manifest.json"

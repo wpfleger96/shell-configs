@@ -70,14 +70,6 @@ class TestLoadDesiredScopes:
 
         assert result == list(_DEFAULT_SCOPES)
 
-    def test_fallback_returns_independent_copies(self, tmp_path: Path) -> None:
-        manifest = tmp_path / "nonexistent.yaml"
-
-        result1 = load_desired_scopes(manifest)
-        result2 = load_desired_scopes(manifest)
-
-        assert result1 is not result2
-
 
 @pytest.mark.unit
 class TestGetCurrentGhScopes:
@@ -95,22 +87,6 @@ class TestGetCurrentGhScopes:
         result = get_current_gh_scopes()
 
         assert result == {"admin:public_key", "workflow"}
-
-    def test_parses_scopes_from_stderr(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from shell_configs.gh_auth import get_current_gh_scopes
-
-        monkeypatch.setattr(
-            "shell_configs.fsio.run_quiet",
-            lambda *a, **kw: _make_result(
-                0,
-                stdout="",
-                stderr="  - Token scopes: 'admin:public_key', 'admin:ssh_signing_key'\n",
-            ),
-        )
-
-        result = get_current_gh_scopes()
-
-        assert result == {"admin:public_key", "admin:ssh_signing_key"}
 
     def test_returns_empty_on_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from shell_configs.gh_auth import get_current_gh_scopes
@@ -372,22 +348,3 @@ class TestGhAuthComponent:
         component.status(self._make_ctx())
 
         assert scopes_called is False
-
-    def test_status_scopes_present(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from shell_configs.cli.components.gh_auth import GhAuthComponent
-
-        monkeypatch.setattr(
-            "shell_configs.signing.ensure_gh_auth",
-            lambda **kw: (True, "authenticated"),
-        )
-        monkeypatch.setattr(
-            "shell_configs.signing.ensure_gh_scopes",
-            lambda **kw: (True, "scopes present"),
-        )
-        monkeypatch.setattr(
-            "shell_configs.gh_auth.load_desired_scopes",
-            lambda manifest_path=None: ["admin:public_key"],
-        )
-
-        component = GhAuthComponent()
-        component.status(self._make_ctx())

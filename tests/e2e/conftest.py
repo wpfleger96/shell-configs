@@ -38,32 +38,6 @@ def e2e_home(tmp_path):
 
 
 @pytest.fixture
-def e2e_config_dir(tmp_path):
-    config_dir = tmp_path / "config"
-    config_dir.mkdir()
-
-    bash_dir = config_dir / "bash"
-    bash_dir.mkdir()
-    (bash_dir / "bashrc").write_text("# E2E test bash config\nalias test='echo test'\n")
-
-    zsh_dir = config_dir / "zsh"
-    zsh_dir.mkdir()
-    (zsh_dir / "zshrc").write_text("# E2E test zsh config\nalias test='echo test'\n")
-
-    git_dir = config_dir / "git"
-    git_dir.mkdir()
-
-    (config_dir / "shared.gitconfig").write_text("[user]\n    name = E2E Test\n")
-    (config_dir / "shared.sh").write_text("# Shared E2E config\n")
-
-    profiles_dir = config_dir / "profiles"
-    profiles_dir.mkdir()
-    (profiles_dir / "default.yaml").write_text("name: default\ndescription: Default\n")
-
-    return config_dir
-
-
-@pytest.fixture
 def run_cli(e2e_home):
     home_dir, env_overrides = e2e_home
     repo_root = Path(__file__).parents[2]

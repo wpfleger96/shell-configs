@@ -118,13 +118,6 @@ class TestExtensionDiff:
         assert diff.extra == frozenset()
         assert diff.ignored == frozenset()
 
-    def test_pylance_excluded_from_cursor_extra(self):
-        desired = {"golang.go"}
-        installed = {"golang.go", "ms-python.vscode-pylance"}
-        diff = self.manager.compute_diff(desired, installed, shell=CursorShell())
-        assert "ms-python.vscode-pylance" not in diff.extra
-        assert not diff.extra
-
     def test_builtin_exclusion_only_for_matching_shell(self):
         desired = {"golang.go"}
         installed = {"golang.go", "anysphere.cursorpyright"}

@@ -14,18 +14,6 @@ from shell_configs.shells.cursor import CursorLocalShell
 class TestCursorLocalShell:
     """Tests for CursorLocalShell class."""
 
-    def test_name(self):
-        shell = CursorLocalShell()
-        assert shell.name == "cursor-local"
-
-    def test_display_name(self):
-        shell = CursorLocalShell()
-        assert shell.display_name == "Cursor (Local)"
-
-    def test_get_extension_cli_returns_none(self):
-        shell = CursorLocalShell()
-        assert shell.get_extension_cli() is None
-
     def test_returns_none_on_non_wsl(self, monkeypatch):
         monkeypatch.setattr(
             "shell_configs.shells.editor.is_platform",

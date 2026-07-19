@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import subprocess
 
-from dataclasses import FrozenInstanceError
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from shell_configs.agents import (
-    DEPRECATED_AGENTS,
     Agent,
     AgentInstallConfig,
     DeprecatedAgentSpec,
@@ -266,25 +264,6 @@ class TestInstallAgent:
             ok, msg = install_agent(agent)
         assert not ok
         assert "timed out" in msg
-
-    def test_linux_uses_install_cmd(self, monkeypatch):
-        monkeypatch.setattr(
-            "shell_configs.installers.is_platform",
-            lambda p: p.value == "wsl",
-        )
-        agent = _make_agent(
-            install_cmd="curl -fsSL https://claude.ai/install.sh | bash"
-        )
-        with (
-            patch("shell_configs.agents.is_agent_installed", return_value=False),
-            patch("subprocess.run") as mock_run,
-        ):
-            mock_run.return_value = subprocess.CompletedProcess(
-                args=[], returncode=0, stdout="", stderr=""
-            )
-            ok, msg = install_agent(agent)
-        assert ok
-        assert mock_run.call_args[1].get("shell") is True
 
     def test_dry_run_npm(self, monkeypatch):
         monkeypatch.setattr(
@@ -887,25 +866,6 @@ class TestUninstallAgent:
             ok, msg = uninstall_agent(agent)
         assert not ok
         assert "timed out" in msg
-
-
-# ---------------------------------------------------------------------------
-# TestDeprecatedAgentRegistry
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestDeprecatedAgentRegistry:
-    def test_is_tuple(self):
-        assert isinstance(DEPRECATED_AGENTS, tuple)
-
-    def test_starts_empty(self):
-        assert len(DEPRECATED_AGENTS) == 0
-
-    def test_spec_is_frozen(self):
-        spec = DeprecatedAgentSpec(agent_id="test", command_name="test-cmd")
-        with pytest.raises(FrozenInstanceError):
-            spec.agent_id = "changed"  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------

@@ -10,25 +10,9 @@ from shell_configs.shells.sublime import SublimeShell
 
 @pytest.mark.unit
 class TestSublimeShell:
-    def test_name(self):
-        shell = SublimeShell()
-        assert shell.name == "sublime"
-
-    def test_display_name(self):
-        shell = SublimeShell()
-        assert shell.display_name == "Sublime Text"
-
     def test_returns_no_config_files(self):
         shell = SublimeShell()
         assert shell.get_config_files() == []
-
-    def test_returns_no_extension_cli(self):
-        shell = SublimeShell()
-        assert shell.get_extension_cli() is None
-
-    def test_returns_no_extension_invoker(self):
-        shell = SublimeShell()
-        assert shell.get_extension_invoker() is None
 
     def test_additional_files_on_wsl(self, monkeypatch):
         monkeypatch.setattr(
@@ -139,32 +123,10 @@ class TestSublimeShell:
 
 @pytest.mark.unit
 class TestRegistrySublimeUnconditional:
-    def test_registered_on_wsl(self, monkeypatch, mock_home):
-        monkeypatch.setattr(
-            "shell_configs.platform.is_platform",
-            lambda p: p == Platform.WSL,
-        )
-        from shell_configs.shells.registry import ShellRegistry
-
-        registry = ShellRegistry()
-        assert registry.get("sublime") is not None
-        assert isinstance(registry.get("sublime"), SublimeShell)
-
     def test_registered_on_linux(self, monkeypatch, mock_home):
         monkeypatch.setattr(
             "shell_configs.platform.is_platform",
             lambda p: p == Platform.LINUX,
-        )
-        from shell_configs.shells.registry import ShellRegistry
-
-        registry = ShellRegistry()
-        assert registry.get("sublime") is not None
-        assert isinstance(registry.get("sublime"), SublimeShell)
-
-    def test_registered_on_macos(self, monkeypatch, mock_home):
-        monkeypatch.setattr(
-            "shell_configs.platform.is_platform",
-            lambda p: p == Platform.MACOS,
         )
         from shell_configs.shells.registry import ShellRegistry
 

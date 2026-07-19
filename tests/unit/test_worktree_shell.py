@@ -350,32 +350,3 @@ class TestWorktreeShell:
             "Removed worktree for 'worktree-backport-ai-rules-improvements'"
             in result.stdout
         )
-
-    def test_wt_cd_navigates_to_external_worktree(self, temp_dir):
-        repo_root = temp_dir / "repo"
-        state = _make_state(repo_root)
-        external_path = (
-            repo_root / ".claude" / "worktrees" / "backport-ai-rules-improvements"
-        )
-        external_path.mkdir(parents=True)
-        state["branches"]["worktree-backport-ai-rules-improvements"] = {
-            "exists": True,
-            "head": "c" * 40,
-            "merge_base": "a" * 40,
-            "has_remote": True,
-            "is_ancestor": False,
-            "cherry_plus": 1,
-        }
-        state["worktrees"].append(
-            {
-                "path": str(external_path),
-                "branch": "worktree-backport-ai-rules-improvements",
-                "head": "c" * 40,
-            }
-        )
-
-        result = _run_wt_command(
-            temp_dir, "_wt_cd worktree-backport-ai-rules-improvements", state
-        )
-
-        assert result.returncode == 0

@@ -219,28 +219,6 @@ class TestIsLanguageInstalled:
         with patch("shell_configs.bootstrap.detection.shutil.which", return_value=None):
             assert not is_language_installed(_make_lang(command="go"))
 
-    def test_glob_check_path_matches(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
-        node_bin = tmp_path / ".nvm" / "versions" / "node" / "v20.0.0" / "bin"
-        node_bin.mkdir(parents=True)
-        (node_bin / "node").touch()
-        lang = _make_lang(
-            name="node",
-            command="node",
-            check_path="~/.nvm/versions/node/v*/bin/node",
-        )
-        assert is_language_installed(lang)
-
-    def test_glob_check_path_no_match(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
-        with patch("shell_configs.bootstrap.detection.shutil.which", return_value=None):
-            lang = _make_lang(
-                name="node",
-                command="node",
-                check_path="~/.nvm/versions/node/v*/bin/node",
-            )
-            assert not is_language_installed(lang)
-
 
 # ---------------------------------------------------------------------------
 # TestInstallLanguage

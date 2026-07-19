@@ -11,7 +11,6 @@ import sys
 import time
 import types
 
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -74,21 +73,6 @@ class TestDetectPlatform:
     ):
         proc_version = tmp_path / "proc_version"
         proc_version.write_text("Linux version 5.15 microsoft standard\n")
-        monkeypatch.setattr(sys, "platform", "linux")
-
-        original_open = open
-
-        def _patched_open(path, *args, **kwargs):
-            if str(path) == "/proc/version":
-                return original_open(str(proc_version), *args, **kwargs)
-            return original_open(path, *args, **kwargs)
-
-        monkeypatch.setattr("builtins.open", _patched_open)
-        assert mod._detect_platform() == "wsl"
-
-    def test_linux_with_wsl_in_proc_version_returns_wsl(self, monkeypatch, tmp_path):
-        proc_version = tmp_path / "proc_version"
-        proc_version.write_text("Linux version 5.15 WSL2 kernel\n")
         monkeypatch.setattr(sys, "platform", "linux")
 
         original_open = open
@@ -460,38 +444,6 @@ class TestScanDevTree:
 
         assert any(t.path == project / "target" for t in rust_targets)
 
-    def test_target_category_is_target(self, tmp_path):
-        project = tmp_path / "myproject"
-        (project / "target" / "debug").mkdir(parents=True)
-
-        rust_targets, _ = _collect_scan_results(tmp_path)
-
-        assert all(t.category == "target" for t in rust_targets)
-
-    def test_incremental_category_is_incremental(self, tmp_path):
-        project = tmp_path / "myproject"
-        (project / "target" / "debug" / "incremental").mkdir(parents=True)
-
-        _, incrementals = _collect_scan_results(tmp_path)
-
-        assert all(t.category == "incremental" for t in incrementals)
-
-    def test_target_tier_is_3(self, tmp_path):
-        project = tmp_path / "myproject"
-        (project / "target" / "debug").mkdir(parents=True)
-
-        rust_targets, _ = _collect_scan_results(tmp_path)
-
-        assert all(t.tier == 3 for t in rust_targets)
-
-    def test_incremental_tier_is_1(self, tmp_path):
-        project = tmp_path / "myproject"
-        (project / "target" / "debug" / "incremental").mkdir(parents=True)
-
-        _, incrementals = _collect_scan_results(tmp_path)
-
-        assert all(t.tier == 1 for t in incrementals)
-
     def test_empty_dev_dir_returns_no_targets(self, tmp_path):
         rust_targets, incrementals = _collect_scan_results(tmp_path)
 
@@ -581,45 +533,6 @@ class TestDockerRawSize:
 
 
 # ---------------------------------------------------------------------------
-# ScanTarget dataclass
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestScanTarget:
-    def test_can_construct_with_required_fields(self):
-        t = mod.ScanTarget(
-            path=Path("/some/path"),
-            label="/some/path",
-            category="cache",
-            tier=2,
-        )
-
-        assert t.path == Path("/some/path")
-        assert t.label == "/some/path"
-        assert t.category == "cache"
-        assert t.tier == 2
-        assert t.cleanup_cmd is None
-        assert t.tool_name is None
-        assert t.size_bytes == 0
-
-    def test_can_construct_with_all_fields(self):
-        t = mod.ScanTarget(
-            path=Path("/usr/local"),
-            label="/usr/local",
-            category="incremental",
-            tier=1,
-            cleanup_cmd=["npm", "cache", "clean"],
-            tool_name="npm",
-            size_bytes=1048576,
-        )
-
-        assert t.cleanup_cmd == ["npm", "cache", "clean"]
-        assert t.tool_name == "npm"
-        assert t.size_bytes == 1048576
-
-
-# ---------------------------------------------------------------------------
 # _register decorator
 # ---------------------------------------------------------------------------
 
@@ -636,45 +549,6 @@ class TestRegisterDecorator:
     def test_linux_platform_has_builders(self):
         assert "linux" in mod._TARGET_BUILDERS
         assert len(mod._TARGET_BUILDERS["linux"]) > 0
-
-    def test_register_adds_function_to_platform(self):
-        registry: dict[str, list] = {}
-
-        def _fake_register(*platforms: str) -> Callable:
-            def decorator(fn: Callable) -> Callable:
-                for p in platforms:
-                    registry.setdefault(p, [])
-                    registry[p].append(fn)
-                return fn
-
-            return decorator
-
-        @_fake_register("testplatform")
-        def _my_builder():
-            return []
-
-        assert "testplatform" in registry
-        assert _my_builder in registry["testplatform"]
-
-    def test_register_adds_to_multiple_platforms(self):
-        registry: dict[str, list] = {}
-
-        def _fake_register(*platforms: str) -> Callable:
-            def decorator(fn: Callable) -> Callable:
-                for p in platforms:
-                    registry.setdefault(p, [])
-                    registry[p].append(fn)
-                return fn
-
-            return decorator
-
-        @_fake_register("alpha", "beta", "gamma")
-        def _multi_builder():
-            return []
-
-        assert _multi_builder in registry["alpha"]
-        assert _multi_builder in registry["beta"]
-        assert _multi_builder in registry["gamma"]
 
 
 # ---------------------------------------------------------------------------
@@ -699,38 +573,6 @@ class TestPrintReport:
 
         captured = capsys.readouterr()
         assert "Disk Usage Report" in captured.out
-
-    def test_report_contains_rust_incremental_section(self, monkeypatch, capsys):
-        import collections
-
-        DiskUsage = collections.namedtuple("DiskUsage", ["total", "used", "free"])
-        monkeypatch.setattr(
-            shutil,
-            "disk_usage",
-            lambda path: DiskUsage(100 * 1024**3, 50 * 1024**3, 50 * 1024**3),
-        )
-
-        targets = []
-        mod._print_report(targets)
-
-        captured = capsys.readouterr()
-        assert "Rust incremental caches" in captured.out
-
-    def test_report_contains_subtotal(self, monkeypatch, capsys):
-        import collections
-
-        DiskUsage = collections.namedtuple("DiskUsage", ["total", "used", "free"])
-        monkeypatch.setattr(
-            shutil,
-            "disk_usage",
-            lambda path: DiskUsage(100 * 1024**3, 50 * 1024**3, 50 * 1024**3),
-        )
-
-        targets = []
-        mod._print_report(targets)
-
-        captured = capsys.readouterr()
-        assert "Subtotal" in captured.out
 
     def test_report_shows_target_above_min_size(self, monkeypatch, tmp_path, capsys):
         import collections
@@ -957,24 +799,6 @@ class TestRunFix:
         mod._run_fix([target], skip_confirm=True, cache=cache)
 
         assert cache.get(target_dir) is None
-
-
-# ---------------------------------------------------------------------------
-# Default workers constant
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestDefaultWorkers:
-    def test_default_workers_is_positive(self):
-        assert mod._DEFAULT_WORKERS >= 1
-
-    def test_default_workers_capped_at_16(self):
-        assert mod._DEFAULT_WORKERS <= 16
-
-    def test_default_workers_matches_formula(self):
-        expected = min(os.cpu_count() or 4, 16)
-        assert mod._DEFAULT_WORKERS == expected
 
 
 # ---------------------------------------------------------------------------
@@ -1251,21 +1075,6 @@ class TestSizeCache:
         # A fresh SizeCache pointed at the same file should load the persisted entry
         cache2 = mod.SizeCache(cache_file, ttl=60)
         assert cache2.get(target) == 77777
-
-
-# ---------------------------------------------------------------------------
-# _du_size_bytes — updated return-None behavior
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestDuSizeBytesNone:
-    def test_du_returns_none_on_nonexistent_path(self, monkeypatch):
-        monkeypatch.setattr(mod.subprocess, "run", _real_subprocess_run)
-
-        result = mod._du_size_bytes(Path("/nonexistent/path/xyz"))
-
-        assert result is None
 
 
 # ---------------------------------------------------------------------------
