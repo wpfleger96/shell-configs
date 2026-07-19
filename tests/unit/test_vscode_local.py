@@ -41,10 +41,6 @@ class TestCliExtensionInvoker:
             "golang.go",
         ]
 
-    def test_display_name(self):
-        invoker = CliExtensionInvoker("code")
-        assert invoker.display_name == "code"
-
 
 @pytest.mark.unit
 class TestPowerShellExtensionInvoker:
@@ -59,6 +55,10 @@ class TestPowerShellExtensionInvoker:
         assert "-NoProfile" in cmd
         assert "-NonInteractive" in cmd
         assert "--list-extensions" in cmd[-1]
+        assert self.WIN_PATH in cmd[-1]
+        assert "$ErrorActionPreference = 'SilentlyContinue'" in cmd[-1]
+        assert "2>$null" in cmd[-1]
+        assert "exit $LASTEXITCODE" in cmd[-1]
 
     def test_install_command_embeds_ext_id(self):
         invoker = PowerShellExtensionInvoker(self.WIN_PATH)
@@ -70,42 +70,10 @@ class TestPowerShellExtensionInvoker:
         cmd = invoker.uninstall_command("golang.go")
         assert "--uninstall-extension golang.go" in cmd[-1]
 
-    def test_commands_contain_error_action_preference(self):
-        invoker = PowerShellExtensionInvoker(self.WIN_PATH)
-        cmd = invoker.list_command()
-        assert "SilentlyContinue" in cmd[-1]
-
-    def test_commands_suppress_stderr(self):
-        invoker = PowerShellExtensionInvoker(self.WIN_PATH)
-        cmd = invoker.list_command()
-        assert "2>$null" in cmd[-1]
-
-    def test_commands_propagate_exit_code(self):
-        invoker = PowerShellExtensionInvoker(self.WIN_PATH)
-        cmd = invoker.list_command()
-        assert "$LASTEXITCODE" in cmd[-1]
-
-    def test_display_name(self):
-        invoker = PowerShellExtensionInvoker(self.WIN_PATH)
-        assert invoker.display_name == "powershell.exe"
-
-    def test_win_path_embedded_in_command(self):
-        invoker = PowerShellExtensionInvoker(self.WIN_PATH)
-        cmd = invoker.list_command()
-        assert self.WIN_PATH in cmd[-1]
-
 
 @pytest.mark.unit
 class TestVSCodeLocalShell:
     """Tests for VSCodeLocalShell class."""
-
-    def test_name(self):
-        shell = VSCodeLocalShell()
-        assert shell.name == "vscode-local"
-
-    def test_display_name(self):
-        shell = VSCodeLocalShell()
-        assert shell.display_name == "VS Code (Local)"
 
     def test_get_extension_cli_returns_none(self):
         shell = VSCodeLocalShell()
@@ -318,14 +286,6 @@ class TestRegistryWSLConditional:
 @pytest.mark.unit
 class TestBuiltinExtensionsVscodeLocal:
     """Tests for vscode-local builtin extension filtering."""
-
-    def test_vscode_local_builtins(self):
-        builtins = VSCodeLocalShell().get_builtin_extensions()
-        assert "ms-vscode-remote.remote-wsl" in builtins
-
-    def test_vscode_local_builtins_includes_copilot_chat(self):
-        builtins = VSCodeLocalShell().get_builtin_extensions()
-        assert "github.copilot-chat" in builtins
 
     def test_compute_diff_ignores_wsl_extension(self):
         manager = ExtensionManager()

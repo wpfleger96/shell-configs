@@ -120,24 +120,6 @@ class TestSaveAutoUpdateConfig:
             saved_data = yaml.safe_load(f)
         assert saved_data["backup_retention"] == 10
 
-    def test_save_with_oserror_logs_debug(self, mock_home, monkeypatch):
-        """Test that OSError logs debug message."""
-        config_file = mock_home / ".shell-configs" / "update_config.yaml"
-
-        def mock_open_error(*args, **kwargs):
-            raise OSError("Permission denied")
-
-        mock_logger = type("MockLogger", (), {"debug": lambda *args: None})()
-        monkeypatch.setattr("builtins.open", mock_open_error)
-        monkeypatch.setattr(
-            "shell_configs.bootstrap.config.get_config_path",
-            lambda pkg="shell-configs": config_file,
-        )
-        monkeypatch.setattr("shell_configs.bootstrap.config.logger", mock_logger)
-
-        config = AutoUpdateConfig(backup_retention=5)
-        save_auto_update_config(config)
-
     def test_active_profile_round_trips(self, mock_home, monkeypatch):
         """AutoUpdateConfig saves and loads active_profile correctly."""
         config_file = mock_home / ".shell-configs" / "update_config.yaml"

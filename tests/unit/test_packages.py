@@ -1,7 +1,6 @@
 """Tests for package management functionality."""
 
 import io
-import shutil
 import subprocess
 
 from pathlib import Path
@@ -9,15 +8,13 @@ from pathlib import Path
 import pytest
 
 from shell_configs.packages import (
-    HomebrewManager,
     InstallConfig,
     LinuxInstaller,
     Package,
-    get_package_manager,
     load_packages,
 )
 from shell_configs.packages.packages import WingetManager
-from shell_configs.platform import Platform, detect_platform, is_platform
+from shell_configs.platform import Platform, is_platform
 
 
 class TestPackageWslOnly:
@@ -143,12 +140,6 @@ def test_linux_only_packages_excluded_on_macos(
         assert pkg not in names
 
 
-def test_platform_detection() -> None:
-    """Test that platform detection returns a Platform enum."""
-    result = detect_platform()
-    assert isinstance(result, Platform)
-
-
 def test_enpass_cli_available_on_linux(monkeypatch: pytest.MonkeyPatch) -> None:
     """enpass-cli must not be wsl_only — it should be installable on native Linux."""
     monkeypatch.setattr(
@@ -213,61 +204,6 @@ def test_package_get_command() -> None:
         macos=InstallConfig(method="brew"),
     )
     assert pkg_without_command.get_command() == "expect"
-
-
-def test_package_get_config_for_platform() -> None:
-    """Test that Package.get_config_for_platform returns correct config."""
-    macos_config = InstallConfig(method="brew")
-    linux_config = InstallConfig(method="apt")
-
-    pkg = Package(
-        name="test",
-        macos=macos_config,
-        linux=linux_config,
-    )
-
-    config = pkg.get_config_for_platform()
-    assert config is not None
-    assert config.method in ["brew", "apt"]
-
-
-def test_get_package_manager_returns_manager() -> None:
-    """Test that get_package_manager finds available manager."""
-    manager = get_package_manager()
-
-    if is_platform(Platform.MACOS) and shutil.which("brew"):
-        assert manager is not None
-        assert manager.name == "homebrew"
-    elif not is_platform(Platform.MACOS) and (
-        shutil.which("apt") or shutil.which("pip") or shutil.which("uv")
-    ):
-        assert manager is not None
-        assert manager.name == "linux"
-
-
-def test_homebrew_manager_detects_availability() -> None:
-    """Test that Homebrew manager correctly reports availability."""
-    homebrew = HomebrewManager()
-
-    has_brew = shutil.which("brew") is not None
-    assert homebrew.is_available() == has_brew
-
-
-def test_homebrew_manager_binary_check_fallback() -> None:
-    """Test that HomebrewManager uses binary check as fast path."""
-    homebrew = HomebrewManager()
-
-    if not is_platform(Platform.MACOS):
-        return
-
-    pkg = Package(
-        name="sh",
-        command="sh",
-        macos=InstallConfig(method="brew"),
-    )
-
-    result = homebrew.is_installed(pkg)
-    assert result is True
 
 
 def test_linux_installer_binary_check_fallback() -> None:

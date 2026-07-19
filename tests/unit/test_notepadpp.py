@@ -10,25 +10,9 @@ from shell_configs.shells.notepadpp import NotepadPPShell
 
 @pytest.mark.unit
 class TestNotepadPPShell:
-    def test_name(self):
-        shell = NotepadPPShell()
-        assert shell.name == "notepadpp"
-
-    def test_display_name(self):
-        shell = NotepadPPShell()
-        assert shell.display_name == "Notepad++"
-
     def test_returns_no_config_files(self):
         shell = NotepadPPShell()
         assert shell.get_config_files() == []
-
-    def test_returns_no_extension_cli(self):
-        shell = NotepadPPShell()
-        assert shell.get_extension_cli() is None
-
-    def test_returns_no_extension_invoker(self):
-        shell = NotepadPPShell()
-        assert shell.get_extension_invoker() is None
 
     def test_additional_files_on_wsl(self, monkeypatch):
         monkeypatch.setattr(

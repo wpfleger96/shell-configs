@@ -246,6 +246,44 @@ class TestListShellsCommand:
 
 @pytest.mark.integration
 @pytest.mark.cli
+class TestInfoCommand:
+    """Test the info command."""
+
+    def test_info_shows_installation_table(self, test_repo, cli_runner, monkeypatch):
+        monkeypatch.chdir(test_repo)
+
+        result = cli_runner.invoke(cli, ["info"])
+
+        assert result.exit_code == 0
+        assert "shell-configs Installation Info" in result.output
+        assert "Version" in result.output
+
+
+@pytest.mark.integration
+@pytest.mark.cli
+class TestCompletionsStatusCommand:
+    """Test the completions status command."""
+
+    def test_completions_status_lists_supported_shells(
+        self, test_repo, mock_home, cli_runner, monkeypatch
+    ):
+        monkeypatch.chdir(test_repo)
+
+        # PowerShell profile discovery shells out to pwsh; simulate it absent
+        monkeypatch.setattr(
+            "shell_configs.shells.powershell._get_powershell_profile_path",
+            lambda: None,
+        )
+
+        result = cli_runner.invoke(cli, ["completions", "status"])
+
+        assert result.exit_code == 0
+        assert "bash" in result.output
+        assert "zsh" in result.output
+
+
+@pytest.mark.integration
+@pytest.mark.cli
 class TestAdditionalFiles:
     """Test CLI commands with additional files."""
 

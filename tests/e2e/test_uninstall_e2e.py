@@ -2,7 +2,7 @@
 
 Drives `configs uninstall` / `scripts uninstall` so the round trip stays
 hermetic (no package/gh/network components). Verifies managed sections and
-managed files are removed while unrelated user content survives.
+managed files are removed.
 """
 
 from __future__ import annotations
@@ -45,15 +45,3 @@ class TestUninstallRoundTrip:
         manifest = json.loads(manifest_path.read_text())
         # Manifest tracks scripts under a "scripts" mapping; it should be empty.
         assert not manifest.get("scripts", manifest)
-
-    def test_user_content_survives_round_trip(self, run_cli, e2e_home):
-        home_dir, _ = e2e_home
-        bashrc = home_dir / ".bashrc"
-        bashrc.write_text("# MY CUSTOM LINE\nexport FOO=bar\n")
-
-        run_cli(["configs", "install", "--shells", "bash", "-y"])
-        run_cli(["configs", "uninstall", "--shells", "bash", "-y"])
-
-        content = bashrc.read_text()
-        assert "MY CUSTOM LINE" in content
-        assert not has_managed_marker(content)

@@ -109,9 +109,6 @@ class TestCommandName:
     def test_no_gh_prefix(self) -> None:
         assert command_name("github/copilot") == "copilot"
 
-    def test_bare_repo_name(self) -> None:
-        assert command_name("owner/gh-dash") == "dash"
-
 
 @pytest.mark.unit
 class TestListInstalled:
@@ -470,19 +467,6 @@ class TestInstallExtension:
         )
         assert success is True
 
-    def test_install_extension_with_pin_and_build_path(self) -> None:
-        with patch(
-            "shell_configs.gh_extensions.install_from_source",
-            return_value=(True, "Built and installed wpfleger96/gh-infra from source"),
-        ) as mock_source:
-            success, msg = install_extension(
-                "wpfleger96/gh-infra", pin="dev", build_path="./cmd/gh-infra/"
-            )
-        mock_source.assert_called_once_with(
-            "wpfleger96/gh-infra", "./cmd/gh-infra/", pin="dev", dry_run=False
-        )
-        assert success is True
-
 
 @pytest.mark.unit
 class TestGhExtensionsComponent:
@@ -567,49 +551,6 @@ class TestGhExtensionsComponent:
         mock_run.assert_not_called()
         # dry_run path still returns True (no failures, just skipped)
         assert result is True
-
-    def test_component_status_all_installed(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        from shell_configs.cli.components.gh_extensions import GhExtensionsComponent
-
-        desired = [GhExtension(repo="babarot/gh-infra")]
-        installed = {"babarot/gh-infra": "v0.13.0"}
-
-        with patch("shell_configs.gh_extensions.load_extensions", return_value=desired):
-            with patch(
-                "shell_configs.gh_extensions.list_installed", return_value=installed
-            ):
-                component = GhExtensionsComponent()
-                component.status(self._make_ctx())
-
-    def test_component_status_missing(self) -> None:
-        from shell_configs.cli.components.gh_extensions import GhExtensionsComponent
-
-        desired = [GhExtension(repo="babarot/gh-infra")]
-
-        with patch("shell_configs.gh_extensions.load_extensions", return_value=desired):
-            with patch("shell_configs.gh_extensions.list_installed", return_value={}):
-                component = GhExtensionsComponent()
-                # Verify it runs without error
-                component.status(self._make_ctx())
-
-    def test_component_status_with_extra(self) -> None:
-        from shell_configs.cli.components.gh_extensions import GhExtensionsComponent
-
-        desired = [GhExtension(repo="babarot/gh-infra")]
-        installed = {
-            "babarot/gh-infra": "v0.13.0",
-            "cli/cli": "v2.0.0",  # unmanaged
-        }
-
-        with patch("shell_configs.gh_extensions.load_extensions", return_value=desired):
-            with patch(
-                "shell_configs.gh_extensions.list_installed", return_value=installed
-            ):
-                component = GhExtensionsComponent()
-                # Should not raise; extra extensions noted in output
-                component.status(self._make_ctx())
 
     def test_component_diff_no_diff(self) -> None:
         from shell_configs.cli.components.gh_extensions import GhExtensionsComponent

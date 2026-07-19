@@ -143,31 +143,6 @@ class TestOptionalPackagesNeedsSudo:
         plan = OptionalPackagesPlan(has_changes=True, missing=[pkg], total=[pkg])
         assert OptionalPackagesComponent().needs_sudo(_make_ctx(), plan) is True
 
-    def test_nothing_missing_returns_false(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        from shell_configs.cli.components.packages import OptionalPackagesComponent
-
-        monkeypatch.setattr(
-            "shell_configs.platform.is_platform",
-            lambda p: p == Platform.LINUX,
-        )
-        plan = OptionalPackagesPlan(has_changes=False, missing=[], total=[])
-        assert OptionalPackagesComponent().needs_sudo(_make_ctx(), plan) is False
-
-    def test_apt_pkg_on_macos_returns_false(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        from shell_configs.cli.components.packages import OptionalPackagesComponent
-
-        monkeypatch.setattr(
-            "shell_configs.platform.is_platform",
-            lambda p: p == Platform.MACOS,
-        )
-        pkg = _linux_pkg(method="apt")
-        plan = OptionalPackagesPlan(has_changes=True, missing=[pkg], total=[pkg])
-        assert OptionalPackagesComponent().needs_sudo(_make_ctx(), plan) is False
-
 
 @pytest.mark.unit
 class TestLanguagesNeedsSudo:

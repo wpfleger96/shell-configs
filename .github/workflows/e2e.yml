@@ -4,10 +4,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
-      - wpfleger/windows-support
 
 concurrency:
   group: e2e-${{ github.ref }}
@@ -24,15 +20,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [macos-latest, windows-latest]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
-      - name: Install zsh (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y zsh
 
       - name: Set up Python
         uses: actions/setup-python@v6

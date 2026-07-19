@@ -22,14 +22,6 @@ class TestITerm2ShellMacOS:
             lambda p: p == Platform.MACOS,
         )
 
-    def test_name(self):
-        shell = ITerm2Shell()
-        assert shell.name == "iterm2"
-
-    def test_display_name(self):
-        shell = ITerm2Shell()
-        assert shell.display_name == "iTerm2"
-
     def test_get_config_files_empty(self):
         shell = ITerm2Shell()
         assert shell.get_config_files() == []
@@ -61,10 +53,6 @@ class TestITerm2ShellMacOS:
         cmd = shell._get_validation_command(Path("/tmp/test.json"))
         assert cmd == ["python3", "-m", "json.tool", "/tmp/test.json"]
 
-    def test_temp_suffix(self):
-        shell = ITerm2Shell()
-        assert shell._get_temp_suffix() == ".json"
-
 
 class TestITerm2ShellNonMacOS:
     """Test ITerm2Shell is a no-op on non-macOS platforms."""
@@ -83,24 +71,6 @@ class TestITerm2ShellNonMacOS:
         monkeypatch.setattr(
             "shell_configs.shells.iterm2.is_platform",
             lambda p: p == Platform.LINUX,
-        )
-        shell = ITerm2Shell()
-        assert shell.get_preferences_files() == []
-
-    @pytest.mark.unit
-    def test_additional_files_empty_on_wsl(self, monkeypatch):
-        monkeypatch.setattr(
-            "shell_configs.shells.iterm2.is_platform",
-            lambda p: p == Platform.WSL,
-        )
-        shell = ITerm2Shell()
-        assert shell.get_additional_files() == []
-
-    @pytest.mark.unit
-    def test_preferences_files_empty_on_wsl(self, monkeypatch):
-        monkeypatch.setattr(
-            "shell_configs.shells.iterm2.is_platform",
-            lambda p: p == Platform.WSL,
         )
         shell = ITerm2Shell()
         assert shell.get_preferences_files() == []

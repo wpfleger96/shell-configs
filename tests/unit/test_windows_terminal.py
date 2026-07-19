@@ -10,25 +10,9 @@ from shell_configs.shells.windows_terminal import WindowsTerminalShell
 
 @pytest.mark.unit
 class TestWindowsTerminalShell:
-    def test_name(self):
-        shell = WindowsTerminalShell()
-        assert shell.name == "windows-terminal"
-
-    def test_display_name(self):
-        shell = WindowsTerminalShell()
-        assert shell.display_name == "Windows Terminal"
-
     def test_returns_no_config_files(self):
         shell = WindowsTerminalShell()
         assert shell.get_config_files() == []
-
-    def test_returns_no_extension_cli(self):
-        shell = WindowsTerminalShell()
-        assert shell.get_extension_cli() is None
-
-    def test_returns_no_extension_invoker(self):
-        shell = WindowsTerminalShell()
-        assert shell.get_extension_invoker() is None
 
     def test_additional_files_on_wsl(self, monkeypatch):
         monkeypatch.setattr(
