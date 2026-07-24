@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## [0.62.4](https://github.com/wpfleger96/shell-configs/compare/v0.62.3...v0.62.4) (2026-07-24)
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#142](https://github.com/wpfleger96/shell-configs/issues/142)) ([c501b89](https://github.com/wpfleger96/shell-configs/commit/c501b89c40846ca70f0f1738006839d01a468fcf))
+* **deps:** Lock file maintenance ([#145](https://github.com/wpfleger96/shell-configs/issues/145)) ([f8760db](https://github.com/wpfleger96/shell-configs/commit/f8760db7a0d8d831f396da4bd97225e20dd35ec1))
+* **deps:** Update astral-sh/setup-uv action to v8.3.2 ([#141](https://github.com/wpfleger96/shell-configs/issues/141)) ([ea5f675](https://github.com/wpfleger96/shell-configs/commit/ea5f675056c55135c560dfc8f4987fcae862edad))
+
+
+### Continuous Integration
+
+* sync CI workflow ([a327da9](https://github.com/wpfleger96/shell-configs/commit/a327da964008941a591324060038490c29803ed5))
+* sync release workflow ([67e2a6e](https://github.com/wpfleger96/shell-configs/commit/67e2a6e6072be67b55402b932b13a6294fbdc5fa))
+
+
+### Testing
+
+* trim low-value tests, parallelize suite, and scope e2e to main ([#144](https://github.com/wpfleger96/shell-configs/issues/144)) ([e28ecb9](https://github.com/wpfleger96/shell-configs/commit/e28ecb9dcccb23b7b7a08fad7b0a7d72ec4b3307))
+
 ## [0.62.3](https://github.com/wpfleger96/shell-configs/compare/v0.62.2...v0.62.3) (2026-07-12)
 
 
