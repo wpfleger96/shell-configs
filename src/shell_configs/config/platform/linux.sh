@@ -41,6 +41,38 @@ load-tf-secrets() {
     unset MASTERPW
 }
 
+load-buzz-relay-secrets() {
+    if ! command -v enpass-cli >/dev/null 2>&1; then
+        echo "Error: enpass-cli not found. Run: shell-configs packages install" >&2
+        return 1
+    fi
+    if [[ -z "$ENPASS_VAULT_PATH" ]]; then
+        echo "Error: ENPASS_VAULT_PATH not set." >&2
+        return 1
+    fi
+
+    # Prompt once — exported so all enpass-cli calls below can run non-interactively.
+    read -rs -p "Enpass master password: " MASTERPW && echo
+    export MASTERPW
+
+    # Buzz Relay Secrets (13)
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_RELAY_PRIVATE_KEY" env BUZZ_RELAY_PRIVATE_KEY="Buzz Homelab Relay Secrets")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_GIT_HOOK_HMAC_SECRET" env BUZZ_GIT_HOOK_HMAC_SECRET="Buzz Homelab Relay Secrets")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "RELAY_OWNER_PUBKEY" env RELAY_OWNER_PUBKEY="Buzz Homelab Relay Secrets")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_DB_PASSWORD" env BUZZ_DB_PASSWORD="Buzz Homelab Relay Secrets")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_REDIS_PASSWORD" env BUZZ_REDIS_PASSWORD="Buzz Homelab Relay Secrets")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_TYPESENSE_API_KEY" env BUZZ_TYPESENSE_API_KEY="Buzz Homelab Relay Secrets")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_S3_ACCESS_KEY" env BUZZ_S3_ACCESS_KEY="Buzz Homelab Relay Secrets")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_S3_SECRET_KEY" env BUZZ_S3_SECRET_KEY="Buzz Homelab Relay Secrets")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_DOMAIN" env BUZZ_DOMAIN="Buzz Homelab Relay Secrets")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "RELAY_URL" env RELAY_URL="Buzz Homelab Relay Secrets")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_CORS_ORIGINS" env BUZZ_CORS_ORIGINS="Buzz Homelab Relay Secrets")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_MEDIA_BASE_URL" env BUZZ_MEDIA_BASE_URL="Buzz Homelab Relay Secrets")"
+    eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_TUNNEL_TOKEN" env BUZZ_TUNNEL_TOKEN="Buzz Homelab Relay Secrets")"
+
+    unset MASTERPW
+}
+
 nosleep() {
     local seconds
     seconds=$(_parse_duration_seconds "${1:-24h}") || return 1

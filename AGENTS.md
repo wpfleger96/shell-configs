@@ -173,6 +173,7 @@ Each shell (bash, zsh, git) implements `Shell` ABC from `shells/base.py`:
 `ShellRegistry` auto-discovers shell implementations:
 ```python
 from shell_configs.shells.registry import get_registry
+
 registry = get_registry()
 selected_shells, invalid = registry.filter_by_names(["bash", "zsh"])
 ```
