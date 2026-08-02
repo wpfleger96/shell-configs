@@ -9,7 +9,7 @@ import os
 import shutil
 import tempfile
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 from importlib.resources import files
@@ -43,6 +43,7 @@ class DiscoveredScript:
     name: str
     rel_path: str
     platforms: frozenset[Platform]
+    profiles: frozenset[str] = field(default_factory=frozenset)
 
 
 class InstallResult(Enum):
@@ -53,6 +54,7 @@ class InstallResult(Enum):
     WOULD_INSTALL = "would_install"
     WOULD_UPDATE = "would_update"
     SKIPPED_PLATFORM = "skipped_platform"
+    SKIPPED_PROFILE = "skipped_profile"
     ERROR = "error"
 
 
@@ -72,6 +74,7 @@ class ScriptStatus(Enum):
     MISSING = "missing"
     COLLISION = "collision"
     SKIPPED_PLATFORM = "skipped_platform"
+    SKIPPED_PROFILE = "skipped_profile"
 
 
 @dataclass
@@ -136,30 +139,50 @@ def get_default_target_dir() -> Path:
     return Path.home() / ".local" / "bin"
 
 
-def _load_platform_exceptions(
+def _load_script_configs(
     source_dir: Path | None = None,
-) -> dict[str, frozenset[Platform]]:
+) -> tuple[dict[str, frozenset[Platform]], dict[str, frozenset[str]]]:
+    """Parse scripts.toml and return (platform_map, profile_map) for each script.
+
+    Absent platforms key → empty frozenset (script runs on all platforms).
+    Absent profiles key → empty frozenset (script available on all profiles).
+    Unknown platform names are warned; profile names are free-form, no validation.
+    """
     try:
         if source_dir is not None:
             raw = (source_dir / "scripts.toml").read_bytes()
         else:
             raw = files("shell_configs.scripts").joinpath("scripts.toml").read_bytes()
     except FileNotFoundError:
-        return {}
+        return {}, {}
 
     data = tomllib.loads(raw.decode())
-    result: dict[str, frozenset[Platform]] = {}
+    platform_map: dict[str, frozenset[Platform]] = {}
+    profile_map: dict[str, frozenset[str]] = {}
     for script_name, table in data.items():
         if not isinstance(table, dict):
             continue
-        raw_platforms = table.get("platforms", [])
-        platforms = frozenset(
-            _PLATFORM_NAMES[p] for p in raw_platforms if p in _PLATFORM_NAMES
-        )
-        if raw_platforms and not platforms:
-            logger.warning("Unknown platforms for %s: %s", script_name, raw_platforms)
-        result[script_name] = platforms
-    return result
+        if "platforms" in table:
+            raw_platforms = table["platforms"]
+            platforms = frozenset(
+                _PLATFORM_NAMES[p] for p in raw_platforms if p in _PLATFORM_NAMES
+            )
+            if raw_platforms and not platforms:
+                logger.warning(
+                    "Unknown platforms for %s: %s", script_name, raw_platforms
+                )
+            platform_map[script_name] = platforms
+        raw_profiles = table.get("profiles", [])
+        profile_map[script_name] = frozenset(raw_profiles)
+    return platform_map, profile_map
+
+
+def _get_active_profile_name() -> str:
+    """Return the active profile name from config, defaulting to 'default'."""
+    from shell_configs.bootstrap.config import load_auto_update_config
+
+    auto_config = load_auto_update_config()
+    return auto_config.active_profile or "default"
 
 
 def _walk_tree(root: object, rel_parts: tuple[str, ...] = ()) -> list[tuple[str, str]]:
@@ -178,11 +201,15 @@ def discover_scripts(
     current_platform: Platform | None = None,
     source_dir: Path | None = None,
     include_all: bool = False,
+    active_profile: str | None = None,
 ) -> list[DiscoveredScript]:
-    if current_platform is None and not include_all:
-        current_platform = detect_platform()
+    if not include_all:
+        if current_platform is None:
+            current_platform = detect_platform()
+        if active_profile is None:
+            active_profile = _get_active_profile_name()
 
-    exceptions = _load_platform_exceptions(source_dir)
+    platform_map, profile_map = _load_script_configs(source_dir)
 
     root = source_dir if source_dir is not None else files("shell_configs.scripts")
     entries = _walk_tree(root)
@@ -199,11 +226,17 @@ def discover_scripts(
             )
             continue
         seen[name] = rel_path
-        platforms = exceptions.get(name, _ALL_PLATFORMS)
-        if not include_all and current_platform not in platforms:
-            continue
+        platforms = platform_map.get(name, _ALL_PLATFORMS)
+        profiles = profile_map.get(name, frozenset())
+        if not include_all:
+            if current_platform not in platforms:
+                continue
+            if profiles and active_profile not in profiles:
+                continue
         scripts.append(
-            DiscoveredScript(name=name, rel_path=rel_path, platforms=platforms)
+            DiscoveredScript(
+                name=name, rel_path=rel_path, platforms=platforms, profiles=profiles
+            )
         )
 
     return scripts
@@ -225,10 +258,17 @@ def get_script_status(
     target_dir: Path,
     manifest: ScriptManifest,
     source_dir: Path | None = None,
+    active_profile: str | None = None,
 ) -> ScriptStatus:
     current_platform = detect_platform()
     if current_platform not in script.platforms:
         return ScriptStatus.SKIPPED_PLATFORM
+
+    if script.profiles:
+        if active_profile is None:
+            active_profile = _get_active_profile_name()
+        if active_profile not in script.profiles:
+            return ScriptStatus.SKIPPED_PROFILE
 
     target = target_dir / script.name
 
@@ -267,6 +307,7 @@ def install_script(
     manifest: ScriptManifest,
     dry_run: bool = False,
     source_dir: Path | None = None,
+    active_profile: str | None = None,
 ) -> tuple[InstallResult, str]:
     current_platform = detect_platform()
     if current_platform not in script.platforms:
@@ -274,6 +315,15 @@ def install_script(
             InstallResult.SKIPPED_PLATFORM,
             f"{script.name}: not supported on {current_platform.display_name}",
         )
+
+    if script.profiles:
+        if active_profile is None:
+            active_profile = _get_active_profile_name()
+        if active_profile not in script.profiles:
+            return (
+                InstallResult.SKIPPED_PROFILE,
+                f"{script.name}: not available for profile '{active_profile}'",
+            )
 
     try:
         source_bytes = _read_script_bytes(script.rel_path, source_dir)

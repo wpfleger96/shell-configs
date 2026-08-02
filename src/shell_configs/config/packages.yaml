@@ -77,6 +77,9 @@ packages:
   - name: docker
     command: docker
     description: "Docker container runtime"
+    macos:
+      method: brew
+      cask: true
     linux:
       method: apt
       package: docker-ce
@@ -250,6 +253,9 @@ packages:
     command: Enpass
     description: "Enpass password manager (desktop app for browser extension)"
     wsl_exclude: true
+    macos:
+      method: brew
+      cask: true
     linux:
       method: apt
       package: enpass
@@ -266,6 +272,8 @@ packages:
   - name: enpass-cli
     command: enpass-cli
     description: "Enpass vault CLI for password and secret retrieval"
+    macos:
+      method: brew
     linux:
       method: script
       install_cmd: "set -e && tmp=$(mktemp -d) && gh release download --repo hazcod/enpass-cli --pattern '*linux_amd64*' -D \"$tmp\" && unzip -qo \"$tmp\"/*.zip -d \"$tmp\" && find \"$tmp\" -name enpasscli -exec install -m 755 {} ~/.local/bin/enpass-cli \\; && rm -rf \"$tmp\""

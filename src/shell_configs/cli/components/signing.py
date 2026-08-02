@@ -24,7 +24,8 @@ class SigningComponent(Component):
 
         from shell_configs.signing import setup_signing
 
-        results = setup_signing(auto_fix=False, interactive=False)
+        emails = ctx.profile.signing_emails or None if ctx.profile else None
+        results = setup_signing(auto_fix=False, interactive=False, emails=emails)
         failed = [r for r in results if not r.success and not r.skipped]
         return SigningPlan(has_changes=bool(failed), results=results, failed=failed)
 
@@ -58,14 +59,18 @@ class SigningComponent(Component):
 
         from shell_configs.signing import setup_signing
 
-        results = setup_signing(auto_fix=True, interactive=False)
+        emails = ctx.profile.signing_emails or None if ctx.profile else None
+        results = setup_signing(auto_fix=True, interactive=False, emails=emails)
         return all(r.success or r.skipped for r in results)
 
     def status(self, ctx: Context) -> None:
         from shell_configs.display import console, print_success, print_warning
         from shell_configs.signing import setup_signing
 
-        signing_results = setup_signing(auto_fix=False, interactive=False)
+        emails = ctx.profile.signing_emails or None if ctx.profile else None
+        signing_results = setup_signing(
+            auto_fix=False, interactive=False, emails=emails
+        )
         for r in signing_results:
             if r.success:
                 print_success(r.message, indent=2)

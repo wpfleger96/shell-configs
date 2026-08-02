@@ -131,13 +131,40 @@ def test_linux_only_packages_excluded_on_macos(
     names = [p.name for p in packages]
     for pkg in (
         "wl-clipboard",
-        "enpass",
-        "enpass-cli",
         "bzip2",
         "build-essential",
-        "docker",
     ):
         assert pkg not in names
+
+
+def test_enpass_docker_available_on_macos(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """enpass, enpass-cli, and docker must be available on macOS with correct brew config."""
+    monkeypatch.setattr(
+        "shell_configs.packages.packages.is_platform",
+        lambda p: p == Platform.MACOS,
+    )
+    packages = load_packages()
+    by_name = {p.name: p for p in packages}
+
+    assert "enpass" in by_name
+    enpass_cfg = by_name["enpass"].macos
+    assert enpass_cfg is not None
+    assert enpass_cfg.method == "brew"
+    assert enpass_cfg.cask is True
+
+    assert "enpass-cli" in by_name
+    enpass_cli_cfg = by_name["enpass-cli"].macos
+    assert enpass_cli_cfg is not None
+    assert enpass_cli_cfg.method == "brew"
+    assert enpass_cli_cfg.cask is not True
+
+    assert "docker" in by_name
+    docker_cfg = by_name["docker"].macos
+    assert docker_cfg is not None
+    assert docker_cfg.method == "brew"
+    assert docker_cfg.cask is True
 
 
 def test_enpass_cli_available_on_linux(monkeypatch: pytest.MonkeyPatch) -> None:

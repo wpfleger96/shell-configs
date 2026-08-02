@@ -462,6 +462,7 @@ def setup_signing(
     auto_fix: bool = False,
     interactive: bool = True,
     dry_run: bool = False,
+    emails: list[str] | None = None,
 ) -> list[StepResult]:
     """Full SSH key lifecycle. Discovers and threads key_path through every step.
 
@@ -588,7 +589,7 @@ def setup_signing(
         )
     else:
         ok, msg = generate_allowed_signers_file(
-            allowed_signers, signing_key=pub_key_str
+            allowed_signers, signing_key=pub_key_str, emails=emails
         )
         results.append(StepResult("allowed_signers", ok, msg))
 
@@ -825,7 +826,8 @@ def generate_allowed_signers_file(
     Args:
         allowed_signers_path: Path where allowed_signers file should be created
         signing_key: The public key string to use. If None, falls back to ssh-agent.
-        emails: List of email addresses to include. If None, uses default emails.
+        emails: List of email addresses to include. If None, falls back to
+            ``git config user.email``. Returns failure if neither is available.
 
     Returns:
         (success, message) tuple
@@ -838,10 +840,19 @@ def generate_allowed_signers_file(
             return False, "No SSH keys in ssh-agent - run 'ssh-add'"
 
     if emails is None:
-        emails = [
-            "pfleger.will@gmail.com",
-            "wpfleger@block.xyz",
-        ]
+        result = _run(
+            ["git", "config", "user.email"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        git_email = result.stdout.strip() if result.returncode == 0 else ""
+        if not git_email:
+            return (
+                False,
+                "No signing emails configured and git config user.email is not set",
+            )
+        emails = [git_email]
 
     lines = []
     for email in emails:

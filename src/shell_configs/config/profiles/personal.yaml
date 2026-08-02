@@ -1,0 +1,91 @@
+name: personal
+description: Personal machines profile
+extends: default
+
+shell_overrides:
+  shared: |
+    ### Enpass vault — location varies by platform ###
+    case "$(uname -s)" in
+        Darwin)
+            export ENPASS_VAULT_PATH="$HOME/Library/Containers/in.sinew.Enpass-Desktop/Data/Documents/Vaults/primary"
+            ;;
+        Linux)
+            if grep -qi microsoft /proc/version 2>/dev/null; then
+                export ENPASS_VAULT_PATH="/mnt/c/Users/Will Pfleger/Documents/Enpass/Vaults/primary"
+            else
+                export ENPASS_VAULT_PATH="$HOME/Documents/Enpass/Vaults/primary"
+            fi
+            ;;
+    esac
+
+    load-tf-secrets() {
+        if ! command -v enpass-cli >/dev/null 2>&1; then
+            echo "Error: enpass-cli not found. Run: shell-configs packages install" >&2
+            return 1
+        fi
+        if [[ -z "$ENPASS_VAULT_PATH" ]]; then
+            echo "Error: ENPASS_VAULT_PATH not set." >&2
+            return 1
+        fi
+
+        # Prompt once — exported so all enpass-cli calls below can run non-interactively.
+        printf 'Enpass master password: '
+        IFS= read -rs MASTERPW
+        echo
+        export MASTERPW
+
+        # Homelab / Proxmox (5)
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Proxmox API Key ID" env TF_VAR_proxmox_api_key_id="Homelab Consoles")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Proxmox01 API Key Secret" env TF_VAR_proxmox01_api_key_secret="Homelab Consoles")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Proxmox02 API Key Secret" env TF_VAR_proxmox02_api_key_secret="Homelab Consoles")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Container User Password" env TF_VAR_container_user_password="Homelab Consoles")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "SSH Public Key" env TF_VAR_ssh_public_key="Homelab Consoles")"
+
+        # AWS (1)
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Email Address" env TF_VAR_alert_email="AWS")"
+
+        # GCP (4)
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "GCP Project ID" env TF_VAR_gcp_project_id="Gmail Main/GCP Homelab")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "GCP Project Number" env TF_VAR_gcp_project_number="Gmail Main/GCP Homelab")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "GCP Billing Account ID" env TF_VAR_gcp_billing_account_id="Gmail Main/GCP Homelab")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Email" env TF_VAR_gcp_alert_email="Gmail Main/GCP Homelab")"
+
+        # Cloudflare (1)
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Account Number" env TF_VAR_cloudflare_account_id="Cloudflare")"
+
+        unset MASTERPW
+    }
+
+    load-buzz-relay-secrets() {
+        if ! command -v enpass-cli >/dev/null 2>&1; then
+            echo "Error: enpass-cli not found. Run: shell-configs packages install" >&2
+            return 1
+        fi
+        if [[ -z "$ENPASS_VAULT_PATH" ]]; then
+            echo "Error: ENPASS_VAULT_PATH not set." >&2
+            return 1
+        fi
+
+        # Prompt once — exported so all enpass-cli calls below can run non-interactively.
+        printf 'Enpass master password: '
+        IFS= read -rs MASTERPW
+        echo
+        export MASTERPW
+
+        # Buzz Relay Secrets (13)
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_RELAY_PRIVATE_KEY" env BUZZ_RELAY_PRIVATE_KEY="Buzz Homelab Relay Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_GIT_HOOK_HMAC_SECRET" env BUZZ_GIT_HOOK_HMAC_SECRET="Buzz Homelab Relay Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "RELAY_OWNER_PUBKEY" env RELAY_OWNER_PUBKEY="Buzz Homelab Relay Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_DB_PASSWORD" env BUZZ_DB_PASSWORD="Buzz Homelab Relay Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_REDIS_PASSWORD" env BUZZ_REDIS_PASSWORD="Buzz Homelab Relay Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_TYPESENSE_API_KEY" env BUZZ_TYPESENSE_API_KEY="Buzz Homelab Relay Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_S3_ACCESS_KEY" env BUZZ_S3_ACCESS_KEY="Buzz Homelab Relay Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_S3_SECRET_KEY" env BUZZ_S3_SECRET_KEY="Buzz Homelab Relay Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_DOMAIN" env BUZZ_DOMAIN="Buzz Homelab Relay Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "RELAY_URL" env RELAY_URL="Buzz Homelab Relay Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_CORS_ORIGINS" env BUZZ_CORS_ORIGINS="Buzz Homelab Relay Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_MEDIA_BASE_URL" env BUZZ_MEDIA_BASE_URL="Buzz Homelab Relay Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_TUNNEL_TOKEN" env BUZZ_TUNNEL_TOKEN="Buzz Homelab Relay Secrets")"
+
+        unset MASTERPW
+    }

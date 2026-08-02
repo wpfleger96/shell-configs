@@ -459,3 +459,83 @@ class TestGetPubFingerprint:
 
         # Reading a directory raises IsADirectoryError (an OSError subclass).
         assert get_pub_fingerprint(tmp_path) == ""
+
+
+@pytest.mark.unit
+class TestGenerateAllowedSignersFile:
+    """Tests for generate_allowed_signers_file — email sourcing and file output."""
+
+    def test_writes_one_line_per_email_per_key(self, tmp_path):
+        from shell_configs.signing import generate_allowed_signers_file
+
+        allowed = tmp_path / "allowed_signers"
+        signing_key = "ssh-ed25519 AAAA user@host"
+        emails = ["a@example.com", "b@example.com"]
+
+        ok, msg = generate_allowed_signers_file(
+            allowed, signing_key=signing_key, emails=emails
+        )
+
+        assert ok is True
+        lines = allowed.read_text().strip().splitlines()
+        assert len(lines) == 2
+        assert "a@example.com ssh-ed25519 AAAA user@host" in lines
+        assert "b@example.com ssh-ed25519 AAAA user@host" in lines
+
+    def test_fallback_to_git_config_user_email(self, tmp_path, monkeypatch):
+        """When emails=None, uses git config user.email as the single email."""
+        from shell_configs.signing import generate_allowed_signers_file
+
+        def mock_run(cmd, **kwargs):
+            if cmd[:2] == ["git", "config"]:
+                return _make_result(0, stdout="git-user@example.com\n")
+            return _make_result(0)
+
+        monkeypatch.setattr("shell_configs.signing._run", mock_run)
+
+        allowed = tmp_path / "allowed_signers"
+        signing_key = "ssh-ed25519 BBBB user@host"
+
+        ok, msg = generate_allowed_signers_file(
+            allowed, signing_key=signing_key, emails=None
+        )
+
+        assert ok is True
+        content = allowed.read_text()
+        assert "git-user@example.com" in content
+        assert "BBBB" in content
+
+    def test_returns_failure_when_no_emails_and_no_git_config(
+        self, tmp_path, monkeypatch
+    ):
+        """When emails=None and git config yields nothing, returns (False, msg)."""
+        from shell_configs.signing import generate_allowed_signers_file
+
+        def mock_run(cmd, **kwargs):
+            if cmd[:2] == ["git", "config"]:
+                return _make_result(1, stdout="")
+            return _make_result(0)
+
+        monkeypatch.setattr("shell_configs.signing._run", mock_run)
+
+        allowed = tmp_path / "allowed_signers"
+        signing_key = "ssh-ed25519 CCCC user@host"
+
+        ok, msg = generate_allowed_signers_file(
+            allowed, signing_key=signing_key, emails=None
+        )
+
+        assert ok is False
+        assert not allowed.exists(), "File must not be written on failure"
+        assert "git config user.email" in msg or "signing emails" in msg
+
+    def test_regression_no_block_xyz_in_source(self):
+        """Hardcoded work email must not appear in signing.py."""
+        import shell_configs.signing as signing_module
+
+        source = signing_module.__file__
+        assert source is not None
+        content = open(source, encoding="utf-8").read()
+        assert "block.xyz" not in content, (
+            "Hardcoded work email 'block.xyz' found in signing.py — remove it"
+        )

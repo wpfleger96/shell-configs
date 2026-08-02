@@ -408,3 +408,87 @@ class TestResolveActiveProfile:
         loader = self._make_loader(temp_dir)
         p = resolve_active_profile("work", loader)
         assert p.name == "work"
+
+
+@pytest.mark.unit
+class TestSigningEmailsSchema:
+    """Tests for signing_emails field: loading, defaults, and merge semantics."""
+
+    def _make_loader(self, temp_dir: Path, profiles: dict[str, Any]) -> ProfileLoader:
+        profiles_dir = temp_dir / "profiles"
+        profiles_dir.mkdir(exist_ok=True)
+        for name, data in profiles.items():
+            (profiles_dir / f"{name}.yaml").write_text(yaml.dump(data))
+        return ProfileLoader(temp_dir)
+
+    def test_load_signing_emails_from_yaml(self, temp_dir):
+        loader = self._make_loader(
+            temp_dir,
+            {
+                "work": {
+                    "name": "work",
+                    "signing_emails": ["user@work.com", "user@personal.com"],
+                }
+            },
+        )
+        p = loader.load_profile("work")
+        assert p.signing_emails == ["user@work.com", "user@personal.com"]
+
+    def test_absent_signing_emails_defaults_to_empty_list(self, temp_dir):
+        loader = self._make_loader(
+            temp_dir,
+            {"simple": {"name": "simple", "description": "no emails"}},
+        )
+        p = loader.load_profile("simple")
+        assert p.signing_emails == []
+
+    def test_default_profile_without_file_has_empty_signing_emails(self, temp_dir):
+        loader = ProfileLoader(temp_dir)
+        p = loader.load_profile("default")
+        assert p.signing_emails == []
+
+    def test_child_nonempty_signing_emails_replaces_parent(self, temp_dir):
+        loader = self._make_loader(
+            temp_dir,
+            {
+                "default": {
+                    "name": "default",
+                    "signing_emails": ["parent@example.com"],
+                },
+                "work": {
+                    "name": "work",
+                    "extends": "default",
+                    "signing_emails": ["work@example.com"],
+                },
+            },
+        )
+        p = loader.resolve_profile("work")
+        assert p.signing_emails == ["work@example.com"]
+
+    def test_child_empty_signing_emails_inherits_parent(self, temp_dir):
+        loader = self._make_loader(
+            temp_dir,
+            {
+                "default": {
+                    "name": "default",
+                    "signing_emails": ["parent@example.com"],
+                },
+                "work": {
+                    "name": "work",
+                    "extends": "default",
+                },
+            },
+        )
+        p = loader.resolve_profile("work")
+        assert p.signing_emails == ["parent@example.com"]
+
+    def test_both_parent_and_child_empty_yields_empty(self, temp_dir):
+        loader = self._make_loader(
+            temp_dir,
+            {
+                "base": {"name": "base"},
+                "child": {"name": "child", "extends": "base"},
+            },
+        )
+        p = loader.resolve_profile("child")
+        assert p.signing_emails == []
