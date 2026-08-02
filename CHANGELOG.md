@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.63.1](https://github.com/wpfleger96/shell-configs/compare/v0.63.0...v0.63.1) (2026-08-02)
+
+
+### Bug Fixes
+
+* **packages:** export Enpass secrets, pin enpass-cli 1.12.0 everywhere ([#149](https://github.com/wpfleger96/shell-configs/issues/149)) ([2c63a2e](https://github.com/wpfleger96/shell-configs/commit/2c63a2e1e2751202333ebeac7b6787743aba3d8a))
+
 ## [0.63.0](https://github.com/wpfleger96/shell-configs/compare/v0.62.3...v0.63.0) (2026-08-02)
 
 
