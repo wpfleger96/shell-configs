@@ -11,6 +11,11 @@ from shell_configs.cli.context import (
 )
 
 
+def _signing_emails(ctx: Context) -> list[str] | None:
+    """Return profile signing emails, or None when no profile or no emails configured."""
+    return (ctx.profile.signing_emails or None) if ctx.profile else None
+
+
 class SigningComponent(Component):
     label = "signing"
     display_name = "SSH Key Lifecycle"
@@ -24,7 +29,7 @@ class SigningComponent(Component):
 
         from shell_configs.signing import setup_signing
 
-        emails = ctx.profile.signing_emails or None if ctx.profile else None
+        emails = _signing_emails(ctx)
         results = setup_signing(auto_fix=False, interactive=False, emails=emails)
         failed = [r for r in results if not r.success and not r.skipped]
         return SigningPlan(has_changes=bool(failed), results=results, failed=failed)
@@ -59,7 +64,7 @@ class SigningComponent(Component):
 
         from shell_configs.signing import setup_signing
 
-        emails = ctx.profile.signing_emails or None if ctx.profile else None
+        emails = _signing_emails(ctx)
         results = setup_signing(auto_fix=True, interactive=False, emails=emails)
         return all(r.success or r.skipped for r in results)
 
@@ -67,7 +72,7 @@ class SigningComponent(Component):
         from shell_configs.display import console, print_success, print_warning
         from shell_configs.signing import setup_signing
 
-        emails = ctx.profile.signing_emails or None if ctx.profile else None
+        emails = _signing_emails(ctx)
         signing_results = setup_signing(
             auto_fix=False, interactive=False, emails=emails
         )

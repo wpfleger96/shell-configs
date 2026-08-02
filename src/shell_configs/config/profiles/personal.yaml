@@ -30,7 +30,7 @@ shell_overrides:
 
         # Prompt once — exported so all enpass-cli calls below can run non-interactively.
         printf 'Enpass master password: '
-        IFS= read -rs MASTERPW
+        IFS= read -rs MASTERPW || { echo; unset MASTERPW; return 1; }
         echo
         export MASTERPW
 
@@ -68,7 +68,7 @@ shell_overrides:
 
         # Prompt once — exported so all enpass-cli calls below can run non-interactively.
         printf 'Enpass master password: '
-        IFS= read -rs MASTERPW
+        IFS= read -rs MASTERPW || { echo; unset MASTERPW; return 1; }
         echo
         export MASTERPW
 

@@ -215,12 +215,14 @@ def scripts_list(include_all: bool) -> None:
     table = Table(show_header=True, header_style="bold")
     table.add_column("Script")
     table.add_column("Platforms")
+    table.add_column("Profiles")
 
     for entry in entries:
         platforms = ", ".join(
             p.display_name for p in sorted(entry.platforms, key=lambda p: p.value)
         )
-        table.add_row(entry.name, platforms)
+        profiles = ", ".join(sorted(entry.profiles)) if entry.profiles else "all"
+        table.add_row(entry.name, platforms, profiles)
 
     print_section("Available Scripts")
     console.print(table)

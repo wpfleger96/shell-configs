@@ -52,3 +52,22 @@ class TestPersonalProfile:
     ) -> None:
         resolved = real_loader.resolve_profile("personal")
         assert resolved.name == "personal"
+
+    def test_resolved_personal_profile_inherits_signing_emails_from_default(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        resolved = real_loader.resolve_profile("personal")
+        assert resolved.signing_emails == ["pfleger.will@gmail.com"]
+
+    def test_loaded_default_profile_signing_emails(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        default = real_loader.load_profile("default")
+        assert default.signing_emails == ["pfleger.will@gmail.com"]
+
+    def test_resolved_work_profile_signing_emails_replaces_parent(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        resolved = real_loader.resolve_profile("work")
+        assert resolved.signing_emails == ["wpfleger@block.xyz"]
+        assert "pfleger.will@gmail.com" not in resolved.signing_emails

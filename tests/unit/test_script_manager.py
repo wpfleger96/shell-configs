@@ -1,6 +1,9 @@
 """Unit tests for script_manager: orphan detection and profile gating."""
 
+from __future__ import annotations
+
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -370,3 +373,175 @@ class TestGetScriptStatusProfileGating:
         )
 
         assert status == ScriptStatus.MISSING
+
+
+def _make_ctx(profile_name: str | None = None) -> MagicMock:
+    ctx = MagicMock()
+    ctx.dry_run = False
+    ctx.yes = True
+    if profile_name is None:
+        ctx.profile = None
+    else:
+        ctx.profile = MagicMock()
+        ctx.profile.name = profile_name
+    return ctx
+
+
+@pytest.mark.unit
+class TestScriptsComponentProfileResolution:
+    """ScriptsComponent.plan() must use ctx.profile, not the on-disk config."""
+
+    def test_plan_uses_ctx_profile_not_on_disk_config(self, tmp_path):
+        """Filtering follows ctx.profile.name even when it differs from the persisted value."""
+        from shell_configs.cli.components.scripts import ScriptsComponent
+
+        target_dir = tmp_path / "bin"
+        target_dir.mkdir()
+        manifest_path = tmp_path / "manifest.json"
+
+        # ctx says "work", but on-disk config says "personal" — filter must follow ctx
+        ctx = _make_ctx(profile_name="work")
+        work_script = _script("work-tool", profiles=frozenset({"work"}))
+
+        # Lazy imports inside plan() mean patches must target source modules
+        with (
+            patch(
+                "shell_configs.script_manager.discover_scripts",
+                return_value=[work_script],
+            ),
+            patch(
+                "shell_configs.script_manager.get_default_target_dir",
+                return_value=target_dir,
+            ),
+            patch(
+                "shell_configs.script_manager.get_default_manifest_path",
+                return_value=manifest_path,
+            ),
+            patch(
+                "shell_configs.script_manager.find_orphaned_scripts",
+                return_value=[],
+            ),
+            patch(
+                "shell_configs.platform.detect_platform",
+                return_value=Platform.LINUX,
+            ),
+            # On-disk config reports "personal" — must NOT influence filtering
+            patch(
+                "shell_configs.bootstrap.config.load_auto_update_config",
+                return_value=MagicMock(active_profile="personal"),
+            ),
+        ):
+            plan = ScriptsComponent().plan(ctx)
+
+        # The work-gated script should appear in entries because ctx.profile.name=="work"
+        assert len(plan.entries) == 1
+        assert plan.entries[0][0].name == "work-tool"
+
+    def test_plan_excludes_script_when_ctx_profile_does_not_match(self, tmp_path):
+        """A profile-gated script is excluded when ctx.profile doesn't match."""
+        from shell_configs.cli.components.scripts import ScriptsComponent
+
+        target_dir = tmp_path / "bin"
+        target_dir.mkdir()
+        manifest_path = tmp_path / "manifest.json"
+
+        ctx = _make_ctx(profile_name="personal")
+        work_script = _script("work-tool", profiles=frozenset({"work"}))
+
+        with (
+            patch(
+                "shell_configs.script_manager.discover_scripts",
+                return_value=[work_script],
+            ),
+            patch(
+                "shell_configs.script_manager.get_default_target_dir",
+                return_value=target_dir,
+            ),
+            patch(
+                "shell_configs.script_manager.get_default_manifest_path",
+                return_value=manifest_path,
+            ),
+            patch(
+                "shell_configs.script_manager.find_orphaned_scripts",
+                return_value=[],
+            ),
+            patch(
+                "shell_configs.platform.detect_platform",
+                return_value=Platform.LINUX,
+            ),
+        ):
+            plan = ScriptsComponent().plan(ctx)
+
+        assert plan.entries == []
+
+    def test_plan_passes_active_profile_to_get_script_status(self, tmp_path):
+        """get_script_status receives the same active_profile used for filtering.
+
+        A profile-gated script that passes the filter (profile matches ctx) must
+        receive the matching profile name and return a real status, not SKIPPED_PROFILE.
+        """
+        from shell_configs.cli.components.scripts import ScriptsComponent
+
+        source_dir = _make_source_dir(
+            tmp_path,
+            scripts=["work-tool"],
+            toml_content='[work-tool]\nprofiles = ["work"]\n',
+        )
+        target_dir = tmp_path / "bin"
+        target_dir.mkdir()
+        manifest_path = tmp_path / "manifest.json"
+
+        ctx = _make_ctx(profile_name="work")
+        work_script = _script(
+            "work-tool",
+            platforms=frozenset({Platform.LINUX}),
+            profiles=frozenset({"work"}),
+        )
+
+        with (
+            patch(
+                "shell_configs.script_manager.discover_scripts",
+                return_value=[work_script],
+            ),
+            patch(
+                "shell_configs.script_manager.get_default_target_dir",
+                return_value=target_dir,
+            ),
+            patch(
+                "shell_configs.script_manager.get_default_manifest_path",
+                return_value=manifest_path,
+            ),
+            patch(
+                "shell_configs.script_manager.find_orphaned_scripts",
+                return_value=[],
+            ),
+            patch(
+                "shell_configs.platform.detect_platform",
+                return_value=Platform.LINUX,
+            ),
+            patch(
+                "shell_configs.bootstrap.config.load_auto_update_config",
+                return_value=MagicMock(active_profile="personal"),
+            ),
+            patch(
+                "shell_configs.script_manager.get_script_status",
+                wraps=lambda entry, td, mf, active_profile=None, **kw: (
+                    get_script_status(
+                        entry,
+                        td,
+                        mf,
+                        source_dir=source_dir,
+                        active_profile=active_profile,
+                    )
+                ),
+            ) as mock_get_status,
+        ):
+            plan = ScriptsComponent().plan(ctx)
+
+        # get_script_status must have been called with active_profile="work"
+        call_kwargs = mock_get_status.call_args
+        assert call_kwargs.kwargs.get("active_profile") == "work"
+        # The script passes the profile filter and should not be SKIPPED_PROFILE
+        assert len(plan.entries) == 1
+        _, status = plan.entries[0]
+        assert status != ScriptStatus.SKIPPED_PROFILE

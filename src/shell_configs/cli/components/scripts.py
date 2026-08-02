@@ -16,7 +16,6 @@ class ScriptsComponent(Component):
     display_name = "Scripts"
 
     def plan(self, ctx: Context) -> ScriptsPlan:
-        from shell_configs.bootstrap.config import load_auto_update_config
         from shell_configs.platform import detect_platform
         from shell_configs.script_manager import (
             ScriptManifest,
@@ -35,9 +34,14 @@ class ScriptsComponent(Component):
         # current-platform/profile subset from the same list to avoid a second walk.
         all_scripts = discover_scripts(include_all=True)
         current_platform = detect_platform()
-        active_profile = load_auto_update_config().active_profile or "default"
+        active_profile = ctx.profile.name if ctx.profile else "default"
         entries = [
-            (entry, get_script_status(entry, target_dir, manifest))
+            (
+                entry,
+                get_script_status(
+                    entry, target_dir, manifest, active_profile=active_profile
+                ),
+            )
             for entry in all_scripts
             if current_platform in entry.platforms
             and (not entry.profiles or active_profile in entry.profiles)
@@ -92,11 +96,18 @@ class ScriptsComponent(Component):
 
         target_dir = get_default_target_dir()
         manifest = ScriptManifest(get_default_manifest_path())
+        active_profile = ctx.profile.name if ctx.profile else "default"
         success = True
         for entry, status in plan.entries:
             if status == ScriptStatus.INSTALLED:
                 continue
-            result, _ = install_script(entry, target_dir, manifest, dry_run=False)
+            result, _ = install_script(
+                entry,
+                target_dir,
+                manifest,
+                dry_run=False,
+                active_profile=active_profile,
+            )
             if result not in (
                 InstallResult.INSTALLED,
                 InstallResult.UPDATED,
