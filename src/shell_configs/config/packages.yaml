@@ -272,11 +272,14 @@ packages:
   - name: enpass-cli
     command: enpass-cli
     description: "Enpass vault CLI for password and secret retrieval"
+    version: "1.12.0"
+    version_cmd: "enpass-cli version"
     macos:
-      method: brew
+      method: script
+      install_cmd: "set -e && (brew list enpass-cli >/dev/null 2>&1 && brew uninstall enpass-cli) || true && tmp=$(mktemp -d) && arch=$(uname -m | sed 's/x86_64/amd64/') && gh release download --repo hazcod/enpass-cli --tag v1.12.0 --pattern \"*darwin_${arch}*\" -D \"$tmp\" && unzip -qo \"$tmp\"/*.zip -d \"$tmp\" && find \"$tmp\" -name enpasscli -exec install -m 755 {} ~/.local/bin/enpass-cli \\; && rm -rf \"$tmp\""
     linux:
       method: script
-      install_cmd: "set -e && tmp=$(mktemp -d) && gh release download --repo hazcod/enpass-cli --pattern '*linux_amd64*' -D \"$tmp\" && unzip -qo \"$tmp\"/*.zip -d \"$tmp\" && find \"$tmp\" -name enpasscli -exec install -m 755 {} ~/.local/bin/enpass-cli \\; && rm -rf \"$tmp\""
+      install_cmd: "set -e && tmp=$(mktemp -d) && gh release download --repo hazcod/enpass-cli --tag v1.12.0 --pattern '*linux_amd64*' -D \"$tmp\" && unzip -qo \"$tmp\"/*.zip -d \"$tmp\" && find \"$tmp\" -name enpasscli -exec install -m 755 {} ~/.local/bin/enpass-cli \\; && rm -rf \"$tmp\""
 
   - name: direnv
     command: direnv

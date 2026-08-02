@@ -239,6 +239,10 @@ class Package(BaseModel):
     macos: InstallConfig | None = None
     linux: InstallConfig | None = None
     windows: InstallConfig | None = None
+    version: str | None = None
+    """Expected installed version string; when set, version_cmd should also be set."""
+    version_cmd: str | None = None
+    """Shell command whose combined stdout+stderr is searched for `version`."""
 
     def get_command(self) -> str:
         """Get command name for system check."""
@@ -271,6 +275,48 @@ def _linux_needs_sudo(pkg: Package) -> bool:
     ):
         return True
     return False
+
+
+def _check_pkg_version(pkg: Package) -> bool | None:
+    """Check whether the binary on PATH matches pkg.version.
+
+    Returns None if version checking is not configured (version or version_cmd
+    is unset). Returns True if pkg.version appears in the combined stdout+stderr
+    of version_cmd, False if it does not or if the command cannot be executed.
+    """
+    if pkg.version is None or pkg.version_cmd is None:
+        return None
+    try:
+        result = subprocess.run(
+            pkg.version_cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            stdin=subprocess.DEVNULL,
+        )
+    except Exception:
+        return False
+    return pkg.version in (result.stdout + result.stderr)
+
+
+def _run_install_script(
+    pkg: Package, config: InstallConfig, dry_run: bool
+) -> tuple[bool, str]:
+    """Install a package via a custom shell script."""
+    if not config.install_cmd:
+        return False, f"No install command for {pkg.name}"
+
+    if dry_run:
+        return True, f"Would run: {config.install_cmd}"
+
+    return _run_pkg_cmd(
+        config.install_cmd,
+        timeout=300,
+        success_msg=f"Successfully installed {pkg.name}",
+        failure_msg="Installation failed",
+        timeout_msg="Installation timed out after 5 minutes",
+    )
 
 
 class PackageManager(ABC):
@@ -349,6 +395,9 @@ class HomebrewManager(PackageManager):
             return _is_pwsh_module_installed(config.package or pkg.name)
 
         if shutil.which(pkg.get_command()):
+            version_ok = _check_pkg_version(pkg)
+            if version_ok is False:
+                return False
             return True
 
         if not config:
@@ -398,6 +447,8 @@ class HomebrewManager(PackageManager):
             return _install_pwsh_module(name, dry_run)
         elif config.method == "brew":
             return self._install_brew(pkg, config, dry_run)
+        elif config.method == "script":
+            return _run_install_script(pkg, config, dry_run)
 
         return False, f"Unknown method: {config.method}"
 
@@ -520,6 +571,9 @@ class LinuxInstaller(PackageManager):
             return _is_pwsh_module_installed(config.package or pkg.name)
 
         if shutil.which(pkg.get_command()):
+            version_ok = _check_pkg_version(pkg)
+            if version_ok is False:
+                return False
             return True
 
         if config and config.method == "apt":
@@ -667,19 +721,7 @@ class LinuxInstaller(PackageManager):
         self, pkg: Package, config: InstallConfig, dry_run: bool
     ) -> tuple[bool, str]:
         """Install a package via custom script."""
-        if not config.install_cmd:
-            return False, f"No install command for {pkg.name}"
-
-        if dry_run:
-            return True, f"Would run: {config.install_cmd}"
-
-        return _run_pkg_cmd(
-            config.install_cmd,
-            timeout=300,
-            success_msg=f"Successfully installed {pkg.name}",
-            failure_msg="Installation failed",
-            timeout_msg="Installation timed out after 5 minutes",
-        )
+        return _run_install_script(pkg, config, dry_run)
 
     def uninstall(self, pkg: Package, dry_run: bool = False) -> tuple[bool, str]:
         """Uninstall a package on Linux."""

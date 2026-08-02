@@ -143,6 +143,8 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
 @profile_option
 def packages_status(profile_name: str | None) -> None:
     """Show status of required packages."""
+    import shutil
+
     from shell_configs.display import (
         console,
         print_error,
@@ -180,11 +182,14 @@ def packages_status(profile_name: str | None) -> None:
         return
 
     installed = []
+    outdated = []
     missing = []
 
     for pkg in packages:
         if manager.is_installed(pkg):
             installed.append(pkg)
+        elif pkg.version is not None and shutil.which(pkg.get_command()):
+            outdated.append(pkg)
         else:
             missing.append(pkg)
 
@@ -193,10 +198,17 @@ def packages_status(profile_name: str | None) -> None:
         for pkg in installed:
             print_success(pkg.name, indent=2)
 
+    if outdated:
+        console.print(f"\n[yellow]Outdated ({len(outdated)}):[/yellow]")
+        for pkg in outdated:
+            console.print(f"  [yellow]{pkg.name}[/yellow]")
+
     if missing:
         console.print(f"\n[yellow]Missing ({len(missing)}):[/yellow]")
         for pkg in missing:
             print_error(pkg.name, indent=2)
+
+    if missing or outdated:
         print_hint("Run 'shell-configs packages install' to install missing packages")
     else:
         console.print()

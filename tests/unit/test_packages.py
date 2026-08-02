@@ -140,7 +140,7 @@ def test_linux_only_packages_excluded_on_macos(
 def test_enpass_docker_available_on_macos(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """enpass, enpass-cli, and docker must be available on macOS with correct brew config."""
+    """enpass, enpass-cli, and docker must be available on macOS with correct config."""
     monkeypatch.setattr(
         "shell_configs.packages.packages.is_platform",
         lambda p: p == Platform.MACOS,
@@ -155,10 +155,16 @@ def test_enpass_docker_available_on_macos(
     assert enpass_cfg.cask is True
 
     assert "enpass-cli" in by_name
-    enpass_cli_cfg = by_name["enpass-cli"].macos
+    enpass_cli_pkg = by_name["enpass-cli"]
+    enpass_cli_cfg = enpass_cli_pkg.macos
     assert enpass_cli_cfg is not None
-    assert enpass_cli_cfg.method == "brew"
-    assert enpass_cli_cfg.cask is not True
+    assert enpass_cli_cfg.method == "script"
+    assert enpass_cli_cfg.install_cmd is not None
+    assert "hazcod/enpass-cli" in enpass_cli_cfg.install_cmd
+    assert "--tag v1.12.0" in enpass_cli_cfg.install_cmd
+    assert "darwin" in enpass_cli_cfg.install_cmd
+    assert enpass_cli_pkg.version == "1.12.0"
+    assert enpass_cli_pkg.version_cmd == "enpass-cli version"
 
     assert "docker" in by_name
     docker_cfg = by_name["docker"].macos
@@ -168,7 +174,7 @@ def test_enpass_docker_available_on_macos(
 
 
 def test_enpass_cli_available_on_linux(monkeypatch: pytest.MonkeyPatch) -> None:
-    """enpass-cli must not be wsl_only — it should be installable on native Linux."""
+    """enpass-cli must not be wsl_only and must be pinned to v1.12.0 on Linux."""
     monkeypatch.setattr(
         "shell_configs.packages.packages.is_platform",
         lambda p: p == Platform.LINUX,
@@ -176,6 +182,12 @@ def test_enpass_cli_available_on_linux(monkeypatch: pytest.MonkeyPatch) -> None:
     packages = load_packages()
     names = [p.name for p in packages]
     assert "enpass-cli" in names
+
+    by_name = {p.name: p for p in packages}
+    linux_cfg = by_name["enpass-cli"].linux
+    assert linux_cfg is not None
+    assert linux_cfg.install_cmd is not None
+    assert "--tag v1.12.0" in linux_cfg.install_cmd
 
 
 def test_load_packages_returns_list(tmp_path: Path) -> None:
@@ -763,3 +775,263 @@ def test_enpass_present_on_native_linux(monkeypatch: pytest.MonkeyPatch) -> None
     packages = load_packages()
     names = [p.name for p in packages]
     assert "enpass" in names
+
+
+class TestVersionCheck:
+    """Tests for _check_pkg_version."""
+
+    def setup_method(self) -> None:
+        from shell_configs.packages.packages import _check_pkg_version
+
+        self._check = _check_pkg_version
+
+    def _pkg(
+        self, version: str | None = None, version_cmd: str | None = None
+    ) -> Package:
+        return Package(
+            name="testpkg",
+            version=version,
+            version_cmd=version_cmd,
+            linux=InstallConfig(method="script", install_cmd="echo hi"),
+        )
+
+    def test_no_version_returns_none(self) -> None:
+        assert self._check(self._pkg(version_cmd="enpass-cli version")) is None
+
+    def test_no_version_cmd_returns_none(self) -> None:
+        assert self._check(self._pkg(version="1.12.0")) is None
+
+    def test_version_in_stdout_returns_true(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.subprocess.run",
+            lambda *a, **kw: subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="version 1.12.0", stderr=""
+            ),
+        )
+        assert (
+            self._check(self._pkg(version="1.12.0", version_cmd="enpass-cli version"))
+            is True
+        )
+
+    def test_version_in_stderr_returns_true(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.subprocess.run",
+            lambda *a, **kw: subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout="",
+                stderr="time=2024 version=1.12.0 msg=ok",
+            ),
+        )
+        assert (
+            self._check(self._pkg(version="1.12.0", version_cmd="enpass-cli version"))
+            is True
+        )
+
+    def test_version_absent_returns_false(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.subprocess.run",
+            lambda *a, **kw: subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="version=1.11.0", stderr=""
+            ),
+        )
+        assert (
+            self._check(self._pkg(version="1.12.0", version_cmd="enpass-cli version"))
+            is False
+        )
+
+    def test_timeout_returns_false(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.subprocess.run",
+            lambda *a, **kw: (_ for _ in ()).throw(
+                subprocess.TimeoutExpired("enpass-cli", 10)
+            ),
+        )
+        assert (
+            self._check(self._pkg(version="1.12.0", version_cmd="enpass-cli version"))
+            is False
+        )
+
+    def test_file_not_found_returns_false(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.subprocess.run",
+            lambda *a, **kw: (_ for _ in ()).throw(FileNotFoundError("no such file")),
+        )
+        assert (
+            self._check(self._pkg(version="1.12.0", version_cmd="enpass-cli version"))
+            is False
+        )
+
+
+class TestIsInstalledVersionCheck:
+    """Tests for version-check integration in HomebrewManager and LinuxInstaller.is_installed."""
+
+    def _versioned_pkg_macos(self) -> Package:
+        return Package(
+            name="enpass-cli",
+            version="1.12.0",
+            version_cmd="enpass-cli version",
+            macos=InstallConfig(method="script", install_cmd="echo hi"),
+        )
+
+    def _versioned_pkg_linux(self) -> Package:
+        return Package(
+            name="enpass-cli",
+            version="1.12.0",
+            version_cmd="enpass-cli version",
+            linux=InstallConfig(method="script", install_cmd="echo hi"),
+        )
+
+    def _unversioned_pkg_macos(self) -> Package:
+        return Package(name="mypkg", macos=InstallConfig(method="brew"))
+
+    def _unversioned_pkg_linux(self) -> Package:
+        return Package(name="mypkg", linux=InstallConfig(method="apt"))
+
+    def test_homebrew_version_mismatch_returns_false(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from shell_configs.packages.packages import HomebrewManager
+
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: "/usr/local/bin/enpass-cli",
+        )
+        monkeypatch.setattr(
+            "shell_configs.packages.packages._check_pkg_version",
+            lambda pkg: False,
+        )
+        assert HomebrewManager().is_installed(self._versioned_pkg_macos()) is False
+
+    def test_homebrew_version_match_returns_true(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from shell_configs.packages.packages import HomebrewManager
+
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: "/usr/local/bin/enpass-cli",
+        )
+        monkeypatch.setattr(
+            "shell_configs.packages.packages._check_pkg_version",
+            lambda pkg: True,
+        )
+        assert HomebrewManager().is_installed(self._versioned_pkg_macos()) is True
+
+    def test_homebrew_no_version_check_returns_true(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from shell_configs.packages.packages import HomebrewManager
+
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: "/usr/local/bin/mypkg",
+        )
+        monkeypatch.setattr(
+            "shell_configs.packages.packages._check_pkg_version",
+            lambda pkg: None,
+        )
+        assert HomebrewManager().is_installed(self._unversioned_pkg_macos()) is True
+
+    def test_linux_version_mismatch_returns_false(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: "/usr/local/bin/enpass-cli",
+        )
+        monkeypatch.setattr(
+            "shell_configs.packages.packages._check_pkg_version",
+            lambda pkg: False,
+        )
+        assert LinuxInstaller().is_installed(self._versioned_pkg_linux()) is False
+
+    def test_linux_version_match_returns_true(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: "/usr/local/bin/enpass-cli",
+        )
+        monkeypatch.setattr(
+            "shell_configs.packages.packages._check_pkg_version",
+            lambda pkg: True,
+        )
+        assert LinuxInstaller().is_installed(self._versioned_pkg_linux()) is True
+
+    def test_linux_no_version_check_returns_true(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: "/usr/local/bin/mypkg",
+        )
+        monkeypatch.setattr(
+            "shell_configs.packages.packages._check_pkg_version",
+            lambda pkg: None,
+        )
+        assert LinuxInstaller().is_installed(self._unversioned_pkg_linux()) is True
+
+
+class TestHomebrewInstallScript:
+    """Tests for HomebrewManager dispatching method: script to _run_install_script."""
+
+    def _script_pkg(self) -> Package:
+        return Package(
+            name="enpass-cli",
+            macos=InstallConfig(method="script", install_cmd="echo install"),
+        )
+
+    def test_install_script_dispatches_to_run_install_script(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from shell_configs.packages.packages import HomebrewManager
+
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: None,
+        )
+        manager = HomebrewManager()
+        monkeypatch.setattr(manager, "is_installed", lambda pkg: False)
+
+        executed: list[str] = []
+
+        def fake_run_install_script(pkg, config, dry_run):
+            executed.append(config.install_cmd)
+            return True, f"Successfully installed {pkg.name}"
+
+        monkeypatch.setattr(
+            "shell_configs.packages.packages._run_install_script",
+            fake_run_install_script,
+        )
+
+        success, msg = manager.install(self._script_pkg(), dry_run=False)
+        assert success is True
+        assert executed == ["echo install"]
+
+    def test_install_script_dry_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from shell_configs.packages.packages import HomebrewManager
+
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which",
+            lambda name: None,
+        )
+        manager = HomebrewManager()
+        monkeypatch.setattr(manager, "is_installed", lambda pkg: False)
+        monkeypatch.setattr(
+            "shell_configs.packages.packages._run_install_script",
+            lambda pkg, config, dry_run: (True, f"Would run: {config.install_cmd}"),
+        )
+
+        success, msg = manager.install(self._script_pkg(), dry_run=True)
+        assert success is True
+        assert "Would run" in msg
+        assert "echo install" in msg
