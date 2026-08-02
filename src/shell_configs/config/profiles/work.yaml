@@ -60,5 +60,4 @@ packages:
     - enpass-cli
 
 signing_emails:
-  - pfleger.will@gmail.com
   - wpfleger@block.xyz
