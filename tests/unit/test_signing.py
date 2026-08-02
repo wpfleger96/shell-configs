@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pathlib
 import subprocess
 
 from collections.abc import Callable
@@ -459,3 +460,221 @@ class TestGetPubFingerprint:
 
         # Reading a directory raises IsADirectoryError (an OSError subclass).
         assert get_pub_fingerprint(tmp_path) == ""
+
+
+@pytest.mark.unit
+class TestGenerateAllowedSignersFile:
+    """Tests for generate_allowed_signers_file — email sourcing and file output."""
+
+    def test_writes_one_line_per_email_per_key(self, tmp_path):
+        from shell_configs.signing import generate_allowed_signers_file
+
+        allowed = tmp_path / "allowed_signers"
+        signing_key = "ssh-ed25519 AAAA user@host"
+        emails = ["a@example.com", "b@example.com"]
+
+        ok, msg = generate_allowed_signers_file(
+            allowed, signing_key=signing_key, emails=emails
+        )
+
+        assert ok is True
+        lines = allowed.read_text().strip().splitlines()
+        assert len(lines) == 2
+        assert "a@example.com ssh-ed25519 AAAA user@host" in lines
+        assert "b@example.com ssh-ed25519 AAAA user@host" in lines
+
+    def test_fallback_to_git_config_user_email(self, tmp_path, monkeypatch):
+        """When emails=None, uses git config user.email as the single email."""
+        from shell_configs.signing import generate_allowed_signers_file
+
+        def mock_run(cmd, **kwargs):
+            if cmd[:2] == ["git", "config"]:
+                return _make_result(0, stdout="git-user@example.com\n")
+            return _make_result(0)
+
+        monkeypatch.setattr("shell_configs.signing._run", mock_run)
+
+        allowed = tmp_path / "allowed_signers"
+        signing_key = "ssh-ed25519 BBBB user@host"
+
+        ok, msg = generate_allowed_signers_file(
+            allowed, signing_key=signing_key, emails=None
+        )
+
+        assert ok is True
+        content = allowed.read_text()
+        assert "git-user@example.com" in content
+        assert "BBBB" in content
+
+    def test_returns_failure_when_no_emails_and_no_git_config(
+        self, tmp_path, monkeypatch
+    ):
+        """When emails=None and git config yields nothing, returns (False, msg)."""
+        from shell_configs.signing import generate_allowed_signers_file
+
+        def mock_run(cmd, **kwargs):
+            if cmd[:2] == ["git", "config"]:
+                return _make_result(1, stdout="")
+            return _make_result(0)
+
+        monkeypatch.setattr("shell_configs.signing._run", mock_run)
+
+        allowed = tmp_path / "allowed_signers"
+        signing_key = "ssh-ed25519 CCCC user@host"
+
+        ok, msg = generate_allowed_signers_file(
+            allowed, signing_key=signing_key, emails=None
+        )
+
+        assert ok is False
+        assert not allowed.exists(), "File must not be written on failure"
+        assert "git config user.email" in msg or "signing emails" in msg
+
+    def test_regression_no_block_xyz_in_source(self):
+        """Hardcoded work email must not appear in signing.py."""
+        import shell_configs.signing as signing_module
+
+        source = signing_module.__file__
+        assert source is not None
+        content = open(source, encoding="utf-8").read()
+        assert "block.xyz" not in content, (
+            "Hardcoded work email 'block.xyz' found in signing.py — remove it"
+        )
+
+    def test_git_subprocess_file_not_found_returns_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """FileNotFoundError from the git subprocess returns (False, msg), no crash."""
+        from shell_configs.signing import generate_allowed_signers_file
+
+        def mock_run(
+            cmd: list[str], **kwargs: object
+        ) -> subprocess.CompletedProcess[str]:
+            if cmd[:2] == ["git", "config"]:
+                raise FileNotFoundError("git not found")
+            return _make_result(0)
+
+        monkeypatch.setattr("shell_configs.signing._run", mock_run)
+
+        allowed = tmp_path / "allowed_signers"
+        ok, msg = generate_allowed_signers_file(
+            allowed, signing_key="ssh-ed25519 XXXX user@host", emails=None
+        )
+
+        assert ok is False
+        assert not allowed.exists(), "No file should be written on failure"
+
+
+@pytest.mark.unit
+class TestValidateAllStepsAllowedSigners:
+    """Tests for allowed_signers validation in _validate_all_steps."""
+
+    @pytest.fixture
+    def key_files(self, tmp_path: Path) -> Path:
+        key_path = tmp_path / "id_ed25519"
+        key_path.touch()
+        key_path.with_suffix(".pub").write_text(PUB_KEY_CONTENT)
+        return key_path
+
+    def _make_mock_run(
+        self, git_email: str = "user@example.com"
+    ) -> Callable[..., subprocess.CompletedProcess[str]]:
+        def mock_run(
+            cmd: list[str], **kwargs: object
+        ) -> subprocess.CompletedProcess[str]:
+            if cmd[:2] == ["ssh-add", "-L"]:
+                return _make_result(0, stdout="")
+            if cmd[:2] == ["gh", "auth"]:
+                return _make_result(0)
+            if cmd[:2] == ["gh", "ssh-key"]:
+                return _make_result(0, stdout="")
+            if cmd[:2] == ["git", "config"]:
+                return _make_result(0, stdout=git_email + "\n")
+            return _make_result(0)
+
+        return mock_run
+
+    def _setup_signers_file(self, tmp_path: Path, content: str) -> Path:
+        git_dir = tmp_path / ".config" / "git"
+        git_dir.mkdir(parents=True, exist_ok=True)
+        signers = git_dir / "allowed_signers"
+        signers.write_text(content)
+        return signers
+
+    def test_stale_allowed_signers_is_failing_step(
+        self, key_files: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from shell_configs.signing import _validate_all_steps
+
+        self._setup_signers_file(
+            tmp_path,
+            f"wrong@example.com {PUB_KEY_CONTENT.strip()}\n",
+        )
+        monkeypatch.setattr("shell_configs.signing._run", self._make_mock_run())
+        monkeypatch.setattr(pathlib.Path, "home", classmethod(lambda cls: tmp_path))
+
+        with (
+            patch(
+                "shell_configs.signing.find_local_ssh_keys", return_value=[key_files]
+            ),
+            patch(
+                "shell_configs.signing.get_github_key_fingerprints", return_value=set()
+            ),
+        ):
+            results = _validate_all_steps(key_files, emails=None)
+
+        allowed = next((r for r in results if r.step == "allowed_signers"), None)
+        assert allowed is not None
+        assert allowed.success is False
+        assert "out of date" in allowed.message
+
+    def test_matching_allowed_signers_is_passing_step(
+        self, key_files: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from shell_configs.signing import _validate_all_steps
+
+        self._setup_signers_file(
+            tmp_path,
+            f"user@example.com {PUB_KEY_CONTENT.strip()}\n",
+        )
+        monkeypatch.setattr("shell_configs.signing._run", self._make_mock_run())
+        monkeypatch.setattr(pathlib.Path, "home", classmethod(lambda cls: tmp_path))
+
+        with (
+            patch(
+                "shell_configs.signing.find_local_ssh_keys", return_value=[key_files]
+            ),
+            patch(
+                "shell_configs.signing.get_github_key_fingerprints", return_value=set()
+            ),
+        ):
+            results = _validate_all_steps(key_files, emails=None)
+
+        allowed = next((r for r in results if r.step == "allowed_signers"), None)
+        assert allowed is not None
+        assert allowed.success is True
+
+    def test_missing_allowed_signers_is_failing_step(
+        self, key_files: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from shell_configs.signing import _validate_all_steps
+
+        git_dir = tmp_path / ".config" / "git"
+        git_dir.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr("shell_configs.signing._run", self._make_mock_run())
+        monkeypatch.setattr(pathlib.Path, "home", classmethod(lambda cls: tmp_path))
+
+        with (
+            patch(
+                "shell_configs.signing.find_local_ssh_keys", return_value=[key_files]
+            ),
+            patch(
+                "shell_configs.signing.get_github_key_fingerprints", return_value=set()
+            ),
+        ):
+            results = _validate_all_steps(key_files, emails=None)
+
+        allowed = next((r for r in results if r.step == "allowed_signers"), None)
+        assert allowed is not None
+        assert allowed.success is False
+        assert "missing" in allowed.message

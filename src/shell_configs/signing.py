@@ -462,8 +462,15 @@ def setup_signing(
     auto_fix: bool = False,
     interactive: bool = True,
     dry_run: bool = False,
+    emails: list[str] | None = None,
 ) -> list[StepResult]:
     """Full SSH key lifecycle. Discovers and threads key_path through every step.
+
+    ``emails`` participates in validation (when auto_fix=False): the
+    allowed_signers file is compared against the expected content for these
+    emails and current keys, emitting a failing step on mismatch or absence.
+    When auto_fix=True, the file is regenerated with these emails. Both paths
+    fall back to ``git config user.email`` when emails is None.
 
     Step order: enumerate → gh auth → scopes → discover match → resolve key →
     agent → upload auth → register signing → allowed_signers
@@ -471,7 +478,7 @@ def setup_signing(
     results: list[StepResult] = []
 
     if not auto_fix:
-        return _validate_all_steps(key_path)
+        return _validate_all_steps(key_path, emails=emails)
 
     gh_authed = False
     if dry_run:
@@ -588,7 +595,7 @@ def setup_signing(
         )
     else:
         ok, msg = generate_allowed_signers_file(
-            allowed_signers, signing_key=pub_key_str
+            allowed_signers, signing_key=pub_key_str, emails=emails
         )
         results.append(StepResult("allowed_signers", ok, msg))
 
@@ -603,7 +610,15 @@ def _read_pub_key(key_path: Path) -> str | None:
     return pub_path.read_text(encoding="utf-8").strip()
 
 
-def _validate_all_steps(key_path: Path | None) -> list[StepResult]:
+def _build_allowed_signers_content(keys: list[str], emails: list[str]) -> str:
+    """Build the text content for an allowed_signers file from keys and emails."""
+    lines = [f"{email} {key}" for email in emails for key in keys]
+    return "\n".join(lines) + "\n"
+
+
+def _validate_all_steps(
+    key_path: Path | None, emails: list[str] | None = None
+) -> list[StepResult]:
     """Validate all SSH lifecycle steps without fixing.
 
     Uses GitHub-as-source-of-truth discovery to find the managed key.
@@ -683,6 +698,72 @@ def _validate_all_steps(key_path: Path | None) -> list[StepResult]:
                     "SSH key not registered for signing. Run 'shell-configs signing --fix'",
                 )
             )
+
+    pub_key_str = _read_pub_key(key_path)
+    keys = [pub_key_str] if pub_key_str else get_agent_keys()
+
+    resolved_emails = emails
+    if resolved_emails is None:
+        try:
+            git_result = _run(
+                ["git", "config", "user.email"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            git_email = git_result.stdout.strip() if git_result.returncode == 0 else ""
+        except (FileNotFoundError, OSError):
+            git_email = ""
+        if git_email:
+            resolved_emails = [git_email]
+
+    allowed_signers = Path.home() / ".config" / "git" / "allowed_signers"
+
+    if not keys or not resolved_emails:
+        if not allowed_signers.exists():
+            results.append(
+                StepResult(
+                    "allowed_signers",
+                    False,
+                    "allowed_signers missing — run: shell-configs signing --fix",
+                )
+            )
+        else:
+            results.append(
+                StepResult(
+                    "allowed_signers",
+                    True,
+                    "allowed_signers exists (content not validated — prerequisites unavailable)",
+                )
+            )
+        return results
+
+    expected = _build_allowed_signers_content(keys, resolved_emails)
+
+    if not allowed_signers.exists():
+        results.append(
+            StepResult(
+                "allowed_signers",
+                False,
+                "allowed_signers missing — run: shell-configs signing --fix",
+            )
+        )
+    elif allowed_signers.read_text(encoding="utf-8") != expected:
+        results.append(
+            StepResult(
+                "allowed_signers",
+                False,
+                "allowed_signers out of date — run: shell-configs signing --fix",
+            )
+        )
+    else:
+        results.append(
+            StepResult(
+                "allowed_signers",
+                True,
+                f"allowed_signers is up to date with {len(keys)} key(s)",
+            )
+        )
 
     return results
 
@@ -823,9 +904,12 @@ def generate_allowed_signers_file(
     """Generate allowed_signers file for git commit signature verification.
 
     Args:
-        allowed_signers_path: Path where allowed_signers file should be created
-        signing_key: The public key string to use. If None, falls back to ssh-agent.
-        emails: List of email addresses to include. If None, uses default emails.
+        allowed_signers_path: Path where allowed_signers file should be created.
+        signing_key: The public key string to use. If None, falls back to
+            ssh-agent keys. Returns failure if neither is available.
+        emails: List of email addresses to include. If None, falls back to
+            ``git config user.email``. Returns failure if neither is available
+            or git is not installed.
 
     Returns:
         (success, message) tuple
@@ -838,17 +922,24 @@ def generate_allowed_signers_file(
             return False, "No SSH keys in ssh-agent - run 'ssh-add'"
 
     if emails is None:
-        emails = [
-            "pfleger.will@gmail.com",
-            "wpfleger@block.xyz",
-        ]
+        try:
+            result = _run(
+                ["git", "config", "user.email"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            git_email = result.stdout.strip() if result.returncode == 0 else ""
+        except (FileNotFoundError, OSError):
+            git_email = ""
+        if not git_email:
+            return (
+                False,
+                "No signing emails configured and git config user.email is not set",
+            )
+        emails = [git_email]
 
-    lines = []
-    for email in emails:
-        for key in keys:
-            lines.append(f"{email} {key}")
-
-    new_content = "\n".join(lines) + "\n"
+    new_content = _build_allowed_signers_content(keys, emails)
 
     file_exists = allowed_signers_path.exists()
     if file_exists:

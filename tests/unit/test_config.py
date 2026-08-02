@@ -1,8 +1,10 @@
 """Unit tests for the ConfigReader."""
 
+import re
+
 import pytest
 
-from shell_configs.config import ConfigReader
+from shell_configs.config import ConfigReader, get_config_dir
 from shell_configs.platform import Platform
 from shell_configs.shells.bash import BashShell
 from shell_configs.shells.git import GitShell
@@ -122,32 +124,24 @@ class TestConfigReader:
         assert "# linux overlay" in content
         assert "# wsl overlay" in content
 
-    def test_wsl_vault_path_overrides_linux_vault_path(self, test_repo, monkeypatch):
-        monkeypatch.setattr(
-            "shell_configs.config.get_config_dir", lambda: test_repo / "config"
-        )
-        monkeypatch.setattr(
-            "shell_configs.config.detect_platform", lambda: Platform.WSL
-        )
-        shared = test_repo / "config" / "shared.sh"
-        shared.write_text("# shared")
-        platform_dir = test_repo / "config" / "platform"
-        platform_dir.mkdir()
-        (platform_dir / "linux.sh").write_text(
-            'export ENPASS_VAULT_PATH="$HOME/Documents/Enpass/Vaults/primary"'
-        )
-        (platform_dir / "wsl.sh").write_text(
-            'export ENPASS_VAULT_PATH="/mnt/c/Users/Will/Documents/Enpass/Vaults/primary"'
-        )
+    def test_platform_files_contain_no_enpass_vault_path(self):
+        config_dir = get_config_dir()
+        for fname in ("linux.sh", "wsl.sh"):
+            content = (config_dir / "platform" / fname).read_text()
+            assert "ENPASS_VAULT_PATH" not in content, (
+                f"platform/{fname} must not set ENPASS_VAULT_PATH (moved to personal.yaml)"
+            )
 
-        content = ConfigReader().get_shared_config_content(BashShell())
-
-        assert content is not None
-        linux_pos = content.index("$HOME/Documents/Enpass/Vaults/primary")
-        wsl_pos = content.index("/mnt/c/Users/Will/Documents/Enpass/Vaults/primary")
-        assert linux_pos < wsl_pos, (
-            "WSL vault path must come after Linux default so it wins at shell eval time"
-        )
+    def test_platform_files_contain_no_secrets_functions(self):
+        config_dir = get_config_dir()
+        pattern = re.compile(r"load-(tf|buzz-relay)-secrets")
+        for fname in ("linux.sh", "wsl.sh"):
+            content = (config_dir / "platform" / fname).read_text()
+            match = pattern.search(content)
+            assert match is None, (
+                f"platform/{fname} must not define {match.group() if match else 'load-*-secrets'} "
+                f"(moved to personal.yaml)"
+            )
 
     def test_macos_overlay_unaffected(self, test_repo, monkeypatch):
         monkeypatch.setattr(

@@ -67,7 +67,7 @@ def scripts_install(dry_run: bool, yes: bool) -> None:
             print_success(message)
         elif result in (InstallResult.WOULD_INSTALL, InstallResult.WOULD_UPDATE):
             print_would(message)
-        elif result == InstallResult.SKIPPED_PLATFORM:
+        elif result in (InstallResult.SKIPPED_PLATFORM, InstallResult.SKIPPED_PROFILE):
             pass
         else:
             print_error(message)
@@ -176,6 +176,7 @@ def scripts_status() -> None:
         ScriptStatus.MISSING: ICON_ERROR,
         ScriptStatus.COLLISION: ICON_WARNING,
         ScriptStatus.SKIPPED_PLATFORM: ICON_SKIPPED,
+        ScriptStatus.SKIPPED_PROFILE: ICON_SKIPPED,
     }
 
     for entry in discover_scripts(include_all=True):
@@ -186,6 +187,8 @@ def scripts_status() -> None:
             label = "exists (not ours)"
         elif status == ScriptStatus.SKIPPED_PLATFORM:
             label = "other platform"
+        elif status == ScriptStatus.SKIPPED_PROFILE:
+            label = "other profile"
         table.add_row(entry.name, f"{icon} {label}")
 
     print_section("Script Status")
@@ -212,12 +215,14 @@ def scripts_list(include_all: bool) -> None:
     table = Table(show_header=True, header_style="bold")
     table.add_column("Script")
     table.add_column("Platforms")
+    table.add_column("Profiles")
 
     for entry in entries:
         platforms = ", ".join(
             p.display_name for p in sorted(entry.platforms, key=lambda p: p.value)
         )
-        table.add_row(entry.name, platforms)
+        profiles = ", ".join(sorted(entry.profiles)) if entry.profiles else "all"
+        table.add_row(entry.name, platforms, profiles)
 
     print_section("Available Scripts")
     console.print(table)

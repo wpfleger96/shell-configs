@@ -31,13 +31,20 @@ class ScriptsComponent(Component):
         manifest = ScriptManifest(get_default_manifest_path())
         # Use include_all=True when computing orphans so platform-filtered scripts
         # (e.g. macOS-only on WSL) aren't false-flagged as orphaned. Derive the
-        # current-platform subset from the same list to avoid a second directory walk.
+        # current-platform/profile subset from the same list to avoid a second walk.
         all_scripts = discover_scripts(include_all=True)
         current_platform = detect_platform()
+        active_profile = ctx.profile.name if ctx.profile else "default"
         entries = [
-            (entry, get_script_status(entry, target_dir, manifest))
+            (
+                entry,
+                get_script_status(
+                    entry, target_dir, manifest, active_profile=active_profile
+                ),
+            )
             for entry in all_scripts
             if current_platform in entry.platforms
+            and (not entry.profiles or active_profile in entry.profiles)
         ]
         orphaned = find_orphaned_scripts(manifest, all_scripts)
         has_changes = any(
@@ -89,17 +96,25 @@ class ScriptsComponent(Component):
 
         target_dir = get_default_target_dir()
         manifest = ScriptManifest(get_default_manifest_path())
+        active_profile = ctx.profile.name if ctx.profile else "default"
         success = True
         for entry, status in plan.entries:
             if status == ScriptStatus.INSTALLED:
                 continue
-            result, _ = install_script(entry, target_dir, manifest, dry_run=False)
+            result, _ = install_script(
+                entry,
+                target_dir,
+                manifest,
+                dry_run=False,
+                active_profile=active_profile,
+            )
             if result not in (
                 InstallResult.INSTALLED,
                 InstallResult.UPDATED,
                 InstallResult.ALREADY_SYNCED,
                 InstallResult.COLLISION,
                 InstallResult.SKIPPED_PLATFORM,
+                InstallResult.SKIPPED_PROFILE,
             ):
                 success = False
 

@@ -217,6 +217,11 @@ def setup(
                     InstallResult.WOULD_UPDATE,
                 ):
                     print_would(message)
+                elif result in (
+                    InstallResult.SKIPPED_PLATFORM,
+                    InstallResult.SKIPPED_PROFILE,
+                ):
+                    pass
 
     if dry_run:
         console.print()

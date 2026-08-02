@@ -31,3 +31,33 @@ shell_overrides:
         fi
         unset _envrc _envrc_content
     fi
+
+    ### Block npm registry scope ###
+    npm_block_package_versions() {
+        npm view "@block/$1" versions --json
+    }
+
+    ### Ruby/bundle with corporate SSL fix (bypasses CRL checking issues) ###
+    rubyssl() {
+        if [[ -z "$SHELL_CONFIGS_DIR" ]]; then
+            echo "Error: SHELL_CONFIGS_DIR not set. Run 'shell-configs install'." >&2
+            return 1
+        fi
+        RUBYOPT="-r $SHELL_CONFIGS_DIR/lib/ssl_fix.rb" ruby "$@"
+    }
+
+    bundlessl() {
+        if [[ -z "$SHELL_CONFIGS_DIR" ]]; then
+            echo "Error: SHELL_CONFIGS_DIR not set. Run 'shell-configs install'." >&2
+            return 1
+        fi
+        RUBYOPT="-r $SHELL_CONFIGS_DIR/lib/ssl_fix.rb" bundle "$@"
+    }
+
+packages:
+  remove:
+    - enpass
+    - enpass-cli
+
+signing_emails:
+  - wpfleger@block.xyz

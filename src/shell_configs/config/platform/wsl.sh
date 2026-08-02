@@ -32,5 +32,3 @@ fi
 
 unset _ssh_agent_env
 unset -f _start_ssh_agent
-
-export ENPASS_VAULT_PATH="/mnt/c/Users/Will Pfleger/Documents/Enpass/Vaults/primary"

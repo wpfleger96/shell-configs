@@ -20,6 +20,8 @@ class Profile:
 
     extensions: dict[str, dict[str, list[str]]] = field(default_factory=dict)
 
+    signing_emails: list[str] = field(default_factory=list)
+
 
 class ProfileError(Exception):
     """Base exception for profile-related errors."""

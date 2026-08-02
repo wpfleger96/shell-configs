@@ -108,6 +108,7 @@ class ProfileLoader:
             shell_overrides=data.get("shell_overrides") or {},
             packages=data.get("packages") or {},
             extensions=data.get("extensions") or {},
+            signing_emails=data.get("signing_emails") or [],
         )
 
     def resolve_profile(self, name: str) -> Profile:
@@ -170,6 +171,11 @@ class ProfileLoader:
             if shell_ext:
                 merged_extensions[shell_name] = shell_ext
 
+        # Non-empty child list replaces parent's; empty child inherits parent's.
+        merged_signing_emails = (
+            child.signing_emails if child.signing_emails else parent.signing_emails
+        )
+
         return Profile(
             name=child.name,
             description=child.description,
@@ -178,4 +184,5 @@ class ProfileLoader:
             shell_overrides=merged_shell,
             packages=merged_packages,
             extensions=merged_extensions,
+            signing_emails=merged_signing_emails,
         )

@@ -767,7 +767,7 @@ python_package_versions() {
 
 ### Node/NPM ###
 npm_package_versions() {
-    npm view "@block/$1" versions --json
+    npm view "$1" versions --json
 }
 
 export NVM_DIR="$HOME/.nvm"
@@ -778,23 +778,6 @@ export NVM_DIR="$HOME/.nvm"
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
 ### Ruby ###
-# Ruby/bundle with corporate SSL fix (bypasses CRL checking issues)
-rubyssl() {
-    if [[ -z "$SHELL_CONFIGS_DIR" ]]; then
-        echo "Error: SHELL_CONFIGS_DIR not set. Run 'shell-configs install'." >&2
-        return 1
-    fi
-    RUBYOPT="-r $SHELL_CONFIGS_DIR/lib/ssl_fix.rb" ruby "$@"
-}
-
-bundlessl() {
-    if [[ -z "$SHELL_CONFIGS_DIR" ]]; then
-        echo "Error: SHELL_CONFIGS_DIR not set. Run 'shell-configs install'." >&2
-        return 1
-    fi
-    RUBYOPT="-r $SHELL_CONFIGS_DIR/lib/ssl_fix.rb" bundle "$@"
-}
-
 # Load rvm shell functions so `rvm use` works (PATH-only setup at top of file
 # adds the rvm binary but doesn't enable the shell integration)
 [ -s "$HOME/.rvm/scripts/rvm" ] && source "$HOME/.rvm/scripts/rvm"
@@ -845,7 +828,17 @@ run_goose_recipe() {
 }
 
 query_goose_database() {
-    sqlite3 ~/.local/share/goose/sessions/sessions.db "$@"
+    local db_path
+    for db_path in \
+        "$HOME/.local/share/goose/sessions/sessions.db" \
+        "$HOME/Library/Application Support/Block/goose/data/sessions/sessions.db"; do
+        if [[ -f "$db_path" ]]; then
+            sqlite3 "$db_path" "$@"
+            return
+        fi
+    done
+    echo "Error: goose sessions database not found" >&2
+    return 1
 }
 
 mcp_inspector() {
