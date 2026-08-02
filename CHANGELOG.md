@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [0.63.0](https://github.com/wpfleger96/shell-configs/compare/v0.62.3...v0.63.0) (2026-08-02)
+
+
+### Features
+
+* **profiles:** add personal profile, decouple personal config from platform ([#148](https://github.com/wpfleger96/shell-configs/issues/148)) ([0665244](https://github.com/wpfleger96/shell-configs/commit/06652447dea5167c674d49cb9258454d40a954ea))
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#142](https://github.com/wpfleger96/shell-configs/issues/142)) ([c501b89](https://github.com/wpfleger96/shell-configs/commit/c501b89c40846ca70f0f1738006839d01a468fcf))
+* **deps:** Lock file maintenance ([#145](https://github.com/wpfleger96/shell-configs/issues/145)) ([f8760db](https://github.com/wpfleger96/shell-configs/commit/f8760db7a0d8d831f396da4bd97225e20dd35ec1))
+* **deps:** Lock file maintenance ([#146](https://github.com/wpfleger96/shell-configs/issues/146)) ([d97a67b](https://github.com/wpfleger96/shell-configs/commit/d97a67bb120062e25efd3effddb67471ddafa5c2))
+* **deps:** Update astral-sh/setup-uv action to v8.3.2 ([#141](https://github.com/wpfleger96/shell-configs/issues/141)) ([ea5f675](https://github.com/wpfleger96/shell-configs/commit/ea5f675056c55135c560dfc8f4987fcae862edad))
+* **deps:** Update github-actions (major) ([#147](https://github.com/wpfleger96/shell-configs/issues/147)) ([1e3649a](https://github.com/wpfleger96/shell-configs/commit/1e3649af6fab28b11107c4bcf75ba45e35c14cd9))
+
+
+### Continuous Integration
+
+* sync CI workflow ([8274560](https://github.com/wpfleger96/shell-configs/commit/8274560682580210769e76346a210660d170a8ff))
+* sync CI workflow ([000d4a4](https://github.com/wpfleger96/shell-configs/commit/000d4a4ecf9abcd1ecf879dbeb98944db547b788))
+* sync CI workflow ([a327da9](https://github.com/wpfleger96/shell-configs/commit/a327da964008941a591324060038490c29803ed5))
+* sync release workflow ([f852fb2](https://github.com/wpfleger96/shell-configs/commit/f852fb207f7a0ec3373aa23b47df092e3da9eaca))
+* sync release workflow ([6596921](https://github.com/wpfleger96/shell-configs/commit/6596921e187a90500cb2c5ef767b0f09c157add8))
+* sync release workflow ([67e2a6e](https://github.com/wpfleger96/shell-configs/commit/67e2a6e6072be67b55402b932b13a6294fbdc5fa))
+
+
+### Testing
+
+* trim low-value tests, parallelize suite, and scope e2e to main ([#144](https://github.com/wpfleger96/shell-configs/issues/144)) ([e28ecb9](https://github.com/wpfleger96/shell-configs/commit/e28ecb9dcccb23b7b7a08fad7b0a7d72ec4b3307))
+
 ## [0.62.3](https://github.com/wpfleger96/shell-configs/compare/v0.62.2...v0.62.3) (2026-07-12)
 
 
