@@ -34,6 +34,8 @@ shell_overrides:
         echo
         export MASTERPW
 
+        set -a
+
         # Homelab / Proxmox (5)
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Proxmox API Key ID" env TF_VAR_proxmox_api_key_id="Homelab Consoles")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Proxmox01 API Key Secret" env TF_VAR_proxmox01_api_key_secret="Homelab Consoles")"
@@ -52,6 +54,7 @@ shell_overrides:
 
         # Cloudflare (1)
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Account Number" env TF_VAR_cloudflare_account_id="Cloudflare")"
+        set +a
 
         unset MASTERPW
     }
@@ -72,6 +75,8 @@ shell_overrides:
         echo
         export MASTERPW
 
+        set -a
+
         # Buzz Relay Secrets (13)
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_RELAY_PRIVATE_KEY" env BUZZ_RELAY_PRIVATE_KEY="Buzz Homelab Relay Secrets")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_GIT_HOOK_HMAC_SECRET" env BUZZ_GIT_HOOK_HMAC_SECRET="Buzz Homelab Relay Secrets")"
@@ -86,6 +91,7 @@ shell_overrides:
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_CORS_ORIGINS" env BUZZ_CORS_ORIGINS="Buzz Homelab Relay Secrets")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_MEDIA_BASE_URL" env BUZZ_MEDIA_BASE_URL="Buzz Homelab Relay Secrets")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_TUNNEL_TOKEN" env BUZZ_TUNNEL_TOKEN="Buzz Homelab Relay Secrets")"
+        set +a
 
         unset MASTERPW
     }

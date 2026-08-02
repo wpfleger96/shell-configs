@@ -71,3 +71,53 @@ class TestPersonalProfile:
         resolved = real_loader.resolve_profile("work")
         assert resolved.signing_emails == ["wpfleger@block.xyz"]
         assert "pfleger.will@gmail.com" not in resolved.signing_emails
+
+    def test_personal_profile_shared_set_minus_a_appears_at_least_twice(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        profile = real_loader.load_profile("personal")
+        shared = profile.shell_overrides.get("shared", "")
+        assert shared.count("set -a") >= 2
+
+    def test_personal_profile_shared_set_plus_a_appears_at_least_twice(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        profile = real_loader.load_profile("personal")
+        shared = profile.shell_overrides.get("shared", "")
+        assert shared.count("set +a") >= 2
+
+    def test_load_tf_secrets_set_minus_a_before_first_eval(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        profile = real_loader.load_profile("personal")
+        shared = profile.shell_overrides.get("shared", "")
+        func_start = shared.index("load-tf-secrets()")
+        func_body = shared[func_start : shared.index("\n}", func_start)]
+        assert func_body.index("set -a") < func_body.index('eval "$(enpass-cli')
+
+    def test_load_tf_secrets_set_plus_a_after_last_eval(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        profile = real_loader.load_profile("personal")
+        shared = profile.shell_overrides.get("shared", "")
+        func_start = shared.index("load-tf-secrets()")
+        func_body = shared[func_start : shared.index("\n}", func_start)]
+        assert func_body.index("set +a") > func_body.rindex('eval "$(enpass-cli')
+
+    def test_load_buzz_relay_secrets_set_minus_a_before_first_eval(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        profile = real_loader.load_profile("personal")
+        shared = profile.shell_overrides.get("shared", "")
+        func_start = shared.index("load-buzz-relay-secrets()")
+        func_body = shared[func_start : shared.index("\n}", func_start)]
+        assert func_body.index("set -a") < func_body.index('eval "$(enpass-cli')
+
+    def test_load_buzz_relay_secrets_set_plus_a_after_last_eval(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        profile = real_loader.load_profile("personal")
+        shared = profile.shell_overrides.get("shared", "")
+        func_start = shared.index("load-buzz-relay-secrets()")
+        func_body = shared[func_start : shared.index("\n}", func_start)]
+        assert func_body.index("set +a") > func_body.rindex('eval "$(enpass-cli')
