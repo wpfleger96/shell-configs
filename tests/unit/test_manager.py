@@ -240,6 +240,29 @@ class TestConfigManagerAdditionalFiles:
         assert "Would remove" in message
         assert target_file.exists()
 
+    def test_uninstall_additional_file_with_backup_dir_places_backup_centrally(
+        self, temp_dir
+    ):
+        manager = ConfigManager()
+        target_dir = temp_dir / "watched_dir"
+        target_dir.mkdir()
+        target_file = target_dir / "profile.json"
+        target_file.write_text('{"key": "value"}')
+        backup_dir = temp_dir / "backups" / "orphans"
+
+        result, _ = manager.uninstall_additional_file(
+            target_file, backup_dir=backup_dir
+        )
+
+        assert result == OperationResult.REMOVED
+        assert not target_file.exists()
+        # No backup sibling left beside the target (apps like iTerm2 watch those dirs)
+        assert list(target_dir.iterdir()) == []
+        # Backup was placed in the central directory instead
+        backups = list(backup_dir.iterdir())
+        assert len(backups) == 1
+        assert backups[0].name.startswith("profile.json")
+
 
 @pytest.mark.unit
 class TestConfigManagerAdditionalFilesFromContent:
