@@ -434,11 +434,15 @@ class ConfigsComponent(Component):
         if not is_first_manifest_run and not ctx.dry_run:
             from pathlib import Path
 
+            # Backups must not land beside the target — apps like iTerm2 watch those dirs.
+            orphan_backup_dir = (
+                Path.home() / ".config" / "shell-configs" / "backups" / "orphans"
+            )
             for target_str in plan.orphaned_additional_files:
                 entry = additional_manifest.files.get(target_str)
                 if entry and entry.owned_file:
                     orphan_result, orphan_msg = manager.uninstall_additional_file(
-                        Path(target_str)
+                        Path(target_str), backup_dir=orphan_backup_dir
                     )
                     if orphan_result != OperationResult.NOT_FOUND:
                         print_operation_result(orphan_result, orphan_msg)
