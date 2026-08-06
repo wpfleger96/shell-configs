@@ -18,7 +18,7 @@ shell_overrides:
             ;;
     esac
 
-    load-tf-secrets() {
+    _enpass-preflight() {
         if ! command -v enpass-cli >/dev/null 2>&1; then
             echo "Error: enpass-cli not found. Run: shell-configs packages install" >&2
             return 1
@@ -27,12 +27,23 @@ shell_overrides:
             echo "Error: ENPASS_VAULT_PATH not set." >&2
             return 1
         fi
+    }
 
-        # Prompt once — exported so all enpass-cli calls below can run non-interactively.
+    # Prompt for the Enpass master password and export it so enpass-cli calls
+    # can run non-interactively. No-op if MASTERPW is already set (allows
+    # load-all-secrets to prompt once for all loaders).
+    _enpass-ensure-masterpw() {
+        [[ -n "${MASTERPW:-}" ]] && return 0
         printf 'Enpass master password: '
         IFS= read -rs MASTERPW || { echo; unset MASTERPW; return 1; }
         echo
         export MASTERPW
+    }
+
+    load-tf-secrets() {
+        _enpass-preflight || return 1
+        local had_masterpw="${MASTERPW:+1}"
+        _enpass-ensure-masterpw || return 1
 
         set -a
 
@@ -56,24 +67,13 @@ shell_overrides:
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Account Number" env TF_VAR_cloudflare_account_id="Cloudflare")"
         set +a
 
-        unset MASTERPW
+        [[ -n "$had_masterpw" ]] || unset MASTERPW
     }
 
     load-buzz-relay-secrets() {
-        if ! command -v enpass-cli >/dev/null 2>&1; then
-            echo "Error: enpass-cli not found. Run: shell-configs packages install" >&2
-            return 1
-        fi
-        if [[ -z "$ENPASS_VAULT_PATH" ]]; then
-            echo "Error: ENPASS_VAULT_PATH not set." >&2
-            return 1
-        fi
-
-        # Prompt once — exported so all enpass-cli calls below can run non-interactively.
-        printf 'Enpass master password: '
-        IFS= read -rs MASTERPW || { echo; unset MASTERPW; return 1; }
-        echo
-        export MASTERPW
+        _enpass-preflight || return 1
+        local had_masterpw="${MASTERPW:+1}"
+        _enpass-ensure-masterpw || return 1
 
         set -a
 
@@ -93,24 +93,13 @@ shell_overrides:
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "BUZZ_TUNNEL_TOKEN" env BUZZ_TUNNEL_TOKEN="Buzz Homelab Relay Secrets")"
         set +a
 
-        unset MASTERPW
+        [[ -n "$had_masterpw" ]] || unset MASTERPW
     }
 
     load-snore-secrets() {
-        if ! command -v enpass-cli >/dev/null 2>&1; then
-            echo "Error: enpass-cli not found. Run: shell-configs packages install" >&2
-            return 1
-        fi
-        if [[ -z "$ENPASS_VAULT_PATH" ]]; then
-            echo "Error: ENPASS_VAULT_PATH not set." >&2
-            return 1
-        fi
-
-        # Prompt once — exported so all enpass-cli calls below can run non-interactively.
-        printf 'Enpass master password: '
-        IFS= read -rs MASTERPW || { echo; unset MASTERPW; return 1; }
-        echo
-        export MASTERPW
+        _enpass-preflight || return 1
+        local had_masterpw="${MASTERPW:+1}"
+        _enpass-ensure-masterpw || return 1
 
         set -a
 
@@ -118,6 +107,17 @@ shell_overrides:
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Client ID" env GOOGLE_CLIENT_ID="SNORE OAuth App (GCP)")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Client Secret" env GOOGLE_CLIENT_SECRET="SNORE OAuth App (GCP)")"
         set +a
+
+        [[ -n "$had_masterpw" ]] || unset MASTERPW
+    }
+
+    load-all-secrets() {
+        _enpass-preflight || return 1
+        _enpass-ensure-masterpw || return 1
+
+        load-tf-secrets
+        load-buzz-relay-secrets
+        load-snore-secrets
 
         unset MASTERPW
     }
