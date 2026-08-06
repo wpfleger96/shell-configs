@@ -95,3 +95,29 @@ shell_overrides:
 
         unset MASTERPW
     }
+
+    load-snore-secrets() {
+        if ! command -v enpass-cli >/dev/null 2>&1; then
+            echo "Error: enpass-cli not found. Run: shell-configs packages install" >&2
+            return 1
+        fi
+        if [[ -z "$ENPASS_VAULT_PATH" ]]; then
+            echo "Error: ENPASS_VAULT_PATH not set." >&2
+            return 1
+        fi
+
+        # Prompt once — exported so all enpass-cli calls below can run non-interactively.
+        printf 'Enpass master password: '
+        IFS= read -rs MASTERPW || { echo; unset MASTERPW; return 1; }
+        echo
+        export MASTERPW
+
+        set -a
+
+        # SNORE OAuth (2)
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Client ID" env GOOGLE_CLIENT_ID="SNORE OAuth App (GCP)")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Client Secret" env GOOGLE_CLIENT_SECRET="SNORE OAuth App (GCP)")"
+        set +a
+
+        unset MASTERPW
+    }
