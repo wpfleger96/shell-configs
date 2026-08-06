@@ -63,8 +63,9 @@ shell_overrides:
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "GCP Billing Account ID" env TF_VAR_gcp_billing_account_id="Gmail Main/GCP Homelab")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Email" env TF_VAR_gcp_alert_email="Gmail Main/GCP Homelab")"
 
-        # Cloudflare (1)
+        # Cloudflare (2)
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Account Number" env TF_VAR_cloudflare_account_id="Cloudflare")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field 'Terraform API Token ("terraform-token")' env CLOUDFLARE_API_TOKEN="Cloudflare")"
         set +a
 
         [[ -n "$had_masterpw" ]] || unset MASTERPW
