@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## [0.64.0](https://github.com/wpfleger96/shell-configs/compare/v0.63.1...v0.64.0) (2026-08-06)
+
+
+### Features
+
+* **profiles:** load SNORE_SESSION_SECRET in load-snore-secrets ([#155](https://github.com/wpfleger96/shell-configs/issues/155)) ([d0d9956](https://github.com/wpfleger96/shell-configs/commit/d0d995673493b87ad355f09ee8bc758e28f261ef))
+* **profiles:** SNORE OAuth loader and single-prompt load-all-secrets ([#153](https://github.com/wpfleger96/shell-configs/issues/153)) ([22309b9](https://github.com/wpfleger96/shell-configs/commit/22309b93c45630fa482667204bc64fcc78a38fb2))
+
+
+### Bug Fixes
+
+* **configs:** route orphan-uninstall backups to central backup dir ([#151](https://github.com/wpfleger96/shell-configs/issues/151)) ([e33d367](https://github.com/wpfleger96/shell-configs/commit/e33d367223b60dd97b62373ffc80187e2198aab6))
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#154](https://github.com/wpfleger96/shell-configs/issues/154)) ([866a179](https://github.com/wpfleger96/shell-configs/commit/866a17915f2726169a9a28cc26a0ce078fc5f08f))
+
 ## [0.63.1](https://github.com/wpfleger96/shell-configs/compare/v0.63.0...v0.63.1) (2026-08-02)
 
 
