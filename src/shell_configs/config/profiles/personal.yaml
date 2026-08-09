@@ -113,6 +113,24 @@ shell_overrides:
         [[ -n "$had_masterpw" ]] || unset MASTERPW
     }
 
+    load-meowdb-secrets() {
+        _enpass-preflight || return 1
+        local had_masterpw="${MASTERPW:+1}"
+        _enpass-ensure-masterpw || return 1
+
+        set -a
+
+        # MeowDB deploy secrets (5)
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "MEOWDB_PASSWORD_HASH" env MEOWDB_PASSWORD_HASH="MeowDB Homelab Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "MEOWDB_SESSION_SECRET" env MEOWDB_SESSION_SECRET="MeowDB Homelab Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "MEOWDB_TUNNEL_TOKEN" env MEOWDB_TUNNEL_TOKEN="MeowDB Homelab Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "MEOWDB_S3_ACCESS_KEY_ID" env MEOWDB_S3_ACCESS_KEY_ID="MeowDB Homelab Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "MEOWDB_S3_SECRET_ACCESS_KEY" env MEOWDB_S3_SECRET_ACCESS_KEY="MeowDB Homelab Secrets")"
+        set +a
+
+        [[ -n "$had_masterpw" ]] || unset MASTERPW
+    }
+
     load-all-secrets() {
         _enpass-preflight || return 1
         _enpass-ensure-masterpw || return 1
@@ -120,6 +138,7 @@ shell_overrides:
         load-tf-secrets
         load-buzz-relay-secrets
         load-snore-secrets
+        load-meowdb-secrets
 
         unset MASTERPW
     }
