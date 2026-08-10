@@ -104,10 +104,11 @@ shell_overrides:
 
         set -a
 
-        # SNORE deploy (4)
+        # SNORE deploy (5)
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Client ID" env GOOGLE_CLIENT_ID="SNORE OAuth App (GCP)")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Client Secret" env GOOGLE_CLIENT_SECRET="SNORE OAuth App (GCP)")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Session Secret" env SNORE_SESSION_SECRET="SNORE OAuth App (GCP)")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Bootstrap Admin Email" env SNORE_BOOTSTRAP_ADMIN_EMAIL="SNORE OAuth App (GCP)")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Tunnel Token" env SNORE_TUNNEL_TOKEN="SNORE OAuth App (GCP)")"
         set +a
 
