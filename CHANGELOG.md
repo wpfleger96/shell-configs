@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [0.65.0](https://github.com/wpfleger96/shell-configs/compare/v0.64.0...v0.65.0) (2026-08-10)
+
+
+### Features
+
+* **profiles:** add load-meowdb-secrets Enpass loader ([#158](https://github.com/wpfleger96/shell-configs/issues/158)) ([0b9f2c5](https://github.com/wpfleger96/shell-configs/commit/0b9f2c5b17239fe0b7efd23cc1775cc8b6b0be8e))
+* **profiles:** export CLOUDFLARE_API_TOKEN in load-tf-secrets ([#156](https://github.com/wpfleger96/shell-configs/issues/156)) ([5aef73e](https://github.com/wpfleger96/shell-configs/commit/5aef73ef8d2ddee4153d276af9cf0e892ff9fc29))
+* **profiles:** export SNORE_TUNNEL_TOKEN in load-snore-secrets ([#160](https://github.com/wpfleger96/shell-configs/issues/160)) ([08f70cf](https://github.com/wpfleger96/shell-configs/commit/08f70cf22c55e242408f0cac1f6ef5ce064347be))
+* **profiles:** load SNORE_BOOTSTRAP_ADMIN_EMAIL in load-snore-secrets ([#161](https://github.com/wpfleger96/shell-configs/issues/161)) ([57d2c73](https://github.com/wpfleger96/shell-configs/commit/57d2c73df4ce806c964f91b56d7ecbf82551fdf0))
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#157](https://github.com/wpfleger96/shell-configs/issues/157)) ([454aad7](https://github.com/wpfleger96/shell-configs/commit/454aad7a8da39367f3a6f62b68180350606317ad))
+* **deps:** Update python Docker tag to v3.14 ([#134](https://github.com/wpfleger96/shell-configs/issues/134)) ([0afee2f](https://github.com/wpfleger96/shell-configs/commit/0afee2f5349c2a8c89100e567574bd692c33b87b))
+
 ## [0.64.0](https://github.com/wpfleger96/shell-configs/compare/v0.63.1...v0.64.0) (2026-08-06)
 
 
