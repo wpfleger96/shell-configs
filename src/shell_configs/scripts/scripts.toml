@@ -24,3 +24,6 @@ profiles = ["work"]
 [backup-resmed]
 platforms = ["wsl", "macos"]
 profiles = ["personal"]
+
+[docker-unstick]
+platforms = ["macos"]

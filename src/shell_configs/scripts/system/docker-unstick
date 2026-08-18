@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+# Force-recover a zombied Docker Desktop (backend survives SIGTERM, dock icon
+# bounces but app never opens). SIGKILL is required — SIGTERM leaves a corpse
+# that blocks all relaunches.
+set -uo pipefail
+
+pkill -9 -f "com.docker" 2>/dev/null
+pkill -9 -f "Docker Desktop" 2>/dev/null
+sleep 1
+pkill -9 -f "com.apple.Virtualization.VirtualMachine" 2>/dev/null
+sleep 1
+
+if pgrep -f "com.docker|Docker Desktop" >/dev/null; then
+    echo "ERROR: Docker processes survived SIGKILL:" >&2
+    pgrep -fl "com.docker|Docker Desktop" >&2
+    exit 1
+fi
+
+open -a Docker || { echo "ERROR: failed to launch Docker.app" >&2; exit 1; }
+echo "relaunched, waiting for engine..."
+
+for i in $(seq 1 30); do
+    if docker ps >/dev/null 2>&1; then
+        echo "engine up after ~$((i * 4))s"
+        exit 0
+    fi
+    sleep 4
+done
+
+echo "ERROR: engine not responding after 120s — check Docker Desktop UI (sign-in prompt?)" >&2
+exit 1
