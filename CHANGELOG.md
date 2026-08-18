@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## [0.66.0](https://github.com/wpfleger96/shell-configs/compare/v0.65.0...v0.66.0) (2026-08-18)
+
+
+### Features
+
+* **scripts:** add docker-unstick script for macOS ([#165](https://github.com/wpfleger96/shell-configs/issues/165)) ([3d78003](https://github.com/wpfleger96/shell-configs/commit/3d780033f503f3fe4b7f985d887bb2ec3aefaaa1))
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#163](https://github.com/wpfleger96/shell-configs/issues/163)) ([a68048b](https://github.com/wpfleger96/shell-configs/commit/a68048b59b436e1b4ec73fa3f5b86d17d64fa96b))
+* **deps:** Lock file maintenance ([#164](https://github.com/wpfleger96/shell-configs/issues/164)) ([a6ba772](https://github.com/wpfleger96/shell-configs/commit/a6ba77265b8bd91b6cfadab178fab15ebde9fe98))
+* sync Justfile ([4554653](https://github.com/wpfleger96/shell-configs/commit/455465347d2d0b1ef12fde90c961fb03292a7511))
+
+
+### Continuous Integration
+
+* sync CI workflow ([bfdcab2](https://github.com/wpfleger96/shell-configs/commit/bfdcab2de6d06a013d176632dd519f766770bd2c))
+
 ## [0.65.0](https://github.com/wpfleger96/shell-configs/compare/v0.64.0...v0.65.0) (2026-08-10)
 
 
