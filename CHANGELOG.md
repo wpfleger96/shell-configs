@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## [0.67.0](https://github.com/wpfleger96/shell-configs/compare/v0.66.0...v0.67.0) (2026-08-24)
+
+
+### Features
+
+* **profiles:** add load-homeassistant-secrets Enpass loader ([#170](https://github.com/wpfleger96/shell-configs/issues/170)) ([7b96a5e](https://github.com/wpfleger96/shell-configs/commit/7b96a5e4f5739307c992f27e3b5f4b892dbc2abb))
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#167](https://github.com/wpfleger96/shell-configs/issues/167)) ([e73c864](https://github.com/wpfleger96/shell-configs/commit/e73c8648aaf0f81b0b824505fe70c8935b4591cc))
+* **deps:** Lock file maintenance ([#169](https://github.com/wpfleger96/shell-configs/issues/169)) ([d3b1244](https://github.com/wpfleger96/shell-configs/commit/d3b1244a80bc099c6fd09b7db6db04a9cdecb60e))
+
+
+### Continuous Integration
+
+* sync CI workflow ([c64c1b2](https://github.com/wpfleger96/shell-configs/commit/c64c1b26eed79461485787e849ee188940aa5601))
+* sync release workflow ([266fd7f](https://github.com/wpfleger96/shell-configs/commit/266fd7fdf2186aa80054809cf97eb591ab1003b5))
+
 ## [0.66.0](https://github.com/wpfleger96/shell-configs/compare/v0.65.0...v0.66.0) (2026-08-18)
 
 
