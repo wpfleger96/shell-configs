@@ -133,6 +133,20 @@ shell_overrides:
         [[ -n "$had_masterpw" ]] || unset MASTERPW
     }
 
+    load-homeassistant-secrets() {
+        _enpass-preflight || return 1
+        local had_masterpw="${MASTERPW:+1}"
+        _enpass-ensure-masterpw || return 1
+
+        set -a
+
+        # Home Assistant deploy secrets (1) — HA itself needs no secrets; this is the Cloudflare tunnel token
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "HOMEASSISTANT_TUNNEL_TOKEN" env HOMEASSISTANT_TUNNEL_TOKEN="Home Assistant Homelab Secrets")"
+        set +a
+
+        [[ -n "$had_masterpw" ]] || unset MASTERPW
+    }
+
     load-all-secrets() {
         _enpass-preflight || return 1
         _enpass-ensure-masterpw || return 1
@@ -141,6 +155,7 @@ shell_overrides:
         load-buzz-relay-secrets
         load-snore-secrets
         load-meowdb-secrets
+        load-homeassistant-secrets
 
         unset MASTERPW
     }
