@@ -147,6 +147,21 @@ shell_overrides:
         [[ -n "$had_masterpw" ]] || unset MASTERPW
     }
 
+    load-unifi-secrets() {
+        _enpass-preflight || return 1
+        local had_masterpw="${MASTERPW:+1}"
+        _enpass-ensure-masterpw || return 1
+
+        set -a
+
+        # UniFi Terraform provider credentials (2) — local admin on the self-hosted Network Application; the .deb controller has no API-key support
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "UNIFI_USERNAME" env TF_VAR_unifi_username="UniFi Homelab Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "UNIFI_PASSWORD" env TF_VAR_unifi_password="UniFi Homelab Secrets")"
+        set +a
+
+        [[ -n "$had_masterpw" ]] || unset MASTERPW
+    }
+
     load-all-secrets() {
         _enpass-preflight || return 1
         _enpass-ensure-masterpw || return 1
@@ -156,6 +171,7 @@ shell_overrides:
         load-snore-secrets
         load-meowdb-secrets
         load-homeassistant-secrets
+        load-unifi-secrets
 
         unset MASTERPW
     }
