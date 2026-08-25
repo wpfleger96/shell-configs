@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.68.0](https://github.com/wpfleger96/shell-configs/compare/v0.67.0...v0.68.0) (2026-08-25)
+
+
+### Features
+
+* **personal:** add load-unifi-secrets loader for UniFi Terraform credentials ([#171](https://github.com/wpfleger96/shell-configs/issues/171)) ([67182ab](https://github.com/wpfleger96/shell-configs/commit/67182aba8fee107541063582b8fc67a86cb77ae6))
+
+
+### Chores
+
+* **deps:** Update astral-sh/setup-uv action to v10 ([#166](https://github.com/wpfleger96/shell-configs/issues/166)) ([7553398](https://github.com/wpfleger96/shell-configs/commit/7553398cdc42e6f59a050dd47eb4c638b4b85a6b))
+
 ## [0.67.0](https://github.com/wpfleger96/shell-configs/compare/v0.66.0...v0.67.0) (2026-08-24)
 
 
