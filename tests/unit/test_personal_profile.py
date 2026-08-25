@@ -147,6 +147,41 @@ class TestPersonalProfile:
         func_body = shared[func_start : shared.index("\n}", func_start)]
         assert func_body.index("set +a") > func_body.rindex('eval "$(enpass-cli')
 
+    def test_personal_profile_shared_contains_load_unifi_secrets(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        profile = real_loader.load_profile("personal")
+        shared = profile.shell_overrides.get("shared", "")
+        assert "load-unifi-secrets" in shared
+
+    def test_load_unifi_secrets_set_minus_a_before_first_eval(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        profile = real_loader.load_profile("personal")
+        shared = profile.shell_overrides.get("shared", "")
+        func_start = shared.index("load-unifi-secrets()")
+        func_body = shared[func_start : shared.index("\n}", func_start)]
+        assert func_body.index("set -a") < func_body.index('eval "$(enpass-cli')
+
+    def test_load_unifi_secrets_set_plus_a_after_last_eval(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        profile = real_loader.load_profile("personal")
+        shared = profile.shell_overrides.get("shared", "")
+        func_start = shared.index("load-unifi-secrets()")
+        func_body = shared[func_start : shared.index("\n}", func_start)]
+        assert func_body.index("set +a") > func_body.rindex('eval "$(enpass-cli')
+
+    def test_load_unifi_secrets_maps_fields_to_tf_vars(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        profile = real_loader.load_profile("personal")
+        shared = profile.shell_overrides.get("shared", "")
+        func_start = shared.index("load-unifi-secrets()")
+        func_body = shared[func_start : shared.index("\n}", func_start)]
+        assert '-field "UNIFI_USERNAME" env TF_VAR_unifi_username=' in func_body
+        assert '-field "UNIFI_PASSWORD" env TF_VAR_unifi_password=' in func_body
+
     def test_personal_profile_shared_contains_load_all_secrets(
         self, real_loader: ProfileLoader
     ) -> None:
@@ -172,6 +207,7 @@ class TestPersonalProfile:
         assert "load-tf-secrets" in func_body
         assert "load-buzz-relay-secrets" in func_body
         assert "load-snore-secrets" in func_body
+        assert "load-unifi-secrets" in func_body
 
     def test_loaders_preserve_preexisting_masterpw(
         self, real_loader: ProfileLoader
