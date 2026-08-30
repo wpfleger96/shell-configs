@@ -128,6 +128,10 @@ shell_overrides:
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "MEOWDB_TUNNEL_TOKEN" env MEOWDB_TUNNEL_TOKEN="MeowDB Homelab Secrets")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "MEOWDB_S3_ACCESS_KEY_ID" env MEOWDB_S3_ACCESS_KEY_ID="MeowDB Homelab Secrets")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "MEOWDB_S3_SECRET_ACCESS_KEY" env MEOWDB_S3_SECRET_ACCESS_KEY="MeowDB Homelab Secrets")"
+
+        # Non-secret deploy config — required: MeowDB media lives only in S3, and
+        # the homelabconfigs env template omits the bucket line when this is unset.
+        MEOWDB_S3_BUCKET=wpfleger-meow-media
         set +a
 
         [[ -n "$had_masterpw" ]] || unset MASTERPW
