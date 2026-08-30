@@ -147,6 +147,15 @@ class TestPersonalProfile:
         func_body = shared[func_start : shared.index("\n}", func_start)]
         assert func_body.index("set +a") > func_body.rindex('eval "$(enpass-cli')
 
+    def test_load_meowdb_secrets_exports_s3_bucket(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        profile = real_loader.load_profile("personal")
+        shared = profile.shell_overrides.get("shared", "")
+        func_start = shared.index("load-meowdb-secrets()")
+        func_body = shared[func_start : shared.index("\n}", func_start)]
+        assert "MEOWDB_S3_BUCKET=wpfleger-meow-media" in func_body
+
     def test_personal_profile_shared_contains_load_unifi_secrets(
         self, real_loader: ProfileLoader
     ) -> None:
