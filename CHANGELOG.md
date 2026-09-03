@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [0.68.1](https://github.com/wpfleger96/shell-configs/compare/v0.68.0...v0.68.1) (2026-09-03)
+
+
+### Bug Fixes
+
+* **profiles:** export MEOWDB_S3_BUCKET in load-meowdb-secrets ([#176](https://github.com/wpfleger96/shell-configs/issues/176)) ([f82b86a](https://github.com/wpfleger96/shell-configs/commit/f82b86a4b4fd4222c971a1c1657d040a768855ff))
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#173](https://github.com/wpfleger96/shell-configs/issues/173)) ([a9f70e7](https://github.com/wpfleger96/shell-configs/commit/a9f70e72d9470432f258b5648e2cccfb29bfb177))
+* **deps:** Lock file maintenance ([#175](https://github.com/wpfleger96/shell-configs/issues/175)) ([ffaa70f](https://github.com/wpfleger96/shell-configs/commit/ffaa70f92fc4201681ce631caaf482d3cb4076b0))
+* **deps:** Lock file maintenance ([#177](https://github.com/wpfleger96/shell-configs/issues/177)) ([aadf5e3](https://github.com/wpfleger96/shell-configs/commit/aadf5e37b15a3e6e6a3f9e9d49063e9c07642477))
+* **deps:** Lock file maintenance ([#178](https://github.com/wpfleger96/shell-configs/issues/178)) ([7beb958](https://github.com/wpfleger96/shell-configs/commit/7beb958929dca94835b1741bc36dd6d8ef6f65bd))
+
 ## [0.68.0](https://github.com/wpfleger96/shell-configs/compare/v0.67.0...v0.68.0) (2026-08-25)
 
 
