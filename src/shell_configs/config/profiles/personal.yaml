@@ -60,15 +60,24 @@ shell_overrides:
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -exact -field "Terraform Access Key" env AWS_ACCESS_KEY_ID="AWS")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -exact -field "Terraform Secret Key" env AWS_SECRET_ACCESS_KEY="AWS")"
 
-        # GCP (4)
+        # GCP (3)
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "GCP Project ID" env TF_VAR_gcp_project_id="Gmail Main/GCP Homelab")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "GCP Project Number" env TF_VAR_gcp_project_number="Gmail Main/GCP Homelab")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "GCP Billing Account ID" env TF_VAR_gcp_billing_account_id="Gmail Main/GCP Homelab")"
-        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Email" env TF_VAR_gcp_alert_email="Gmail Main/GCP Homelab")"
 
         # Cloudflare (2)
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Account Number" env TF_VAR_cloudflare_account_id="Cloudflare")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field 'Terraform API Token ("terraform-token")' env CLOUDFLARE_API_TOKEN="Cloudflare")"
+
+        # Homelab IdP (2) - field names mirror the GitHub Actions variable/secret names
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "IDP_ISSUER" env TF_VAR_idp_issuer="Homelab IdP Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "TF_VAR_IDP_TAILSCALE_ADMIN_EMAIL" env TF_VAR_idp_tailscale_admin_email="Homelab IdP Secrets")"
+
+        # Tailscale (2) - the provider reads these from the env directly, not via TF_VAR_*.
+        # The Enpass entry is created during tailnet bootstrap; until it exists these
+        # evals print an error and export nothing.
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "TAILSCALE_OAUTH_CLIENT_ID" env TAILSCALE_OAUTH_CLIENT_ID="Tailscale Homelab Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "TAILSCALE_OAUTH_CLIENT_SECRET" env TAILSCALE_OAUTH_CLIENT_SECRET="Tailscale Homelab Secrets")"
         set +a
 
         [[ -n "$had_masterpw" ]] || unset MASTERPW
