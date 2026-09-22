@@ -54,8 +54,11 @@ shell_overrides:
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Container User Password" env TF_VAR_container_user_password="Homelab Consoles")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "SSH Public Key" env TF_VAR_ssh_public_key="Homelab Consoles")"
 
-        # AWS (1)
-        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Email Address" env TF_VAR_alert_email="AWS")"
+        # AWS (3) — -exact: other vault entries contain "AWS" in their titles,
+        # so a substring filter is ambiguous and enpass-cli refuses to pick one
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -exact -field "Email Address" env TF_VAR_alert_email="AWS")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -exact -field "Terraform Access Key" env AWS_ACCESS_KEY_ID="AWS")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -exact -field "Terraform Secret Key" env AWS_SECRET_ACCESS_KEY="AWS")"
 
         # GCP (4)
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "GCP Project ID" env TF_VAR_gcp_project_id="Gmail Main/GCP Homelab")"
