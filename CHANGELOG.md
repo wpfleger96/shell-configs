@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.70.0](https://github.com/wpfleger96/shell-configs/compare/v0.69.0...v0.70.0) (2026-09-23)
+
+
+### Features
+
+* **profiles:** wire Tailscale and homelab IdP inputs into load-tf-secrets ([#184](https://github.com/wpfleger96/shell-configs/issues/184)) ([7c6f7c8](https://github.com/wpfleger96/shell-configs/commit/7c6f7c8309068addc24d7476e7e9ffaf8032527d))
+
+
+### Chores
+
+* **deps:** Update astral-sh/setup-uv action to v10.1.0 ([#182](https://github.com/wpfleger96/shell-configs/issues/182)) ([3979f63](https://github.com/wpfleger96/shell-configs/commit/3979f63cff70137d49c188ae7f6eb92fa3999f50))
+
 ## [0.69.0](https://github.com/wpfleger96/shell-configs/compare/v0.68.0...v0.69.0) (2026-09-22)
 
 
