@@ -156,14 +156,18 @@ def test_enpass_docker_available_on_macos(
 
     assert "enpass-cli" in by_name
     enpass_cli_pkg = by_name["enpass-cli"]
-    enpass_cli_cfg = enpass_cli_pkg.macos
-    assert enpass_cli_cfg is not None
-    assert enpass_cli_cfg.method == "script"
-    assert enpass_cli_cfg.install_cmd is not None
-    assert "hazcod/enpass-cli" in enpass_cli_cfg.install_cmd
-    assert "--tag v1.12.0" in enpass_cli_cfg.install_cmd
-    assert "darwin" in enpass_cli_cfg.install_cmd
-    assert enpass_cli_pkg.version == "1.12.0"
+    for enpass_cli_cfg in (enpass_cli_pkg.macos, enpass_cli_pkg.linux):
+        assert enpass_cli_cfg is not None
+        assert enpass_cli_cfg.method == "script"
+        assert enpass_cli_cfg.install_cmd is not None
+        assert "go install" in enpass_cli_cfg.install_cmd
+        assert (
+            "github.com/hazcod/enpass-cli/cmd/enpasscli@cfb4a832639a007091b2c47cea67df67f83c70fc"
+            in enpass_cli_cfg.install_cmd
+        )
+        assert "-X main.version=cfb4a83" in enpass_cli_cfg.install_cmd
+        assert "--tag" not in enpass_cli_cfg.install_cmd
+    assert enpass_cli_pkg.version == "cfb4a83"
     assert enpass_cli_pkg.version_cmd == "enpass-cli version"
 
     assert "docker" in by_name
@@ -174,7 +178,7 @@ def test_enpass_docker_available_on_macos(
 
 
 def test_enpass_cli_available_on_linux(monkeypatch: pytest.MonkeyPatch) -> None:
-    """enpass-cli must not be wsl_only and must be pinned to v1.12.0 on Linux."""
+    """enpass-cli must not be wsl_only and must have a Linux install path."""
     monkeypatch.setattr(
         "shell_configs.packages.packages.is_platform",
         lambda p: p == Platform.LINUX,
@@ -187,7 +191,7 @@ def test_enpass_cli_available_on_linux(monkeypatch: pytest.MonkeyPatch) -> None:
     linux_cfg = by_name["enpass-cli"].linux
     assert linux_cfg is not None
     assert linux_cfg.install_cmd is not None
-    assert "--tag v1.12.0" in linux_cfg.install_cmd
+    assert "/usr/local/go/bin" in linux_cfg.install_cmd
 
 
 def test_load_packages_returns_list(tmp_path: Path) -> None:
