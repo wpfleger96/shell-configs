@@ -144,6 +144,16 @@ def print_section(title: str) -> None:
     get_console().print(f"\n[bold cyan]{title}[/bold cyan]\n")
 
 
+def print_batch_summary(
+    action: str, verb: str, success_count: int, fail_count: int
+) -> None:
+    """Summarize a batch operation: warn on any failure, otherwise report success."""
+    if fail_count:
+        print_warning(f"{success_count} {verb}, {fail_count} failed")
+    else:
+        print_success(f"{action} complete ({success_count} packages)")
+
+
 # ─── Shell-configs-specific helpers ──────────────────────────────────────────
 
 

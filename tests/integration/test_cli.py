@@ -6,11 +6,26 @@ from shell_configs.cli import cli
 from shell_configs.manager import ConfigManager
 
 
+@pytest.fixture
+def configs_only_install(monkeypatch):
+    """Limit `install` to ConfigsComponent.
+
+    gh-auth, signing, and gh-extensions fail against the stubbed `gh` CLI, and
+    `install` now exits non-zero when any component fails.
+    """
+    from shell_configs.cli.components.configs import ConfigsComponent
+
+    monkeypatch.setattr(
+        "shell_configs.cli.components.INSTALL_COMPONENTS", [ConfigsComponent()]
+    )
+
+
 @pytest.mark.integration
 @pytest.mark.cli
 class TestInstallCommand:
     """Test the install command."""
 
+    @pytest.mark.usefixtures("configs_only_install")
     def test_install_all_shells(self, test_repo, mock_home, cli_runner, monkeypatch):
         monkeypatch.chdir(test_repo)
 
@@ -27,6 +42,7 @@ class TestInstallCommand:
         assert manager.has_managed_section(zshrc)
         assert manager.has_managed_section(gitconfig)
 
+    @pytest.mark.usefixtures("configs_only_install")
     def test_install_with_shell_filter(
         self, test_repo, mock_home, cli_runner, monkeypatch
     ):
@@ -44,6 +60,26 @@ class TestInstallCommand:
         assert manager.has_managed_section(bashrc)
         assert manager.has_managed_section(zshrc)
         assert not manager.has_managed_section(gitconfig)
+
+    def test_install_full_components_reports_errors_but_writes_configs(
+        self, test_repo, mock_home, cli_runner, monkeypatch
+    ):
+        """Documents the seam behind `configs_only_install`: with every default
+        component, the gh-dependent ones fail against the stubbed `gh`, so the
+        run exits 1 — yet config files are still written."""
+        monkeypatch.chdir(test_repo)
+        # Keep the run hermetic: nothing that would shell out to real installers.
+        monkeypatch.setattr(
+            "shell_configs.packages.load_packages_for_profile", lambda profile: []
+        )
+        monkeypatch.setattr("shell_configs.languages.load_languages", lambda: [])
+        monkeypatch.setattr("shell_configs.agents.load_agents", lambda: [])
+
+        result = cli_runner.invoke(cli, ["install", "-y"])
+
+        assert result.exit_code == 1
+        assert "Install completed with errors" in result.output
+        assert ConfigManager().has_managed_section(mock_home / ".bashrc")
 
     def test_install_dry_run(self, test_repo, mock_home, cli_runner, monkeypatch):
         monkeypatch.chdir(test_repo)
@@ -287,6 +323,7 @@ class TestCompletionsStatusCommand:
 class TestAdditionalFiles:
     """Test CLI commands with additional files."""
 
+    @pytest.mark.usefixtures("configs_only_install")
     def test_install_with_additional_files(
         self, test_repo, mock_home, cli_runner, monkeypatch
     ):
@@ -337,6 +374,7 @@ class TestAdditionalFiles:
 class TestSharedConfigSupport:
     """Test CLI commands with shared config support."""
 
+    @pytest.mark.usefixtures("configs_only_install")
     def test_install_with_shared_config(
         self, test_repo, mock_home, cli_runner, monkeypatch
     ):
@@ -357,6 +395,7 @@ class TestSharedConfigSupport:
         assert "### Shell-Specific Config ###" in content
         assert "alias ll='ls -la'" in content
 
+    @pytest.mark.usefixtures("configs_only_install")
     def test_shared_config_in_multiple_shells(
         self, test_repo, mock_home, cli_runner, monkeypatch
     ):

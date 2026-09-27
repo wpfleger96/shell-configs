@@ -488,8 +488,9 @@ def run_components_parallel(
     console as it arrives.
 
     Errors are collected rather than aborting on the first failure.  After all
-    futures settle, per-component errors are printed and partial results are
-    returned.  If *every* component failed the first exception is re-raised.
+    futures settle, per-component errors are printed and the results of the
+    components that did not raise are returned; components that raised are
+    absent from the result dict (callers treat them as failed).
     """
     if not components:
         return {}
@@ -564,8 +565,6 @@ def run_components_parallel(
 
         for comp, exc in errors.items():
             print_error(f"{comp.label}: {type(exc).__name__}: {exc}")
-        if len(errors) == len(components):
-            raise next(iter(errors.values()))
 
     return results
 
@@ -579,6 +578,22 @@ def _make_progress(real_console: Any) -> Any:
         console=real_console,
         transient=True,
     )
+
+
+def _finish_task(progress: Any, task_id: Any, comp: Any, ok: Any) -> None:
+    """Mark a component's spinner row done: green on success, red "(failed)" otherwise.
+
+    ``ok`` is the component's return value. ``None`` (methods like ``status``
+    and ``uninstall`` that return nothing) counts as success; any other falsy
+    value counts as failure, matching how ``install`` counts apply results.
+    """
+    failed = ok is not None and not ok
+    label = (
+        f"[red]{comp.label} (failed)[/red]"
+        if failed
+        else f"[green]{comp.label}[/green]"
+    )
+    progress.update(task_id, description=label, completed=True)
 
 
 def _run_buffered(
@@ -607,18 +622,10 @@ def _run_buffered(
             exc = future.exception()
             if exc is not None:
                 errors[comp] = exc
-                progress.update(
-                    task_ids[comp],
-                    description=f"[red]{comp.label} (failed)[/red]",
-                    completed=True,
-                )
+                _finish_task(progress, task_ids[comp], comp, ok=False)
             else:
                 results[comp] = future.result()
-                progress.update(
-                    task_ids[comp],
-                    description=f"[green]{comp.label}[/green]",
-                    completed=True,
-                )
+                _finish_task(progress, task_ids[comp], comp, ok=results[comp])
 
     first = True
     for comp in components:
@@ -665,15 +672,7 @@ def _run_unbuffered(
                     results[comp] = ComponentPlan(has_changes=False)
                 else:
                     errors[comp] = exc
-                progress.update(
-                    task_ids[comp],
-                    description=f"[red]{comp.label} (failed)[/red]",
-                    completed=True,
-                )
+                _finish_task(progress, task_ids[comp], comp, ok=False)
             else:
                 results[comp] = future.result()
-                progress.update(
-                    task_ids[comp],
-                    description=f"[green]{comp.label}[/green]",
-                    completed=True,
-                )
+                _finish_task(progress, task_ids[comp], comp, ok=results[comp])

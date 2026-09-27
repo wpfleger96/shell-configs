@@ -1,6 +1,7 @@
 """Tests for package management functionality."""
 
 import io
+import re
 import subprocess
 
 from pathlib import Path
@@ -137,6 +138,30 @@ def test_linux_only_packages_excluded_on_macos(
         assert pkg not in names
 
 
+def _assert_enpass_cli_go_build(pkg: Package, cfg: InstallConfig | None) -> str:
+    """Assert an enpass-cli install config builds the pinned commit with cgo; return its command."""
+    assert cfg is not None
+    assert cfg.method == "script"
+    assert cfg.install_cmd is not None
+    cmd = cfg.install_cmd
+    assert pkg.version is not None
+    assert pkg.version_cmd == "enpass-cli version"
+
+    match = re.search(
+        r"github\.com/hazcod/enpass-cli/cmd/enpasscli@([0-9a-f]{40})\b", cmd
+    )
+    assert match is not None
+    assert match.group(1).startswith(pkg.version)
+    assert f"-X main.version={pkg.version}" in cmd
+
+    assert "command -v go" in cmd
+    assert "CGO_ENABLED=1 go install" in cmd
+    assert "trap " in cmd
+    assert "set -e" not in cmd
+    assert "--tag" not in cmd
+    return cmd
+
+
 def test_enpass_docker_available_on_macos(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -156,15 +181,8 @@ def test_enpass_docker_available_on_macos(
 
     assert "enpass-cli" in by_name
     enpass_cli_pkg = by_name["enpass-cli"]
-    enpass_cli_cfg = enpass_cli_pkg.macos
-    assert enpass_cli_cfg is not None
-    assert enpass_cli_cfg.method == "script"
-    assert enpass_cli_cfg.install_cmd is not None
-    assert "hazcod/enpass-cli" in enpass_cli_cfg.install_cmd
-    assert "--tag v1.12.0" in enpass_cli_cfg.install_cmd
-    assert "darwin" in enpass_cli_cfg.install_cmd
-    assert enpass_cli_pkg.version == "1.12.0"
-    assert enpass_cli_pkg.version_cmd == "enpass-cli version"
+    macos_cmd = _assert_enpass_cli_go_build(enpass_cli_pkg, enpass_cli_pkg.macos)
+    assert 'export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"' in macos_cmd
 
     assert "docker" in by_name
     docker_cfg = by_name["docker"].macos
@@ -174,7 +192,7 @@ def test_enpass_docker_available_on_macos(
 
 
 def test_enpass_cli_available_on_linux(monkeypatch: pytest.MonkeyPatch) -> None:
-    """enpass-cli must not be wsl_only and must be pinned to v1.12.0 on Linux."""
+    """enpass-cli must not be wsl_only and must have a Linux install path."""
     monkeypatch.setattr(
         "shell_configs.packages.packages.is_platform",
         lambda p: p == Platform.LINUX,
@@ -183,11 +201,9 @@ def test_enpass_cli_available_on_linux(monkeypatch: pytest.MonkeyPatch) -> None:
     names = [p.name for p in packages]
     assert "enpass-cli" in names
 
-    by_name = {p.name: p for p in packages}
-    linux_cfg = by_name["enpass-cli"].linux
-    assert linux_cfg is not None
-    assert linux_cfg.install_cmd is not None
-    assert "--tag v1.12.0" in linux_cfg.install_cmd
+    enpass_cli_pkg = next(p for p in packages if p.name == "enpass-cli")
+    linux_cmd = _assert_enpass_cli_go_build(enpass_cli_pkg, enpass_cli_pkg.linux)
+    assert 'export PATH="/usr/local/go/bin:$PATH"' in linux_cmd
 
 
 def test_load_packages_returns_list(tmp_path: Path) -> None:

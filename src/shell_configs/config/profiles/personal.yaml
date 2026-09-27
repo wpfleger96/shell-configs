@@ -20,7 +20,7 @@ shell_overrides:
 
     _enpass-preflight() {
         if ! command -v enpass-cli >/dev/null 2>&1; then
-            echo "Error: enpass-cli not found. Run: shell-configs packages install" >&2
+            echo "Error: enpass-cli not found. Run: shell-configs install" >&2
             return 1
         fi
         if [[ -z "$ENPASS_VAULT_PATH" ]]; then

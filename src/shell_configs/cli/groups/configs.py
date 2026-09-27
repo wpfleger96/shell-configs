@@ -9,6 +9,8 @@ network or sudo operations — making it a safe, hermetic configs-only path.
 
 from __future__ import annotations
 
+import sys
+
 from pathlib import Path
 
 import click
@@ -80,7 +82,8 @@ def configs_install(
             print_info("Installation cancelled")
             return
 
-    component.apply(ctx, plan)
+    if not component.apply(ctx, plan):
+        sys.exit(1)
 
 
 @configs.command(name="uninstall")
