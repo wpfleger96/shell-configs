@@ -404,6 +404,7 @@ class ConfigsComponent(Component):
             get_default_additional_manifest_path()
         )
         is_first_manifest_run = additional_manifest.is_new
+        orphan_results: dict[str, OperationResult] = {}
 
         for shell in ctx.selected_shells:
             additional_files = shell.get_additional_files()
@@ -446,6 +447,7 @@ class ConfigsComponent(Component):
                     )
                     if orphan_result != OperationResult.NOT_FOUND:
                         print_operation_result(orphan_result, orphan_msg)
+                    orphan_results[target_str] = orphan_result
                     # Only remove the manifest entry when the file was actually gone or
                     # successfully deleted; keep it if uninstall failed so the orphan
                     # is re-detected on the next run.
@@ -500,14 +502,16 @@ class ConfigsComponent(Component):
         if ctx.dry_run:
             print_hint("Use without --dry-run to apply changes.")
 
-        total_success = sum(
-            _count_successes(d)
-            for d in [
-                results,
-                additional_file_results,
-                preferences_results,
-                state_db_results,
-            ]
+        all_results = [
+            results,
+            additional_file_results,
+            orphan_results,
+            preferences_results,
+            state_db_results,
+        ]
+        total_success = sum(_count_successes(d) for d in all_results)
+        total_failed = sum(
+            1 for d in all_results for r in d.values() if r == OperationResult.ERROR
         )
 
         if total_success > 0 and not ctx.dry_run:
@@ -526,6 +530,9 @@ class ConfigsComponent(Component):
         if not ctx.dry_run:
             additional_manifest.save()
 
+        if total_failed:
+            print_warning(f"{total_failed} file(s) failed")
+            return False
         return True
 
     def status(self, ctx: Context) -> None:

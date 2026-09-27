@@ -61,13 +61,19 @@ def setup(
         print_would,
     )
 
+    failed = False
+
     if not skip_packages:
         print_section("Step 1/5: Install required packages")
         print_dim("Installing system packages needed by shell configurations.")
         console.print()
         from shell_configs.cli.groups.packages import packages_install
 
-        ctx.invoke(packages_install, dry_run=dry_run, yes=yes)
+        try:
+            ctx.invoke(packages_install, dry_run=dry_run, yes=yes)
+        except SystemExit as e:
+            if e.code:
+                failed = True
 
     print_section("Step 2/5: Install shell-configs system-wide")
     print_dim("This allows you to run 'shell-configs' from any directory.")
@@ -148,13 +154,17 @@ def setup(
 
     from shell_configs.cli.commands.install import install
 
-    ctx.invoke(
-        install,
-        shells=shells,
-        dry_run=dry_run,
-        yes=yes,
-        config_dir=config_dir,
-    )
+    try:
+        ctx.invoke(
+            install,
+            shells=shells,
+            dry_run=dry_run,
+            yes=yes,
+            config_dir=config_dir,
+        )
+    except SystemExit as e:
+        if e.code:
+            failed = True
 
     if not skip_completions:
         print_section("Step 4/5: Shell completion setup")
@@ -174,12 +184,14 @@ def setup(
                         print_success(message)
                     else:
                         print_warning(message)
+                        failed = True
             else:
                 success, message = install_completion(shell, dry_run=dry_run)
                 if success:
                     print_success(message)
                 else:
                     print_warning(message)
+                    failed = True
 
     if not skip_scripts:
         print_section("Step 5/5: Install utility scripts")
@@ -222,8 +234,15 @@ def setup(
                     InstallResult.SKIPPED_PROFILE,
                 ):
                     pass
+                else:
+                    print_error(message)
+                    failed = True
 
-    if dry_run:
+    if failed:
+        console.print()
+        print_warning("Setup completed with errors")
+        sys.exit(1)
+    elif dry_run:
         console.print()
         print_dim("Dry run complete - no changes were made.")
     else:

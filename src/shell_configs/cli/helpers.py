@@ -614,11 +614,12 @@ def _run_buffered(
                 )
             else:
                 results[comp] = future.result()
-                progress.update(
-                    task_ids[comp],
-                    description=f"[green]{comp.label}[/green]",
-                    completed=True,
+                label = (
+                    f"[red]{comp.label} (failed)[/red]"
+                    if results[comp] is False
+                    else f"[green]{comp.label}[/green]"
                 )
+                progress.update(task_ids[comp], description=label, completed=True)
 
     first = True
     for comp in components:
@@ -672,8 +673,9 @@ def _run_unbuffered(
                 )
             else:
                 results[comp] = future.result()
-                progress.update(
-                    task_ids[comp],
-                    description=f"[green]{comp.label}[/green]",
-                    completed=True,
+                label = (
+                    f"[red]{comp.label} (failed)[/red]"
+                    if results[comp] is False
+                    else f"[green]{comp.label}[/green]"
                 )
+                progress.update(task_ids[comp], description=label, completed=True)

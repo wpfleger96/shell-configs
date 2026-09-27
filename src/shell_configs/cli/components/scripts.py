@@ -83,6 +83,7 @@ class ScriptsComponent(Component):
         if not plan.has_changes:
             return True
 
+        from shell_configs.display import print_error
         from shell_configs.script_manager import (
             InstallResult,
             ScriptManifest,
@@ -101,7 +102,7 @@ class ScriptsComponent(Component):
         for entry, status in plan.entries:
             if status == ScriptStatus.INSTALLED:
                 continue
-            result, _ = install_script(
+            result, install_msg = install_script(
                 entry,
                 target_dir,
                 manifest,
@@ -116,6 +117,7 @@ class ScriptsComponent(Component):
                 InstallResult.SKIPPED_PLATFORM,
                 InstallResult.SKIPPED_PROFILE,
             ):
+                print_error(install_msg)
                 success = False
 
         for name in plan.orphaned:
@@ -132,6 +134,7 @@ class ScriptsComponent(Component):
                 UninstallResult.REMOVED,
                 UninstallResult.NOT_FOUND,
             ):
+                print_error(uninstall_msg)
                 success = False
 
         return success

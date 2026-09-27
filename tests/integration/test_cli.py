@@ -6,11 +6,26 @@ from shell_configs.cli import cli
 from shell_configs.manager import ConfigManager
 
 
+@pytest.fixture
+def configs_only_install(monkeypatch):
+    """Limit `install` to ConfigsComponent.
+
+    gh-auth, signing, and gh-extensions fail against the stubbed `gh` CLI, and
+    `install` now exits non-zero when any component fails.
+    """
+    from shell_configs.cli.components.configs import ConfigsComponent
+
+    monkeypatch.setattr(
+        "shell_configs.cli.components.INSTALL_COMPONENTS", [ConfigsComponent()]
+    )
+
+
 @pytest.mark.integration
 @pytest.mark.cli
 class TestInstallCommand:
     """Test the install command."""
 
+    @pytest.mark.usefixtures("configs_only_install")
     def test_install_all_shells(self, test_repo, mock_home, cli_runner, monkeypatch):
         monkeypatch.chdir(test_repo)
 
@@ -27,6 +42,7 @@ class TestInstallCommand:
         assert manager.has_managed_section(zshrc)
         assert manager.has_managed_section(gitconfig)
 
+    @pytest.mark.usefixtures("configs_only_install")
     def test_install_with_shell_filter(
         self, test_repo, mock_home, cli_runner, monkeypatch
     ):
@@ -287,6 +303,7 @@ class TestCompletionsStatusCommand:
 class TestAdditionalFiles:
     """Test CLI commands with additional files."""
 
+    @pytest.mark.usefixtures("configs_only_install")
     def test_install_with_additional_files(
         self, test_repo, mock_home, cli_runner, monkeypatch
     ):
@@ -337,6 +354,7 @@ class TestAdditionalFiles:
 class TestSharedConfigSupport:
     """Test CLI commands with shared config support."""
 
+    @pytest.mark.usefixtures("configs_only_install")
     def test_install_with_shared_config(
         self, test_repo, mock_home, cli_runner, monkeypatch
     ):
@@ -357,6 +375,7 @@ class TestSharedConfigSupport:
         assert "### Shell-Specific Config ###" in content
         assert "alias ll='ls -la'" in content
 
+    @pytest.mark.usefixtures("configs_only_install")
     def test_shared_config_in_multiple_shells(
         self, test_repo, mock_home, cli_runner, monkeypatch
     ):

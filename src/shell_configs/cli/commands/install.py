@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 from pathlib import Path
 
 import click
@@ -87,10 +89,14 @@ def install(
         if not ok:
             print_warning(f"{msg} — installs requiring sudo will fail fast")
 
+    failed = False
+
     def _apply_sequential(stage: str) -> None:
+        nonlocal failed
         for comp in INSTALL_COMPONENTS:
             if comp.apply_stage == stage and (plans[comp].has_changes or force):
-                comp.apply(ctx, plans[comp])
+                if not comp.apply(ctx, plans[comp]):
+                    failed = True
 
     # Pre-stage components install tools the rest depend on.
     _apply_sequential("pre")
@@ -100,9 +106,16 @@ def install(
         c: plans[c] for c in parallel_comps if plans[c].has_changes or force
     }
     if parallel_plans:
-        run_components_parallel(
+        results = run_components_parallel(
             list(parallel_plans.keys()), "apply", ctx, plans=parallel_plans
         )
+        # Components that raised are absent from results (already reported).
+        if not all(results.get(c, False) for c in parallel_plans):
+            failed = True
 
     # gh auth state is mutated by these components; run sequentially to avoid races
     _apply_sequential("post")
+
+    if failed:
+        print_warning("Install completed with errors")
+        sys.exit(1)

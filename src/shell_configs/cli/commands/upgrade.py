@@ -115,6 +115,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
     )
 
     upgraded_tools = []
+    failed = False
     for tool, _ in tool_updates:
         with console.status(f"Upgrading {tool.display_name}..."):
             try:
@@ -125,6 +126,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
                 )
             except Exception as e:
                 print_error(f"{tool.display_name} upgrade failed: {e}")
+                failed = True
                 continue
 
         if success:
@@ -138,14 +140,20 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
                 print_done(f"{tool.display_name} is already up to date")
         else:
             print_error(f"{tool.display_name} upgrade failed: {msg}")
+            failed = True
 
     if upgraded_tools:
         console.print()
         console.print("[cyan]Installing updated configurations...[/cyan]")
         shell_configs_bin = _shutil.which("shell-configs")
         if shell_configs_bin:
-            subprocess.run([shell_configs_bin, "install", "--yes", "--force"])
+            result = subprocess.run([shell_configs_bin, "install", "--yes", "--force"])
+            if result.returncode != 0:
+                failed = True
         else:
             from shell_configs.cli.commands.install import install
 
             ctx.invoke(install, yes=True, force=True)
+
+    if failed:
+        sys.exit(1)

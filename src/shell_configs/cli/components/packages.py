@@ -85,6 +85,7 @@ class RequiredPackagesComponent(Component):
         if not pkg_manager:
             return True
 
+        all_ok = True
         try:
             for pkg in plan.missing:
                 console.print(f"  Installing {pkg.name}...")
@@ -93,11 +94,13 @@ class RequiredPackagesComponent(Component):
                     print_success(pkg.name, indent=2)
                 else:
                     print_error(f"{pkg.name}: {message}", indent=2)
+                    all_ok = False
             console.print()
         except Exception as e:
             print_warning(f"Error installing required packages: {e}")
+            return False
 
-        return True
+        return all_ok
 
 
 class OptionalPackagesComponent(Component):
@@ -149,13 +152,21 @@ class OptionalPackagesComponent(Component):
         if not plan.missing:
             return True
 
-        from shell_configs.display import console, print_dim, print_error, print_success
+        from shell_configs.display import (
+            console,
+            print_dim,
+            print_error,
+            print_success,
+            print_warning,
+        )
         from shell_configs.packages import get_package_manager
 
         pkg_manager = get_package_manager()
         if not pkg_manager:
             return True
 
+        success_count = 0
+        fail_count = 0
         try:
             total = len(plan.missing)
             for i, pkg in enumerate(plan.missing, start=1):
@@ -164,18 +175,24 @@ class OptionalPackagesComponent(Component):
 
                 if success:
                     print_success(pkg.name)
+                    success_count += 1
                 else:
                     print_error(f"{pkg.name}: {message}")
+                    fail_count += 1
 
                 if i < total:
                     console.print()
 
             console.print()
-            print_success(f"Package installation complete ({total} packages)")
+            if fail_count:
+                print_warning(f"{success_count} installed, {fail_count} failed")
+            else:
+                print_success(f"Package installation complete ({total} packages)")
         except Exception as e:
             print_error(f"Error installing packages: {e}")
+            return False
 
-        return True
+        return fail_count == 0
 
     def status(self, ctx: Context) -> None:
         from shell_configs.display import (

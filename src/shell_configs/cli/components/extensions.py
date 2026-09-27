@@ -91,6 +91,7 @@ class ExtensionsComponent(Component):
         shell_by_name = {s.name: s for s in ide_shells}
 
         any_ext_activity = False
+        all_ok = True
         for shell_name, diff in plan.per_shell.items():
             shell = shell_by_name.get(shell_name)
             if shell is None:
@@ -136,12 +137,13 @@ class ExtensionsComponent(Component):
             )
             for ext_r in ext_results:
                 _print_extension_result(ext_r)
+            all_ok &= all(r.success for r in ext_results)
 
         if not any_ext_activity:
             console.print()
             print_done("All IDE extensions already in sync")
 
-        return True
+        return all_ok
 
     def status(self, ctx: Context) -> None:
         from shell_configs.cli.helpers import _get_extension_shells

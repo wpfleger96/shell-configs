@@ -32,6 +32,7 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
         print_info,
         print_label,
         print_success,
+        print_warning,
     )
     from shell_configs.packages import (
         get_package_manager,
@@ -113,6 +114,8 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
 
     console.print()
     total = len(to_install)
+    success_count = 0
+    fail_count = 0
     for i, pkg in enumerate(to_install, start=1):
         if not dry_run:
             print_dim(f"[{i}/{total}] Installing {pkg.name}...")
@@ -126,14 +129,20 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
                 print_dim(f"Would install {pkg.name}", indent=2)
             else:
                 print_success(pkg.name)
+                success_count += 1
         else:
             print_error(f"{pkg.name}: {message}")
+            fail_count += 1
 
         if not dry_run and i < total:
             console.print()
 
     if dry_run:
         print_hint("Use without --dry-run to install.")
+    elif fail_count > 0:
+        console.print()
+        print_warning(f"{success_count} installed, {fail_count} failed")
+        sys.exit(1)
     else:
         console.print()
         print_success(f"Package installation complete ({total} packages)")
@@ -348,6 +357,7 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
         if fail_count > 0:
             console.print()
             print_warning(f"{success_count} uninstalled, {fail_count} failed")
+            sys.exit(1)
         else:
             console.print()
             print_success(f"Package uninstall complete ({success_count} packages)")
