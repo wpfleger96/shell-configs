@@ -34,6 +34,12 @@ def _count_successes(results: dict[str, OperationResult]) -> int:
     )
 
 
+def _count_failures(results: dict[str, OperationResult]) -> int:
+    from shell_configs.manager import OperationResult
+
+    return sum(1 for r in results.values() if r == OperationResult.ERROR)
+
+
 def _add_file_status_row(
     table: Table,
     shell_display_name: str,
@@ -393,7 +399,7 @@ class ConfigsComponent(Component):
                 print_operation_result(result, message)
                 if diff_text and result == OperationResult.UPDATED:
                     print_diff(diff_text)
-                results[shell.name] = result
+                results[str(config_file.path)] = result
 
         from shell_configs.manager import (
             AdditionalFileManifest,
@@ -473,7 +479,7 @@ class ConfigsComponent(Component):
                 print_operation_result(result, message)
                 if diff_text and result == OperationResult.UPDATED:
                     print_diff(diff_text)
-                preferences_results[pref_file.name] = result
+                preferences_results[f"{shell.name}:{pref_file.name}"] = result
 
         state_db_results: dict[str, OperationResult] = {}
         if plan.state_db_changes:
@@ -482,11 +488,13 @@ class ConfigsComponent(Component):
             from shell_configs.shells.state_db import write_state_db_value
 
             for change in plan.state_db_changes:
+                # Editors share keys across distinct DBs; key by both to avoid overwrites.
+                change_id = f"{change.db_path}:{change.key}"
                 if ctx.dry_run:
                     print_operation_result(
                         OperationResult.UPDATED, f"Would update: {change.key}"
                     )
-                    state_db_results[change.key] = OperationResult.UPDATED
+                    state_db_results[change_id] = OperationResult.UPDATED
                 else:
                     result, message = write_state_db_value(
                         _Path(change.db_path), change.key, change.desired_value
@@ -497,7 +505,7 @@ class ConfigsComponent(Component):
                             "Close the editor and re-run 'shell-configs install' to apply",
                             indent=2,
                         )
-                    state_db_results[change.key] = result
+                    state_db_results[change_id] = result
 
         if ctx.dry_run:
             print_hint("Use without --dry-run to apply changes.")
@@ -510,9 +518,7 @@ class ConfigsComponent(Component):
             state_db_results,
         ]
         total_success = sum(_count_successes(d) for d in all_results)
-        total_failed = sum(
-            1 for d in all_results for r in d.values() if r == OperationResult.ERROR
-        )
+        total_failed = sum(_count_failures(d) for d in all_results)
 
         if total_success > 0 and not ctx.dry_run:
             print_info(f"Successfully installed/updated {total_success} file(s)")
@@ -531,7 +537,7 @@ class ConfigsComponent(Component):
             additional_manifest.save()
 
         if total_failed:
-            print_warning(f"{total_failed} file(s) failed")
+            print_warning(f"{total_failed} item(s) failed")
             return False
         return True
 

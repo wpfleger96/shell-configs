@@ -73,12 +73,7 @@ class RequiredPackagesComponent(Component):
         if not plan.missing:
             return True
 
-        from shell_configs.display import (
-            console,
-            print_error,
-            print_success,
-            print_warning,
-        )
+        from shell_configs.display import console, print_error, print_success
         from shell_configs.packages import get_package_manager
 
         pkg_manager = get_package_manager()
@@ -97,7 +92,7 @@ class RequiredPackagesComponent(Component):
                     all_ok = False
             console.print()
         except Exception as e:
-            print_warning(f"Error installing required packages: {e}")
+            print_error(f"Error installing required packages: {e}")
             return False
 
         return all_ok
@@ -154,10 +149,10 @@ class OptionalPackagesComponent(Component):
 
         from shell_configs.display import (
             console,
+            print_batch_summary,
             print_dim,
             print_error,
             print_success,
-            print_warning,
         )
         from shell_configs.packages import get_package_manager
 
@@ -184,10 +179,9 @@ class OptionalPackagesComponent(Component):
                     console.print()
 
             console.print()
-            if fail_count:
-                print_warning(f"{success_count} installed, {fail_count} failed")
-            else:
-                print_success(f"Package installation complete ({total} packages)")
+            print_batch_summary(
+                "Package installation", "installed", success_count, fail_count
+            )
         except Exception as e:
             print_error(f"Error installing packages: {e}")
             return False

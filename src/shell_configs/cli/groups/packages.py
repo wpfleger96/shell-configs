@@ -25,6 +25,7 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
     from shell_configs.display import (
         console,
         dim,
+        print_batch_summary,
         print_dim,
         print_done,
         print_error,
@@ -32,7 +33,6 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
         print_info,
         print_label,
         print_success,
-        print_warning,
     )
     from shell_configs.packages import (
         get_package_manager,
@@ -129,7 +129,7 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
                 print_dim(f"Would install {pkg.name}", indent=2)
             else:
                 print_success(pkg.name)
-                success_count += 1
+            success_count += 1
         else:
             print_error(f"{pkg.name}: {message}")
             fail_count += 1
@@ -139,13 +139,12 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
 
     if dry_run:
         print_hint("Use without --dry-run to install.")
-    elif fail_count > 0:
-        console.print()
-        print_warning(f"{success_count} installed, {fail_count} failed")
+        return
+
+    console.print()
+    print_batch_summary("Package installation", "installed", success_count, fail_count)
+    if fail_count:
         sys.exit(1)
-    else:
-        console.print()
-        print_success(f"Package installation complete ({total} packages)")
 
 
 @packages.command(name="status")
@@ -232,13 +231,13 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
     """Uninstall managed system packages."""
     from shell_configs.display import (
         console,
+        print_batch_summary,
         print_dim,
         print_error,
         print_hint,
         print_info,
         print_label,
         print_success,
-        print_warning,
     )
     from shell_configs.packages import (
         get_package_manager,
@@ -343,7 +342,7 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
                 print_dim(f"Would uninstall {pkg.name}", indent=2)
             else:
                 print_success(pkg.name)
-                success_count += 1
+            success_count += 1
         else:
             print_error(f"{pkg.name}: {message}")
             fail_count += 1
@@ -353,11 +352,9 @@ def packages_uninstall(dry_run: bool, yes: bool, profile_name: str | None) -> No
 
     if dry_run:
         print_hint("Use without --dry-run to uninstall.")
-    else:
-        if fail_count > 0:
-            console.print()
-            print_warning(f"{success_count} uninstalled, {fail_count} failed")
-            sys.exit(1)
-        else:
-            console.print()
-            print_success(f"Package uninstall complete ({success_count} packages)")
+        return
+
+    console.print()
+    print_batch_summary("Package uninstall", "uninstalled", success_count, fail_count)
+    if fail_count:
+        sys.exit(1)

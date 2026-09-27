@@ -14,8 +14,7 @@ import click
 @click.option(
     "-y", "--yes", is_flag=True, help="Auto-confirm installation without prompting"
 )
-@click.pass_context
-def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
+def upgrade(check: bool, force: bool, yes: bool) -> None:
     """Upgrade shell-configs to the latest version from GitHub.
 
     Examples:
@@ -46,6 +45,14 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         print_warning("No tools are installed")
         sys.exit(1)
 
+    failed = False
+
+    def _exit_if_failed() -> None:
+        if failed:
+            console.print()
+            print_warning("Upgrade completed with errors")
+            sys.exit(1)
+
     tool_updates = []
     for tool in tools:
         try:
@@ -54,6 +61,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
                 print_dim(f"{tool.display_name} current version: {current}")
         except Exception as e:
             print_error(f"Could not get {tool.display_name} version: {e}")
+            failed = True
             continue
 
         with console.status(f"Checking {tool.display_name} for updates..."):
@@ -61,6 +69,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
                 update_info = check_tool_updates(tool)
             except Exception as e:
                 print_error(f"Failed to check {tool.display_name} updates: {e}")
+                failed = True
                 continue
 
         if update_info and (update_info.has_update or force):
@@ -71,6 +80,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
     console.print()
 
     if not tool_updates and not force:
+        _exit_if_failed()
         print_done("All tools are up to date")
         return
 
@@ -94,6 +104,7 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
     if check:
         if tool_updates:
             print_hint("Run 'shell-configs upgrade' to install")
+        _exit_if_failed()
         return
 
     if not force and not yes:
@@ -115,7 +126,6 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
     )
 
     upgraded_tools = []
-    failed = False
     for tool, _ in tool_updates:
         with console.status(f"Upgrading {tool.display_name}..."):
             try:
@@ -148,12 +158,18 @@ def upgrade(ctx: click.Context, check: bool, force: bool, yes: bool) -> None:
         shell_configs_bin = _shutil.which("shell-configs")
         if shell_configs_bin:
             result = subprocess.run([shell_configs_bin, "install", "--yes", "--force"])
-            if result.returncode != 0:
-                failed = True
+            configs_ok = result.returncode == 0
         else:
-            from shell_configs.cli.commands.install import install
+            from shell_configs.cli.commands.install import run_install
+            from shell_configs.cli.components import INSTALL_COMPONENTS
+            from shell_configs.cli.helpers import build_context
 
-            ctx.invoke(install, yes=True, force=True)
+            install_ctx = build_context(None, yes=True, force=True)
+            configs_ok = install_ctx is None or run_install(
+                install_ctx, INSTALL_COMPONENTS
+            )
+        if not configs_ok:
+            print_warning("Upgrade succeeded, but applying configs reported errors")
+            failed = True
 
-    if failed:
-        sys.exit(1)
+    _exit_if_failed()

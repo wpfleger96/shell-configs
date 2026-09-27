@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 from pathlib import Path
 
 import click
@@ -141,6 +143,7 @@ def cleanup(dry_run: bool, keep: int | None, yes: bool) -> None:
             f"{to_remove_count - removed_count} of {to_remove_count} "
             "backup files could not be removed"
         )
+        sys.exit(1)
     else:
         print_success(
             f"Removed {removed_count} backup files "

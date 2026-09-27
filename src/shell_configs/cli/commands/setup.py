@@ -16,9 +16,7 @@ from shell_configs.cli.options import dry_run_option, shells_option, yes_option
 @click.option("--skip-completions", is_flag=True, help="Skip shell completion setup")
 @click.option("--skip-packages", is_flag=True, help="Skip package installation")
 @click.option("--skip-scripts", is_flag=True, help="Skip utility script installation")
-@click.pass_context
 def setup(
-    ctx: click.Context,
     yes: bool,
     dry_run: bool,
     shells: list[str] | None,
@@ -44,6 +42,9 @@ def setup(
         get_tool_by_id,
         perform_github_update,
     )
+    from shell_configs.cli.commands.install import run_install
+    from shell_configs.cli.components import INSTALL_COMPONENTS
+    from shell_configs.cli.helpers import build_context
     from shell_configs.completions import (
         detect_shell,
         get_supported_shells,
@@ -54,6 +55,7 @@ def setup(
         print_dim,
         print_done,
         print_error,
+        print_hint,
         print_info,
         print_section,
         print_success,
@@ -65,15 +67,28 @@ def setup(
 
     if not skip_packages:
         print_section("Step 1/5: Install required packages")
-        print_dim("Installing system packages needed by shell configurations.")
+        print_dim("Installing system packages and languages needed by later steps.")
         console.print()
-        from shell_configs.cli.groups.packages import packages_install
+        from shell_configs.cli.components.languages import LanguagesComponent
+        from shell_configs.cli.components.packages import RequiredPackagesComponent
+        from shell_configs.packages import get_package_manager
 
-        try:
-            ctx.invoke(packages_install, dry_run=dry_run, yes=yes)
-        except SystemExit as e:
-            if e.code:
-                failed = True
+        if get_package_manager() is None:
+            print_error("No package manager available for this platform")
+            print_hint(
+                "Install Homebrew: https://brew.sh (macOS) or use apt (Linux/WSL)"
+            )
+            sys.exit(1)
+
+        # Optional packages (some need languages, e.g. enpass-cli needs Go) are
+        # installed by Step 3 after LanguagesComponent has run.
+        step1_ctx = build_context(None, shells, dry_run=dry_run, yes=yes)
+        if step1_ctx is None:
+            print_warning("No shells to install")
+        elif not run_install(
+            step1_ctx, [RequiredPackagesComponent(), LanguagesComponent()]
+        ):
+            failed = True
 
     print_section("Step 2/5: Install shell-configs system-wide")
     print_dim("This allows you to run 'shell-configs' from any directory.")
@@ -152,19 +167,13 @@ def setup(
 
     print_section("Step 3/5: Installing shell configurations")
 
-    from shell_configs.cli.commands.install import install
-
-    try:
-        ctx.invoke(
-            install,
-            shells=shells,
-            dry_run=dry_run,
-            yes=yes,
-            config_dir=config_dir,
-        )
-    except SystemExit as e:
-        if e.code:
-            failed = True
+    install_ctx = build_context(
+        None, shells, config_dir=config_dir, dry_run=dry_run, yes=yes
+    )
+    if install_ctx is None:
+        print_warning("No shells to install")
+    elif not run_install(install_ctx, INSTALL_COMPONENTS):
+        failed = True
 
     if not skip_completions:
         print_section("Step 4/5: Shell completion setup")
