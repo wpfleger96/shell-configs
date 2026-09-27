@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.70.1](https://github.com/wpfleger96/shell-configs/compare/v0.70.0...v0.70.1) (2026-09-27)
+
+
+### Bug Fixes
+
+* build enpass-cli from pinned commit and stop reporting false success ([#186](https://github.com/wpfleger96/shell-configs/issues/186)) ([4f04512](https://github.com/wpfleger96/shell-configs/commit/4f04512cfe1abd1b236872cbc8057df621873a38))
+
 ## [0.70.0](https://github.com/wpfleger96/shell-configs/compare/v0.69.0...v0.70.0) (2026-09-23)
 
 
