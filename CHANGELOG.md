@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [0.70.2](https://github.com/wpfleger96/shell-configs/compare/v0.70.1...v0.70.2) (2026-10-10)
+
+
+### Bug Fixes
+
+* **transcribe:** cap av below 19 for faster-whisper compatibility ([#195](https://github.com/wpfleger96/shell-configs/issues/195)) ([c710827](https://github.com/wpfleger96/shell-configs/commit/c710827c45b047c2c1bc54fe7df39faba3521798))
+* **transcribe:** resolve torch from PyPI on macOS ([#194](https://github.com/wpfleger96/shell-configs/issues/194)) ([a80f9b1](https://github.com/wpfleger96/shell-configs/commit/a80f9b1babd1de529413bcf1b52cfad405364a3f))
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#189](https://github.com/wpfleger96/shell-configs/issues/189)) ([d103f14](https://github.com/wpfleger96/shell-configs/commit/d103f14e3b336076c762a5b58c00c266d7fbbb8b))
+* **deps:** Lock file maintenance ([#191](https://github.com/wpfleger96/shell-configs/issues/191)) ([a5cf16b](https://github.com/wpfleger96/shell-configs/commit/a5cf16b4f1d2b332af88fad5573c221132acd65b))
+* **deps:** Lock file maintenance ([#192](https://github.com/wpfleger96/shell-configs/issues/192)) ([7c5a6f2](https://github.com/wpfleger96/shell-configs/commit/7c5a6f2dddc6c6c8fd7e7e5d08a68a6ac2b910d5))
+* **deps:** Lock file maintenance ([#193](https://github.com/wpfleger96/shell-configs/issues/193)) ([97e25d1](https://github.com/wpfleger96/shell-configs/commit/97e25d13159a0d8abf9e68fdb498e3408d731523))
+* **deps:** Update astral-sh/setup-uv action to v10.2.0 ([#188](https://github.com/wpfleger96/shell-configs/issues/188)) ([66cda08](https://github.com/wpfleger96/shell-configs/commit/66cda08cf09428683e30c974c8bd0531e7b2427d))
+
+
+### Continuous Integration
+
+* sync CI workflow ([0d75032](https://github.com/wpfleger96/shell-configs/commit/0d7503268398681fd32981c6f145cd83184b138e))
+* sync release workflow ([babafd0](https://github.com/wpfleger96/shell-configs/commit/babafd0149aa53006fc2629bf5ea06942128ca93))
+
 ## [0.70.1](https://github.com/wpfleger96/shell-configs/compare/v0.70.0...v0.70.1) (2026-09-27)
 
 
