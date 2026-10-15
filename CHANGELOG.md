@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.70.3](https://github.com/wpfleger96/shell-configs/compare/v0.70.2...v0.70.3) (2026-10-15)
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#196](https://github.com/wpfleger96/shell-configs/issues/196)) ([740185c](https://github.com/wpfleger96/shell-configs/commit/740185c4a49b13818b874c528413dc6f6cd989c6))
+* **deps:** Lock file maintenance ([#198](https://github.com/wpfleger96/shell-configs/issues/198)) ([ce7ac76](https://github.com/wpfleger96/shell-configs/commit/ce7ac76a43560176db1e9399cc4604495f7e62ec))
+* **deps:** Lock file maintenance ([#199](https://github.com/wpfleger96/shell-configs/issues/199)) ([5fdceb4](https://github.com/wpfleger96/shell-configs/commit/5fdceb42b057209d348a506a13d131ea93d3e2bf))
+
 ## [0.70.2](https://github.com/wpfleger96/shell-configs/compare/v0.70.1...v0.70.2) (2026-10-10)
 
 
