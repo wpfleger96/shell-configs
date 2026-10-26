@@ -1182,6 +1182,8 @@ class TestHomebrewCaskAppDetection:
         self._setup(monkeypatch, tmp_path, self._info(self._CASKS))
         (tmp_path / "Applications" / "ZzChat.app").mkdir(parents=True)
         loading, release = threading.Event(), threading.Event()
+        # Set once the second caller is at the lock, or has returned without it.
+        second_waiting = threading.Event()
         info_calls: list[list[str]] = []
         fake_run = subprocess.run
 
@@ -1192,21 +1194,46 @@ class TestHomebrewCaskAppDetection:
                 release.wait(5)
             return fake_run(cmd, **kwargs)
 
+        class SignallingLock:
+            def __init__(self) -> None:
+                self._lock = threading.Lock()
+                self._entries = 0
+
+            def __enter__(self) -> None:
+                self._entries += 1
+                if self._entries == 2:
+                    second_waiting.set()
+                self._lock.acquire()
+
+            def __exit__(self, *exc: object) -> None:
+                self._lock.release()
+
         monkeypatch.setattr("shell_configs.packages.packages.subprocess.run", held_run)
+        monkeypatch.setattr(
+            "shell_configs.packages.packages._cask_apps_lock",
+            SignallingLock(),
+            raising=False,
+        )
         results: dict[str, bool] = {}
 
         def check(key: str) -> None:
-            results[key] = HomebrewManager().is_installed(self._cask("zz-chat"))
+            try:
+                results[key] = HomebrewManager().is_installed(self._cask("zz-chat"))
+            finally:
+                if key == "second":
+                    second_waiting.set()
 
         first = threading.Thread(target=check, args=("first",))
-        first.start()
-        assert loading.wait(5)
         second = threading.Thread(target=check, args=("second",))
-        second.start()
-        second.join(0.2)
-        release.set()
-        first.join(5)
-        second.join(5)
+        try:
+            first.start()
+            assert loading.wait(5)
+            second.start()
+            assert second_waiting.wait(5)
+        finally:
+            release.set()
+            first.join(5)
+            second.join(5)
 
         assert results == {"first": True, "second": True}
         assert len(info_calls) == 1
