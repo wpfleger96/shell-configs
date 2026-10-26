@@ -1172,6 +1172,45 @@ class TestHomebrewCaskAppDetection:
         assert len(calls) == 1
         assert calls[0][-2:] == ["zz-chat", "zz-vault"]
 
+    def test_concurrent_callers_wait_for_loaded_metadata(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        import threading
+
+        from shell_configs.packages.packages import HomebrewManager
+
+        self._setup(monkeypatch, tmp_path, self._info(self._CASKS))
+        (tmp_path / "Applications" / "ZzChat.app").mkdir(parents=True)
+        loading, release = threading.Event(), threading.Event()
+        info_calls: list[list[str]] = []
+        fake_run = subprocess.run
+
+        def held_run(cmd, **kwargs):
+            if cmd[:2] == ["brew", "info"]:
+                info_calls.append(cmd)
+                loading.set()
+                release.wait(5)
+            return fake_run(cmd, **kwargs)
+
+        monkeypatch.setattr("shell_configs.packages.packages.subprocess.run", held_run)
+        results: dict[str, bool] = {}
+
+        def check(key: str) -> None:
+            results[key] = HomebrewManager().is_installed(self._cask("zz-chat"))
+
+        first = threading.Thread(target=check, args=("first",))
+        first.start()
+        assert loading.wait(5)
+        second = threading.Thread(target=check, args=("second",))
+        second.start()
+        second.join(0.2)
+        release.set()
+        first.join(5)
+        second.join(5)
+
+        assert results == {"first": True, "second": True}
+        assert len(info_calls) == 1
+
     def test_brew_info_called_once_across_managers(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:

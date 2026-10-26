@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -349,6 +350,7 @@ class PackageManager(ABC):
 # App names from `brew info` don't change during a run, so they are fetched once
 # per process; `upgrade` runs `install` in a child process, which starts fresh.
 _cask_apps_cache: dict[str, list[str]] | None = None
+_cask_apps_lock = threading.Lock()
 
 
 def _app_name(artifact: dict[str, Any]) -> str | None:
@@ -363,8 +365,10 @@ def _app_name(artifact: dict[str, Any]) -> str | None:
 def _get_cask_apps(name: str) -> dict[str, list[str]]:
     """Map cask tokens (canonical and old) to their .app names, from one brew info call."""
     global _cask_apps_cache
-    if _cask_apps_cache is None:
-        _cask_apps_cache = {}
+    with _cask_apps_lock:
+        if _cask_apps_cache is not None:
+            return _cask_apps_cache
+        apps_by_token: dict[str, list[str]] = {}
         try:
             tokens = {name} | {
                 p.macos.package or p.name
@@ -385,9 +389,10 @@ def _get_cask_apps(name: str) -> dict[str, list[str]]:
                         if isinstance(artifact, dict) and (app := _app_name(artifact))
                     ]
                     for token in [cask["token"], *cask.get("old_tokens", [])]:
-                        _cask_apps_cache[token] = apps
+                        apps_by_token[token] = apps
         except Exception:
-            _cask_apps_cache = {}
+            apps_by_token = {}
+        _cask_apps_cache = apps_by_token
     return _cask_apps_cache
 
 
