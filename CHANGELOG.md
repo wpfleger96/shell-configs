@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [0.70.3](https://github.com/wpfleger96/shell-configs/compare/v0.70.2...v0.70.3) (2026-10-26)
+
+
+### Bug Fixes
+
+* **upgrade:** report failed update checks instead of up to date ([#203](https://github.com/wpfleger96/shell-configs/issues/203)) ([26ab875](https://github.com/wpfleger96/shell-configs/commit/26ab875929cfc67ba34612a3b166fd833a528d60))
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#196](https://github.com/wpfleger96/shell-configs/issues/196)) ([740185c](https://github.com/wpfleger96/shell-configs/commit/740185c4a49b13818b874c528413dc6f6cd989c6))
+* **deps:** Lock file maintenance ([#198](https://github.com/wpfleger96/shell-configs/issues/198)) ([ce7ac76](https://github.com/wpfleger96/shell-configs/commit/ce7ac76a43560176db1e9399cc4604495f7e62ec))
+* **deps:** Lock file maintenance ([#199](https://github.com/wpfleger96/shell-configs/issues/199)) ([5fdceb4](https://github.com/wpfleger96/shell-configs/commit/5fdceb42b057209d348a506a13d131ea93d3e2bf))
+* **deps:** Lock file maintenance ([#201](https://github.com/wpfleger96/shell-configs/issues/201)) ([d9a9cd5](https://github.com/wpfleger96/shell-configs/commit/d9a9cd53fdce00942404b28e6b6d29ec3778c0d6))
+* **deps:** Lock file maintenance ([#202](https://github.com/wpfleger96/shell-configs/issues/202)) ([4ca9676](https://github.com/wpfleger96/shell-configs/commit/4ca9676c6d6e6f0869ce4dceb83d5c75cd16e634))
+* sync Justfile ([abcea79](https://github.com/wpfleger96/shell-configs/commit/abcea79e8005a5e058bded57a6f612d07c89e26f))
+
+
+### Continuous Integration
+
+* sync CI workflow ([f9ce675](https://github.com/wpfleger96/shell-configs/commit/f9ce675a740957463c725ad35786fc40b0177f49))
+* sync release workflow ([ed2a156](https://github.com/wpfleger96/shell-configs/commit/ed2a156b5ea489cb23976378bd4bc6fcbb205039))
+
 ## [0.70.2](https://github.com/wpfleger96/shell-configs/compare/v0.70.1...v0.70.2) (2026-10-10)
 
 
