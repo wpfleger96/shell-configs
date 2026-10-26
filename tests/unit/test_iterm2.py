@@ -252,11 +252,56 @@ class TestConfigManagerPreferences:
         assert message == "Updated 1 of 2 preference(s) in com.test.domain"
         assert diff == "\n".join(
             [
-                "  + GlobalKeyMap.0x4e-0x120000-0x2d: <dict with 1 key(s)>",
+                "  + GlobalKeyMap.0x4e-0x120000-0x2d.Action: 25",
                 '  ~ GlobalKeyMap.0x54-0x120000-0x11.Text: "" → "x"',
-                "  - GlobalKeyMap.0x99-0x0-0x0: <dict with 1 key(s)>",
+                "  - GlobalKeyMap.0x99-0x0-0x0.Action: 1",
             ]
         )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        ("current", "expected", "sign"),
+        [
+            ({}, {"0x54": {"Action": 12, "Text": "x"}}, "+"),
+            ({"0x54": {"Action": 12, "Text": "x"}}, {}, "-"),
+        ],
+    )
+    def test_install_added_or_removed_binding_shows_its_leaves(
+        self, manager, tmp_path, mock_subprocess, current, expected, sign
+    ):
+        prefs = tmp_path / "preferences.json"
+        prefs.write_text(json.dumps({"GlobalKeyMap": expected}))
+        mock_subprocess(domain_data={"GlobalKeyMap": current})
+
+        _, _, diff = manager.install_preferences_file(prefs, "com.test.domain")
+        assert diff == "\n".join(
+            [
+                f"  {sign} GlobalKeyMap.0x54.Action: 12",
+                f'  {sign} GlobalKeyMap.0x54.Text: "x"',
+            ]
+        )
+
+    @pytest.mark.unit
+    def test_install_added_empty_dict_keeps_marker(
+        self, manager, tmp_path, mock_subprocess
+    ):
+        prefs = tmp_path / "preferences.json"
+        prefs.write_text(json.dumps({"Map": {"a": 1, "b": {}}}))
+        mock_subprocess(domain_data={"Map": {"a": 1}})
+
+        _, _, diff = manager.install_preferences_file(prefs, "com.test.domain")
+        assert diff == "  + Map.b: <dict with 0 key(s)>"
+
+    @pytest.mark.unit
+    def test_install_key_containing_dot_is_quoted(
+        self, manager, tmp_path, mock_subprocess
+    ):
+        prefs = tmp_path / "preferences.json"
+        prefs.write_text(json.dumps({"Map": {"a.b": 2, "a": {"b": 2}}}))
+        mock_subprocess(domain_data={"Map": {"a.b": 1, "a": {"b": 1}}})
+
+        _, _, diff = manager.install_preferences_file(prefs, "com.test.domain")
+        assert diff == '  ~ Map.a.b: 1 → 2\n  ~ Map."a.b": 1 → 2'
 
     @pytest.mark.unit
     def test_install_type_change_from_dict_is_a_single_line(

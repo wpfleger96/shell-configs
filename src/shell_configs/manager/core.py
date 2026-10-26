@@ -37,6 +37,21 @@ def _format_pref_value(value: object) -> str:
     return str(value)
 
 
+def _pref_path(parent: str | None, key: object) -> str:
+    """Join a key onto a dotted path, quoting keys that contain a dot."""
+    segment = f'"{key}"' if "." in str(key) else str(key)
+    return segment if parent is None else f"{parent}.{segment}"
+
+
+def _emit_pref_leaves(sign: str, path: str, value: object, lines: list[str]) -> None:
+    """Append one line per leaf of an added or removed value."""
+    if isinstance(value, dict) and value:
+        for key in sorted(value):
+            _emit_pref_leaves(sign, _pref_path(path, key), value[key], lines)
+        return
+    lines.append(f"  {sign} {path}: {_format_pref_value(value)}")
+
+
 def _diff_pref_value(
     path: str, current: object, expected: object, lines: list[str]
 ) -> None:
@@ -45,11 +60,11 @@ def _diff_pref_value(
         return
     if isinstance(current, dict) and isinstance(expected, dict):
         for key in sorted(current.keys() | expected.keys()):
-            child = f"{path}.{key}"
+            child = _pref_path(path, key)
             if key not in current:
-                lines.append(f"  + {child}: {_format_pref_value(expected[key])}")
+                _emit_pref_leaves("+", child, expected[key], lines)
             elif key not in expected:
-                lines.append(f"  - {child}: {_format_pref_value(current[key])}")
+                _emit_pref_leaves("-", child, current[key], lines)
             else:
                 _diff_pref_value(child, current[key], expected[key], lines)
         return
@@ -2040,10 +2055,11 @@ class ConfigManager:
         lines = []
         for key, expected in sorted(managed_prefs.items()):
             current = domain_data.get(key, _MISSING)
+            path = _pref_path(None, key)
             if current is _MISSING:
-                lines.append(f"  + {key}: {_format_pref_value(expected)}")
+                _emit_pref_leaves("+", path, expected, lines)
             else:
-                _diff_pref_value(key, current, expected, lines)
+                _diff_pref_value(path, current, expected, lines)
 
         if not lines:
             return None
