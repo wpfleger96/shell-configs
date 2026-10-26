@@ -204,6 +204,90 @@ class TestConfigManagerPreferences:
         assert "TabStyleWithAutomaticOption" in diff
 
     @pytest.mark.unit
+    def test_install_update_counts_only_changed_keys(
+        self, manager, prefs_file, mock_subprocess
+    ):
+        mock_subprocess(
+            domain_data={
+                "AllowClipboardAccess": True,
+                "PromptOnQuit": True,
+                "TabStyleWithAutomaticOption": 4,
+            }
+        )
+
+        result, message, diff = manager.install_preferences_file(
+            prefs_file, "com.test.domain"
+        )
+        assert message == "Updated 1 of 3 preference(s) in com.test.domain"
+        assert diff == "  ~ PromptOnQuit: True → False"
+
+    @pytest.mark.unit
+    def test_install_nested_dict_diff_shows_changed_leaves(
+        self, manager, tmp_path, mock_subprocess
+    ):
+        expected = {
+            "GlobalKeyMap": {
+                "0x54-0x120000-0x11": {"Action": 61, "Text": "x"},
+                "0xd-0x20000-0x24": {"Action": 12, "Text": "\\n"},
+                "0x4e-0x120000-0x2d": {"Action": 25},
+            },
+            "PromptOnQuit": False,
+        }
+        prefs = tmp_path / "preferences.json"
+        prefs.write_text(json.dumps(expected))
+        mock_subprocess(
+            domain_data={
+                "GlobalKeyMap": {
+                    "0x54-0x120000-0x11": {"Action": 61, "Text": ""},
+                    "0xd-0x20000-0x24": {"Action": 12, "Text": "\\n"},
+                    "0x99-0x0-0x0": {"Action": 1},
+                },
+                "PromptOnQuit": False,
+            }
+        )
+
+        result, message, diff = manager.install_preferences_file(
+            prefs, "com.test.domain"
+        )
+        assert message == "Updated 1 of 2 preference(s) in com.test.domain"
+        assert diff == "\n".join(
+            [
+                "  + GlobalKeyMap.0x4e-0x120000-0x2d: <dict with 1 key(s)>",
+                '  ~ GlobalKeyMap.0x54-0x120000-0x11.Text: "" → "x"',
+                "  - GlobalKeyMap.0x99-0x0-0x0: <dict with 1 key(s)>",
+            ]
+        )
+
+    @pytest.mark.unit
+    def test_install_type_change_from_dict_is_a_single_line(
+        self, manager, tmp_path, mock_subprocess
+    ):
+        prefs = tmp_path / "preferences.json"
+        prefs.write_text(json.dumps({"Map": {"a": 1}}))
+        mock_subprocess(domain_data={"Map": "flat"})
+
+        _, _, diff = manager.install_preferences_file(prefs, "com.test.domain")
+        assert diff == '  ~ Map: "flat" → <dict with 1 key(s)>'
+
+    @pytest.mark.unit
+    def test_install_force_with_nothing_changed_keeps_total_count(
+        self, manager, prefs_file, mock_subprocess
+    ):
+        mock_subprocess(
+            domain_data={
+                "AllowClipboardAccess": True,
+                "PromptOnQuit": False,
+                "TabStyleWithAutomaticOption": 4,
+            }
+        )
+
+        _, message, diff = manager.install_preferences_file(
+            prefs_file, "com.test.domain", force=True
+        )
+        assert message == "Updated 3 preference(s) in com.test.domain"
+        assert diff is None
+
+    @pytest.mark.unit
     def test_install_dry_run(self, manager, prefs_file, mock_subprocess):
         mock_subprocess(domain_data={"AllowClipboardAccess": False})
 

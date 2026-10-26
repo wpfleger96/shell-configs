@@ -37,6 +37,27 @@ def _format_pref_value(value: object) -> str:
     return str(value)
 
 
+def _diff_pref_value(
+    path: str, current: object, expected: object, lines: list[str]
+) -> None:
+    """Append diff lines for one preference, recursing into nested dicts."""
+    if current == expected:
+        return
+    if isinstance(current, dict) and isinstance(expected, dict):
+        for key in sorted(current.keys() | expected.keys()):
+            child = f"{path}.{key}"
+            if key not in current:
+                lines.append(f"  + {child}: {_format_pref_value(expected[key])}")
+            elif key not in expected:
+                lines.append(f"  - {child}: {_format_pref_value(current[key])}")
+            else:
+                _diff_pref_value(child, current[key], expected[key], lines)
+        return
+    lines.append(
+        f"  ~ {path}: {_format_pref_value(current)} → {_format_pref_value(expected)}"
+    )
+
+
 class ConfigManager:
     """Manages configuration sections in shell config files."""
 
@@ -1838,8 +1859,19 @@ class ConfigManager:
                 if temp_path:
                     Path(temp_path).unlink(missing_ok=True)
 
-            action = "Updated" if exists else "Created"
-            message = f"{action} {len(managed_prefs)} preference(s) in {domain}"
+            changed = sum(
+                1
+                for key, value in managed_prefs.items()
+                if (domain_data or {}).get(key, _MISSING) != value
+            )
+            if exists and changed:
+                message = (
+                    f"Updated {changed} of {len(managed_prefs)} "
+                    f"preference(s) in {domain}"
+                )
+            else:
+                action = "Updated" if exists else "Created"
+                message = f"{action} {len(managed_prefs)} preference(s) in {domain}"
 
             if app_name:
                 warning = self._check_app_running(app_name)
@@ -2010,12 +2042,8 @@ class ConfigManager:
             current = domain_data.get(key, _MISSING)
             if current is _MISSING:
                 lines.append(f"  + {key}: {_format_pref_value(expected)}")
-            elif current != expected:
-                lines.append(
-                    f"  ~ {key}: "
-                    f"{_format_pref_value(current)} → "
-                    f"{_format_pref_value(expected)}"
-                )
+            else:
+                _diff_pref_value(key, current, expected, lines)
 
         if not lines:
             return None
