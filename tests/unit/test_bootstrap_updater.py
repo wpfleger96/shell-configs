@@ -73,6 +73,8 @@ class TestCheckGitHubUpdates:
 
         update_info = check_github_updates("owner/repo", "1.0.0")
         assert update_info.has_update is False
+        assert update_info.check_failed is True
+        assert update_info.error == "Network error"
 
     def test_check_github_no_tags(self, monkeypatch):
         """Test when repository has no tags."""
@@ -92,6 +94,8 @@ class TestCheckGitHubUpdates:
 
         update_info = check_github_updates("owner/repo", "1.0.0")
         assert update_info.has_update is False
+        assert update_info.check_failed is True
+        assert update_info.error == "no tags found in repository"
 
     def test_check_github_gh_not_installed(self, monkeypatch):
         """Test when gh CLI is not available."""
@@ -103,6 +107,8 @@ class TestCheckGitHubUpdates:
         assert update_info.has_update is False
         assert update_info.current_version == "1.0.0"
         assert update_info.latest_version == "1.0.0"
+        assert update_info.check_failed is True
+        assert update_info.error == "GitHub CLI (gh) not found"
 
     def test_check_github_gh_api_failure(self, monkeypatch):
         """Test handling of gh api failures (auth, rate limit, etc)."""
@@ -114,7 +120,7 @@ class TestCheckGitHubUpdates:
             class Result:
                 returncode = 1
                 stdout = ""
-                stderr = "gh api failed for some reason"
+                stderr = "warning: noise\ngh: Bad credentials (HTTP 401)\n\n"
 
             return Result()
 
@@ -122,6 +128,8 @@ class TestCheckGitHubUpdates:
 
         update_info = check_github_updates("owner/repo", "1.0.0")
         assert update_info.has_update is False
+        assert update_info.check_failed is True
+        assert update_info.error == "gh: Bad credentials (HTTP 401)"
 
     def test_check_github_timeout(self, monkeypatch):
         """Test handling of timeout."""
@@ -136,6 +144,30 @@ class TestCheckGitHubUpdates:
 
         update_info = check_github_updates("owner/repo", "1.0.0")
         assert update_info.has_update is False
+        assert update_info.check_failed is True
+        assert update_info.error == "timed out after 10s"
+
+    def test_check_github_pins_public_host(self, monkeypatch):
+        """GH_HOST pointing elsewhere must not redirect the tags or releases calls."""
+        monkeypatch.setenv("GH_HOST", "enterprise.example")
+        monkeypatch.setattr(
+            "shell_configs.bootstrap.updater.is_command_available", lambda cmd: True
+        )
+        calls: list[list[str]] = []
+
+        def mock_run(cmd, **kwargs):
+            calls.append(cmd)
+            return subprocess.CompletedProcess(
+                cmd, 0, "v1.1.0\n" if "--jq" in cmd and ".[0].name" in cmd else "[]", ""
+            )
+
+        monkeypatch.setattr("shell_configs.bootstrap.updater.subprocess.run", mock_run)
+
+        update_info = check_github_updates("owner/repo", "1.0.0")
+        assert update_info.has_update is True
+        assert len(calls) == 2
+        for cmd in calls:
+            assert cmd[1:4] == ["api", "--hostname", "github.com"]
 
 
 @pytest.mark.unit

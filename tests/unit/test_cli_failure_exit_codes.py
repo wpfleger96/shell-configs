@@ -536,6 +536,89 @@ class TestUpgradeExitCode:
         assert "network down" in result.output
         assert "All tools are up to date" not in result.output
 
+    @staticmethod
+    def _failed_check(monkeypatch: pytest.MonkeyPatch) -> None:
+        from shell_configs.bootstrap.updater import UpdateInfo
+
+        monkeypatch.setattr(
+            "shell_configs.bootstrap.check_tool_updates",
+            lambda t: UpdateInfo(
+                has_update=False,
+                current_version="1.0.0",
+                latest_version="1.0.0",
+                source="github",
+                check_failed=True,
+                error="gh: Bad credentials (HTTP 401)",
+            ),
+        )
+
+    @pytest.mark.parametrize(
+        "args", [["upgrade"], ["upgrade", "--check"], ["upgrade", "--force", "--check"]]
+    )
+    def test_failed_check_exits_nonzero_with_reason(
+        self,
+        args: list[str],
+        cli_runner: CliRunner,
+        mock_home: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _patch_upgrade(monkeypatch, (True, "ok", True), "/bin/sc")
+        self._failed_check(monkeypatch)
+
+        result = cli_runner.invoke(cli, args)
+
+        assert result.exit_code == 1, result.output
+        assert "gh: Bad credentials (HTTP 401)" in result.output
+        assert "up to date" not in result.output
+
+    def test_failed_check_with_force_still_reinstalls_then_exits_nonzero(
+        self, cli_runner: CliRunner, mock_home: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _patch_upgrade(monkeypatch, (True, "ok", True), "/bin/sc")
+        self._failed_check(monkeypatch)
+
+        result = cli_runner.invoke(cli, ["upgrade", "--force", "-y"])
+
+        assert result.exit_code == 1, result.output
+        assert "gh: Bad credentials (HTTP 401)" in result.output
+        assert "upgraded successfully" in result.output
+
+    def test_decline_after_another_tools_failed_check_exits_nonzero(
+        self, cli_runner: CliRunner, mock_home: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from shell_configs.bootstrap.updater import ToolSpec, UpdateInfo
+
+        _patch_upgrade(monkeypatch, (True, "ok", True), "/bin/sc")
+        good, bad = (
+            ToolSpec(
+                tool_id=name,
+                package_name=name,
+                display_name=name,
+                get_version=lambda: "1.0.0",
+                is_installed=lambda: True,
+                github_repo=f"owner/{name}",
+            )
+            for name in ("good", "bad")
+        )
+        monkeypatch.setattr("shell_configs.bootstrap.UPDATABLE_TOOLS", [good, bad])
+        monkeypatch.setattr(
+            "shell_configs.bootstrap.check_tool_updates",
+            lambda t: UpdateInfo(
+                has_update=t is good,
+                current_version="1.0.0",
+                latest_version="2.0.0" if t is good else "1.0.0",
+                source="github",
+                check_failed=t is bad,
+                error=None if t is good else "timed out after 10s",
+            ),
+        )
+
+        result = cli_runner.invoke(cli, ["upgrade"], input="n\n")
+
+        assert result.exit_code == 1, result.output
+        assert "Cancelled" in result.output
+        assert "timed out after 10s" in result.output
+
 
 @pytest.mark.unit
 @pytest.mark.cli

@@ -125,6 +125,11 @@ def setup(
                             tool_install_success = True
                         else:
                             print_error(f"Failed to upgrade shell-configs: {msg}")
+            elif update_info and update_info.check_failed:
+                print_warning(
+                    f"Could not check shell-configs for updates: {update_info.error}"
+                )
+                tool_install_success = True
             else:
                 print_done("shell-configs is already up to date")
                 tool_install_success = True

@@ -72,9 +72,15 @@ def upgrade(check: bool, force: bool, yes: bool) -> None:
                 failed = True
                 continue
 
+        if update_info and update_info.check_failed:
+            print_warning(
+                f"Could not check {tool.display_name} for updates: {update_info.error}"
+            )
+            failed = True
+
         if update_info and (update_info.has_update or force):
             tool_updates.append((tool, update_info))
-        elif update_info and not update_info.has_update:
+        elif update_info and not update_info.check_failed:
             print_done(f"{tool.display_name} is already up to date")
 
     console.print()
@@ -114,6 +120,7 @@ def upgrade(check: bool, force: bool, yes: bool) -> None:
             prompt = f"\nInstall {len(tool_updates)} updates?"
         if not click.confirm(prompt, default=True):
             print_info("Cancelled")
+            _exit_if_failed()
             return
 
     import shutil as _shutil
