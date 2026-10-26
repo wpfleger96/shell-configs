@@ -5,6 +5,7 @@ import re
 import subprocess
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -1056,6 +1057,10 @@ class TestHomebrewInstallScript:
 class TestHomebrewCaskAppDetection:
     """A cask installed outside brew counts as installed when its .app exists."""
 
+    @pytest.fixture(autouse=True)
+    def _reset_cask_apps_cache(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("shell_configs.packages.packages._cask_apps_cache", None)
+
     def _cask(self, name: str) -> Package:
         return Package(name=name, macos=InstallConfig(method="brew", cask=True))
 
@@ -1089,12 +1094,12 @@ class TestHomebrewCaskAppDetection:
         return info_calls
 
     @staticmethod
-    def _info(casks: list[dict]) -> subprocess.CompletedProcess[str]:
+    def _info(casks: list[dict[str, Any]]) -> subprocess.CompletedProcess[str]:
         import json
 
         return subprocess.CompletedProcess([], 0, json.dumps({"casks": casks}), "")
 
-    _CASKS = [
+    _CASKS: list[dict[str, Any]] = [
         {"token": "zz-chat", "artifacts": [{"uninstall": []}, {"app": ["ZzChat.app"]}]},
         {"token": "zz-vault", "artifacts": [{"pkg": ["ZzVault.pkg"]}]},
     ]
@@ -1166,3 +1171,62 @@ class TestHomebrewCaskAppDetection:
             manager.is_installed(self._cask(name))
         assert len(calls) == 1
         assert calls[0][-2:] == ["zz-chat", "zz-vault"]
+
+    def test_brew_info_called_once_across_managers(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        from shell_configs.packages.packages import HomebrewManager
+
+        calls = self._setup(
+            monkeypatch, tmp_path, subprocess.TimeoutExpired("brew", 30)
+        )
+
+        assert HomebrewManager().is_installed(self._cask("zz-chat")) is False
+        assert HomebrewManager().is_installed(self._cask("zz-chat")) is False
+        assert len(calls) == 1
+
+    @pytest.mark.parametrize(
+        ("artifact", "installed_as"),
+        [
+            ({"app": ["Original.app", {"target": "Renamed.app"}]}, "Renamed.app"),
+            (
+                {"app": ["Original.app"], "target": "/Applications/Renamed.app"},
+                "Renamed.app",
+            ),
+            ({"app": ["Zz Chat 1.0/ZzChat.app"]}, "ZzChat.app"),
+        ],
+    )
+    def test_app_installed_name_follows_target(
+        self,
+        artifact: dict[str, Any],
+        installed_as: str,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        from shell_configs.packages.packages import HomebrewManager
+
+        info = self._info([{"token": "zz-chat", "artifacts": [artifact]}])
+        self._setup(monkeypatch, tmp_path, info)
+        other = "Original.app" if installed_as == "Renamed.app" else "Other.app"
+        (tmp_path / "Applications" / other).mkdir(parents=True)
+        assert HomebrewManager().is_installed(self._cask("zz-chat")) is False
+
+        (tmp_path / "Applications" / installed_as).mkdir()
+        assert HomebrewManager().is_installed(self._cask("zz-chat")) is True
+
+    def test_old_cask_token_finds_renamed_cask(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        from shell_configs.packages.packages import HomebrewManager
+
+        docker = {
+            "token": "docker-desktop",
+            "old_tokens": ["docker"],
+            "artifacts": [
+                {"app": ["Docker.app"], "target": "/Applications/Docker.app"}
+            ],
+        }
+        self._setup(monkeypatch, tmp_path, self._info([docker]))
+        (tmp_path / "Applications" / "Docker.app").mkdir(parents=True)
+
+        assert HomebrewManager().is_installed(self._cask("docker")) is True
