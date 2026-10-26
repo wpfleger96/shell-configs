@@ -47,6 +47,8 @@ def fetch_changelog_entries(
             [
                 "gh",
                 "api",
+                "--hostname",
+                "github.com",
                 f"repos/{repo}/releases",
                 "--jq",
                 "[.[] | {tag_name, body}]",
@@ -89,6 +91,20 @@ class UpdateInfo:
     latest_version: str
     source: str
     changelog_entries: list[tuple[str, str]] | None = None
+    check_failed: bool = False
+    error: str | None = None
+
+
+def _failed_check(current_version: str, error: str) -> UpdateInfo:
+    logger.debug(f"GitHub update check failed: {error}")
+    return UpdateInfo(
+        has_update=False,
+        current_version=current_version,
+        latest_version=current_version,
+        source="github",
+        check_failed=True,
+        error=error,
+    )
 
 
 def check_github_updates(
@@ -111,40 +127,32 @@ def check_github_updates(
     """
     try:
         if not is_command_available("gh"):
-            logger.debug("GitHub CLI not found. Install from https://cli.github.com")
-            return UpdateInfo(
-                has_update=False,
-                current_version=current_version,
-                latest_version=current_version,
-                source="github",
-            )
+            return _failed_check(current_version, "GitHub CLI (gh) not found")
 
         result = subprocess.run(
-            ["gh", "api", f"repos/{repo}/tags", "--jq", ".[0].name"],
+            [
+                "gh",
+                "api",
+                "--hostname",
+                "github.com",
+                f"repos/{repo}/tags",
+                "--jq",
+                ".[0].name",
+            ],
             capture_output=True,
             text=True,
             timeout=timeout,
         )
 
         if result.returncode != 0:
-            logger.debug(f"gh api failed: {result.stderr.strip()}")
-            return UpdateInfo(
-                has_update=False,
-                current_version=current_version,
-                latest_version=current_version,
-                source="github",
-            )
+            lines = [line for line in result.stderr.splitlines() if line.strip()]
+            reason = lines[-1].strip() if lines else f"gh exited {result.returncode}"
+            return _failed_check(current_version, reason)
 
         latest_tag = result.stdout.strip()
 
         if not latest_tag:
-            logger.debug("No tags found in repository")
-            return UpdateInfo(
-                has_update=False,
-                current_version=current_version,
-                latest_version=current_version,
-                source="github",
-            )
+            return _failed_check(current_version, "no tags found in repository")
 
         latest_version = latest_tag.lstrip("v")
 
@@ -165,21 +173,9 @@ def check_github_updates(
         )
 
     except subprocess.TimeoutExpired:
-        logger.debug(f"GitHub check timed out after {timeout} seconds")
-        return UpdateInfo(
-            has_update=False,
-            current_version=current_version,
-            latest_version=current_version,
-            source="github",
-        )
+        return _failed_check(current_version, f"timed out after {timeout}s")
     except Exception as e:
-        logger.debug(f"GitHub check failed: {e}")
-        return UpdateInfo(
-            has_update=False,
-            current_version=current_version,
-            latest_version=current_version,
-            source="github",
-        )
+        return _failed_check(current_version, str(e) or type(e).__name__)
 
 
 def _spawn_deferred_upgrade(

@@ -45,7 +45,9 @@ def info() -> None:
         update_display = "-"
         try:
             update_info = check_tool_updates(tool, timeout=5)
-            if update_info and update_info.has_update:
+            if update_info and update_info.check_failed:
+                update_display = dim(f"(check failed: {update_info.error})")
+            elif update_info and update_info.has_update:
                 update_display = f"[cyan]{update_info.latest_version} available[/cyan]"
                 has_updates = True
         except Exception:
