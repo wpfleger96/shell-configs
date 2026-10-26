@@ -2052,7 +2052,7 @@ class ConfigManager:
         Returns:
             Formatted diff string, or None if all match
         """
-        lines = []
+        lines: list[str] = []
         for key, expected in sorted(managed_prefs.items()):
             current = domain_data.get(key, _MISSING)
             path = _pref_path(None, key)
