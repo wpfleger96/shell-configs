@@ -671,3 +671,92 @@ class TestCleanupExitCode:
 
         assert result.exit_code == 1
         assert "2 of 3 backup files could not be removed" in result.output
+
+
+_CHECK_REASON = "HTTP 401"
+
+
+def _patch_failed_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make shell-configs look installed and its update check fail with a known reason."""
+    from shell_configs.bootstrap.updater import ToolSpec, UpdateInfo
+
+    tool = ToolSpec(
+        tool_id="shell-configs",
+        package_name="shell-configs",
+        display_name="shell-configs",
+        get_version=lambda: "1.0.0",
+        is_installed=lambda: True,
+        github_repo="owner/shell-configs",
+    )
+    for target in ("shell_configs.bootstrap", "shell_configs.bootstrap.updater"):
+        monkeypatch.setattr(f"{target}.UPDATABLE_TOOLS", [tool])
+        monkeypatch.setattr(f"{target}.get_tool_by_id", lambda _: tool)
+    monkeypatch.setattr(
+        "shell_configs.bootstrap.updater.check_github_updates",
+        lambda repo, current, timeout=10: UpdateInfo(
+            has_update=False,
+            current_version=current,
+            latest_version=current,
+            source="github",
+            check_failed=True,
+            error=_CHECK_REASON,
+        ),
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.cli
+class TestFailedUpdateCheckReporting:
+    def test_info_shows_reason(
+        self, cli_runner: CliRunner, mock_home: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _patch_failed_check(monkeypatch)
+
+        result = cli_runner.invoke(cli, ["info"])
+
+        assert result.exit_code == 0, result.output
+        assert f"(check failed: {_CHECK_REASON})" in result.output
+
+    def test_version_shows_reason(
+        self, cli_runner: CliRunner, mock_home: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _patch_failed_check(monkeypatch)
+
+        result = cli_runner.invoke(cli, ["--version"])
+
+        assert result.exit_code == 0, result.output
+        assert f"Could not check for updates: {_CHECK_REASON}" in result.output
+
+    def test_setup_shows_reason_without_reinstall(
+        self,
+        cli_runner: CliRunner,
+        mock_home: Path,
+        test_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        log: list[str] = []
+        _patch_packages(
+            monkeypatch, set(), [Package(name="req", required=True)], log=log
+        )
+        _patch_setup(monkeypatch, test_repo, [], log)
+        _patch_failed_check(monkeypatch)
+        installs: list[bool] = []
+        monkeypatch.setattr(
+            "shell_configs.bootstrap.installer.install_tool",
+            lambda force, dry_run: _track_install(installs),
+        )
+
+        result = cli_runner.invoke(cli, _SETUP_ARGS)
+
+        assert result.exit_code == 0, result.output
+        assert (
+            f"Could not check shell-configs for updates: {_CHECK_REASON}"
+            in result.output
+        )
+        assert "already up to date" not in result.output
+        assert installs == []
+
+
+def _track_install(installs: list[bool]) -> tuple[bool, str]:
+    installs.append(True)
+    return True, "Installed shell-configs"
