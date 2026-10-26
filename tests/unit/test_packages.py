@@ -1051,3 +1051,118 @@ class TestHomebrewInstallScript:
         assert success is True
         assert "Would run" in msg
         assert "echo install" in msg
+
+
+class TestHomebrewCaskAppDetection:
+    """A cask installed outside brew counts as installed when its .app exists."""
+
+    def _cask(self, name: str) -> Package:
+        return Package(name=name, macos=InstallConfig(method="brew", cask=True))
+
+    def _setup(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        info: subprocess.CompletedProcess[str] | Exception,
+    ) -> list[list[str]]:
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.shutil.which", lambda name: None
+        )
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.Path.home", lambda: tmp_path
+        )
+        monkeypatch.setattr(
+            "shell_configs.packages.packages.load_packages",
+            lambda: [self._cask("zz-chat"), self._cask("zz-vault")],
+        )
+        info_calls: list[list[str]] = []
+
+        def fake_run(cmd, **kwargs):
+            if cmd[:2] == ["brew", "list"]:
+                return subprocess.CompletedProcess(cmd, 0, "zz-managed\n", "")
+            info_calls.append(cmd)
+            if isinstance(info, Exception):
+                raise info
+            return info
+
+        monkeypatch.setattr("shell_configs.packages.packages.subprocess.run", fake_run)
+        return info_calls
+
+    @staticmethod
+    def _info(casks: list[dict]) -> subprocess.CompletedProcess[str]:
+        import json
+
+        return subprocess.CompletedProcess([], 0, json.dumps({"casks": casks}), "")
+
+    _CASKS = [
+        {"token": "zz-chat", "artifacts": [{"uninstall": []}, {"app": ["ZzChat.app"]}]},
+        {"token": "zz-vault", "artifacts": [{"pkg": ["ZzVault.pkg"]}]},
+    ]
+
+    def test_app_present_outside_brew_counts_as_installed(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        from shell_configs.packages.packages import HomebrewManager
+
+        self._setup(monkeypatch, tmp_path, self._info(self._CASKS))
+        (tmp_path / "Applications" / "ZzChat.app").mkdir(parents=True)
+
+        manager = HomebrewManager()
+        assert manager.is_installed(self._cask("zz-chat")) is True
+        assert manager.is_managed_by_brew(self._cask("zz-chat")) is False
+
+    def test_app_absent_is_not_installed(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        from shell_configs.packages.packages import HomebrewManager
+
+        self._setup(monkeypatch, tmp_path, self._info(self._CASKS))
+
+        assert HomebrewManager().is_installed(self._cask("zz-chat")) is False
+
+    def test_pkg_cask_without_app_artifact_is_not_installed(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        from shell_configs.packages.packages import HomebrewManager
+
+        self._setup(monkeypatch, tmp_path, self._info(self._CASKS))
+        (tmp_path / "Applications" / "ZzVault.app").mkdir(parents=True)
+
+        assert HomebrewManager().is_installed(self._cask("zz-vault")) is False
+
+    @pytest.mark.parametrize(
+        "info",
+        [
+            subprocess.CompletedProcess([], 1, "", "Error: boom"),
+            subprocess.CompletedProcess([], 0, "not json", ""),
+            subprocess.CompletedProcess([], 0, '{"casks": [{"artifacts": []}]}', ""),
+            subprocess.TimeoutExpired("brew", 30),
+        ],
+    )
+    def test_brew_info_failure_means_not_installed(
+        self,
+        info: subprocess.CompletedProcess[str] | Exception,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        from shell_configs.packages.packages import HomebrewManager
+
+        self._setup(monkeypatch, tmp_path, info)
+        (tmp_path / "Applications" / "ZzChat.app").mkdir(parents=True)
+
+        assert HomebrewManager().is_installed(self._cask("zz-chat")) is False
+
+    def test_brew_info_called_once_for_all_declared_casks(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        from shell_configs.packages.packages import HomebrewManager
+
+        calls = self._setup(monkeypatch, tmp_path, self._info(self._CASKS))
+
+        manager = HomebrewManager()
+        assert manager.is_installed(self._cask("zz-managed")) is True
+        assert calls == []
+        for name in ("zz-chat", "zz-vault", "zz-chat"):
+            manager.is_installed(self._cask(name))
+        assert len(calls) == 1
+        assert calls[0][-2:] == ["zz-chat", "zz-vault"]
