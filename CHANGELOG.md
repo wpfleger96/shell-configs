@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.70.4](https://github.com/wpfleger96/shell-configs/compare/v0.70.3...v0.70.4) (2026-10-27)
+
+
+### Bug Fixes
+
+* **packages:** count casks installed outside brew as installed ([#205](https://github.com/wpfleger96/shell-configs/issues/205)) ([0145020](https://github.com/wpfleger96/shell-configs/commit/01450205f74b4345c40cdcbdad696d3a8aa12c97))
+* **preferences:** show nested changes in the preferences diff ([#204](https://github.com/wpfleger96/shell-configs/issues/204)) ([7ae9028](https://github.com/wpfleger96/shell-configs/commit/7ae9028adf27b8b71f2c4bd2acadc8ac614d63eb))
+
 ## [0.70.3](https://github.com/wpfleger96/shell-configs/compare/v0.70.2...v0.70.3) (2026-10-26)
 
 
