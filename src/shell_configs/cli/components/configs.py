@@ -475,6 +475,7 @@ class ConfigsComponent(Component):
                     dry_run=ctx.dry_run,
                     app_name=pref_file.app_name,
                     force=ctx.force,
+                    diff_formatters=pref_file.diff_formatters,
                 )
                 print_operation_result(result, message)
                 if diff_text and result == OperationResult.UPDATED:
