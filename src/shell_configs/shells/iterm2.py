@@ -1,9 +1,11 @@
 """iTerm2 terminal emulator configuration."""
 
+from __future__ import annotations
+
 import re
 
-from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from shell_configs.config import get_config_dir
 from shell_configs.platform import Platform, is_platform
@@ -13,6 +15,9 @@ from shell_configs.shells.base import (
     PreferencesFile,
     Shell,
 )
+
+if TYPE_CHECKING:
+    from shell_configs.manager.core import PrefDiffFormatters
 
 ITERM2_PREFERENCES_DOMAIN = "com.googlecode.iterm2"
 
@@ -129,7 +134,7 @@ _KEY_PATTERN = re.compile(r"0x([0-9a-f]+)-0x([0-9a-f]+)(?:-0x[0-9a-f]+)?")
 
 
 def _key_combo(key: str) -> str:
-    """Render a GlobalKeyMap key like ``0x54-0x120000-0x11`` as ``⌘⇧T``."""
+    """Render a GlobalKeyMap key like ``0x54-0x120000-0x11`` as ``⇧⌘T``."""
     match = _KEY_PATTERN.fullmatch(key)
     if not match:
         return f'"{key}"' if "." in key else key
@@ -191,9 +196,7 @@ def diff_global_key_map(current: object, expected: object) -> list[str]:
     return lines
 
 
-ITERM2_DIFF_FORMATTERS: dict[str, Callable[[object, object], list[str]]] = {
-    "GlobalKeyMap": diff_global_key_map
-}
+ITERM2_DIFF_FORMATTERS: PrefDiffFormatters = {"GlobalKeyMap": diff_global_key_map}
 
 
 class ITerm2Shell(Shell):
