@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from shell_configs.extensions import ExtensionInvoker
 
 
@@ -48,6 +50,10 @@ class PreferencesFile:
     source_path: Path
     domain: str
     app_name: str | None = None
+    # Per-key diff renderers: (current, expected) -> diff lines.
+    diff_formatters: dict[str, Callable[[object, object], list[str]]] = field(
+        default_factory=dict
+    )
 
 
 @dataclass

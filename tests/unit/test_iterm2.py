@@ -9,7 +9,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from shell_configs.platform import Platform
-from shell_configs.shells.iterm2 import ITERM2_PREFERENCES_DOMAIN, ITerm2Shell
+from shell_configs.shells.iterm2 import (
+    ITERM2_DIFF_FORMATTERS,
+    ITERM2_PREFERENCES_DOMAIN,
+    ITerm2Shell,
+    diff_global_key_map,
+)
 
 
 class TestITerm2ShellMacOS:
@@ -526,3 +531,83 @@ class TestConfigManagerPreferences:
         assert result == OperationResult.REMOVED
         assert "1 failed" in message
         assert "PromptOnQuit" in message
+
+
+_REPO_KEY_MAP = json.loads(
+    (
+        Path(__file__).parents[2] / "src/shell_configs/config/iterm2/preferences.json"
+    ).read_text()
+)["GlobalKeyMap"]
+
+
+class TestGlobalKeyMapDiff:
+    """GlobalKeyMap diffs name key combos and actions instead of raw IDs."""
+
+    @pytest.mark.unit
+    def test_repo_bindings_render_as_key_combos(self):
+        assert diff_global_key_map({}, _REPO_KEY_MAP) == [
+            '  + Key binding ⇧⌘N: Select Menu Item "Duplicate Window\\nDuplicate Window"',
+            "  + Key binding ⇧⌘T: Duplicate Tab",
+            '  + Key binding ⇧Return: Send Text "\\n"',
+        ]
+
+    @pytest.mark.unit
+    def test_removed_binding_is_one_line(self):
+        current = {"0x9-0x40000-0x30": {"Action": 0, "Version": 1}}
+        assert diff_global_key_map(current, {}) == ["  - Key binding ⌃Tab: Next Tab"]
+
+    @pytest.mark.unit
+    def test_changed_fields_get_one_line_each_and_hide_redundant_fields(self):
+        current = {"0x54-0x120000-0x11": {"Action": 12, "Text": "a", "Version": 1}}
+        expected = {"0x54-0x120000-0x11": {"Action": 25, "Text": "b", "Version": 2}}
+        assert diff_global_key_map(current, expected) == [
+            "  ~ Key binding ⇧⌘T: action: Send Text → Select Menu Item",
+            '  ~ Key binding ⇧⌘T: text: "a" → "b"',
+        ]
+
+    @pytest.mark.unit
+    def test_change_only_in_hidden_field_is_still_shown(self):
+        current = {"0xd-0x20000-0x24": {"Action": 12, "Version": 1}}
+        expected = {"0xd-0x20000-0x24": {"Action": 12, "Version": 2}}
+        assert diff_global_key_map(current, expected) == [
+            "  ~ Key binding ⇧Return: version: 1 → 2"
+        ]
+
+    @pytest.mark.unit
+    def test_non_hex_key_and_unknown_action_fall_back(self):
+        expected = {
+            "custom.key": {"Action": 99},
+            "0xf704-0xa00000-0x7a": {"Action": 13},
+        }
+        assert diff_global_key_map({}, expected) == [
+            "  + Key binding F1: Ignore",
+            '  + Key binding "custom.key": action 99',
+        ]
+
+    @pytest.mark.unit
+    def test_install_uses_formatter_for_global_key_map_only(self, tmp_path):
+        from shell_configs.manager.core import ConfigManager
+
+        expected = {"GlobalKeyMap": _REPO_KEY_MAP, "PromptOnQuit": False}
+        current = {
+            "GlobalKeyMap": {
+                **{k: v for k, v in _REPO_KEY_MAP.items() if k != "0xd-0x20000-0x24"},
+                "0x54-0x120000-0x11": {
+                    **_REPO_KEY_MAP["0x54-0x120000-0x11"],
+                    "Text": "gurney old value",
+                },
+                "gurney.extra.binding": {"Action": 12, "Text": "remove me"},
+            },
+            "PromptOnQuit": True,
+        }
+        diff = ConfigManager(tmp_path / "rc")._build_preferences_diff(
+            expected, current, ITERM2_DIFF_FORMATTERS
+        )
+        assert diff == "\n".join(
+            [
+                '  ~ Key binding ⇧⌘T: text: "gurney old value" → ""',
+                '  + Key binding ⇧Return: Send Text "\\n"',
+                '  - Key binding "gurney.extra.binding": Send Text "remove me"',
+                "  ~ PromptOnQuit: True → False",
+            ]
+        )

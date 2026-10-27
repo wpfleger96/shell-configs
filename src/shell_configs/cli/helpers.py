@@ -411,7 +411,7 @@ def _compute_diffs_for_shells(
         preferences_files = shell.get_preferences_files()
         for pref_file in preferences_files:
             pref_diff = manager.diff_preferences_file(
-                pref_file.source_path, pref_file.domain
+                pref_file.source_path, pref_file.domain, pref_file.diff_formatters
             )
             if pref_diff:
                 diffs.append(

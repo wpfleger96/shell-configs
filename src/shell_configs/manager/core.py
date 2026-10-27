@@ -15,12 +15,15 @@ import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
 
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
 from shell_configs.fsio import atomic_write_text, unified_diff_text
 
 from .types import ManagedSection, OperationResult
+
+PrefDiffFormatters = dict[str, Callable[[object, object], list[str]]]
 
 logger = logging.getLogger(__name__)
 
@@ -1789,6 +1792,7 @@ class ConfigManager:
         dry_run: bool = False,
         app_name: str | None = None,
         force: bool = False,
+        diff_formatters: PrefDiffFormatters | None = None,
     ) -> tuple[OperationResult, str, str | None]:
         """Install preferences from a JSON file into a macOS defaults domain.
 
@@ -1849,7 +1853,9 @@ class ConfigManager:
                     None,
                 )
 
-            diff_text = self._build_preferences_diff(managed_prefs, domain_data or {})
+            diff_text = self._build_preferences_diff(
+                managed_prefs, domain_data or {}, diff_formatters
+            )
 
             temp_path = None
             try:
@@ -2017,7 +2023,12 @@ class ConfigManager:
         except Exception:
             return (False, False)
 
-    def diff_preferences_file(self, source_path: Path, domain: str) -> str | None:
+    def diff_preferences_file(
+        self,
+        source_path: Path,
+        domain: str,
+        diff_formatters: PrefDiffFormatters | None = None,
+    ) -> str | None:
         """Get a human-readable diff between repo preferences and installed.
 
         Args:
@@ -2034,7 +2045,9 @@ class ConfigManager:
             managed_prefs = json.loads(source_path.read_text(encoding="utf-8"))
             domain_data = self._export_defaults_domain(domain)
 
-            return self._build_preferences_diff(managed_prefs, domain_data or {})
+            return self._build_preferences_diff(
+                managed_prefs, domain_data or {}, diff_formatters
+            )
         except Exception:
             return None
 
@@ -2042,12 +2055,14 @@ class ConfigManager:
         self,
         managed_prefs: dict[str, object],
         domain_data: dict[str, object],
+        diff_formatters: PrefDiffFormatters | None = None,
     ) -> str | None:
         """Build a human-readable diff between managed and installed prefs.
 
         Args:
             managed_prefs: Expected preference values
             domain_data: Current domain values
+            diff_formatters: Optional per-key renderers replacing the generic diff
 
         Returns:
             Formatted diff string, or None if all match
@@ -2056,7 +2071,13 @@ class ConfigManager:
         for key, expected in sorted(managed_prefs.items()):
             current = domain_data.get(key, _MISSING)
             path = _pref_path(None, key)
-            if current is _MISSING:
+            formatter = (diff_formatters or {}).get(key)
+            if formatter is not None:
+                if current != expected:
+                    lines.extend(
+                        formatter(None if current is _MISSING else current, expected)
+                    )
+            elif current is _MISSING:
                 _emit_pref_leaves("+", path, expected, lines)
             else:
                 _diff_pref_value(path, current, expected, lines)
