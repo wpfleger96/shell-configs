@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from shell_configs.extensions import ExtensionInvoker
+    from shell_configs.manager.core import PrefDiffFormatters
 
 
 @dataclass
@@ -48,6 +49,8 @@ class PreferencesFile:
     source_path: Path
     domain: str
     app_name: str | None = None
+    # Per-key diff renderers: (current, expected) -> diff lines.
+    diff_formatters: PrefDiffFormatters = field(default_factory=dict)
 
 
 @dataclass
