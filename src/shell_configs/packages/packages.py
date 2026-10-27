@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import threading
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
@@ -345,6 +347,55 @@ class PackageManager(ABC):
         return self.is_installed(pkg)
 
 
+# App names from `brew info` don't change during a run, so they are fetched once
+# per process; `upgrade` runs `install` in a child process, which starts fresh.
+_cask_apps_cache: dict[str, list[str]] | None = None
+_cask_apps_lock = threading.Lock()
+
+
+def _app_name(artifact: dict[str, Any]) -> str | None:
+    """Installed .app name of one app artifact: its target, else the source basename."""
+    record = artifact.get("app") or []
+    if not record or not isinstance(record[0], str):
+        return None
+    options = record[1] if len(record) > 1 and isinstance(record[1], dict) else {}
+    return Path(artifact.get("target") or options.get("target") or record[0]).name
+
+
+def _get_cask_apps(name: str) -> dict[str, list[str]]:
+    """Map cask tokens (canonical and old) to their .app names, from one brew info call."""
+    global _cask_apps_cache
+    with _cask_apps_lock:
+        if _cask_apps_cache is not None:
+            return _cask_apps_cache
+        apps_by_token: dict[str, list[str]] = {}
+        try:
+            tokens = {name} | {
+                p.macos.package or p.name
+                for p in load_packages()
+                if p.macos and p.macos.cask
+            }
+            result = subprocess.run(
+                ["brew", "info", "--cask", "--json=v2", *sorted(tokens)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode == 0:
+                for cask in json.loads(result.stdout)["casks"]:
+                    apps = [
+                        app
+                        for artifact in cask.get("artifacts", [])
+                        if isinstance(artifact, dict) and (app := _app_name(artifact))
+                    ]
+                    for token in [cask["token"], *cask.get("old_tokens", [])]:
+                        apps_by_token[token] = apps
+        except Exception:
+            apps_by_token = {}
+        _cask_apps_cache = apps_by_token
+    return _cask_apps_cache
+
+
 class HomebrewManager(PackageManager):
     """Homebrew package manager for macOS."""
 
@@ -406,8 +457,14 @@ class HomebrewManager(PackageManager):
         name = config.package or pkg.name
 
         if config.cask:
-            return name in self._get_installed_casks()
+            return name in self._get_installed_casks() or self._cask_app_present(name)
         return name in self._get_installed_formulae()
+
+    def _cask_app_present(self, name: str) -> bool:
+        """Check whether a cask's .app bundle exists, even if brew doesn't manage it."""
+        apps = _get_cask_apps(name).get(name.split("/")[-1], [])
+        dirs = [Path("/Applications"), Path.home() / "Applications"]
+        return any((d / app).exists() for app in apps for d in dirs)
 
     def is_managed_by_brew(self, pkg: Package) -> bool:
         """Check if package is managed by Homebrew (ignores PATH binaries)."""
@@ -516,7 +573,7 @@ class HomebrewManager(PackageManager):
             return False, "Homebrew is not installed"
 
         if not self.is_managed_by_brew(pkg):
-            if shutil.which(pkg.get_command()):
+            if self.is_installed(pkg):
                 return (
                     True,
                     f"{name} is installed but not managed by Homebrew (skipping)",
