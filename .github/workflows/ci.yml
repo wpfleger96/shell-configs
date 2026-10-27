@@ -57,7 +57,7 @@ jobs:
         if: contains(matrix.recipe, 'shell')
 
       - name: Install dependencies
-        run: just sync
+        run: uv sync --locked
 
       - name: Run ${{ matrix.name }}
         run: just ${{ matrix.recipe }}
@@ -97,7 +97,7 @@ jobs:
         uses: extractions/setup-just@v4
 
       - name: Install dependencies
-        run: just sync
+        run: uv sync --locked
 
       - name: Run end-to-end tests
         run: just test-e2e
