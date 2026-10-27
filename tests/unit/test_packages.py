@@ -1116,6 +1116,21 @@ class TestHomebrewCaskAppDetection:
         assert manager.is_installed(self._cask("zz-chat")) is True
         assert manager.is_managed_by_brew(self._cask("zz-chat")) is False
 
+    def test_uninstall_skips_app_present_outside_brew(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        from shell_configs.packages.packages import HomebrewManager
+
+        info_calls = self._setup(monkeypatch, tmp_path, self._info(self._CASKS))
+        (tmp_path / "Applications" / "ZzChat.app").mkdir(parents=True)
+        monkeypatch.setattr(HomebrewManager, "is_available", lambda self: True)
+
+        ok, msg = HomebrewManager().uninstall(self._cask("zz-chat"))
+
+        assert ok is True
+        assert msg == "zz-chat is installed but not managed by Homebrew (skipping)"
+        assert not any(cmd[:2] == ["brew", "uninstall"] for cmd in info_calls)
+
     def test_app_absent_is_not_installed(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:

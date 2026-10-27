@@ -573,7 +573,7 @@ class HomebrewManager(PackageManager):
             return False, "Homebrew is not installed"
 
         if not self.is_managed_by_brew(pkg):
-            if shutil.which(pkg.get_command()):
+            if self.is_installed(pkg):
                 return (
                     True,
                     f"{name} is installed but not managed by Homebrew (skipping)",
