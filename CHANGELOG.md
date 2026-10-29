@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [0.70.5](https://github.com/wpfleger96/shell-configs/compare/v0.70.4...v0.70.5) (2026-10-29)
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#208](https://github.com/wpfleger96/shell-configs/issues/208)) ([d3b198f](https://github.com/wpfleger96/shell-configs/commit/d3b198fa946f1afb59a013017ed9bc3bfde74e68))
+* **deps:** Lock file maintenance ([#209](https://github.com/wpfleger96/shell-configs/issues/209)) ([b65072b](https://github.com/wpfleger96/shell-configs/commit/b65072b8f9f233b270ca99026f073d36a97d602d))
+
+
+### Continuous Integration
+
+* sync CI workflow ([0a379c3](https://github.com/wpfleger96/shell-configs/commit/0a379c3db2a4a07cc1b469b863119dfcc7a39118))
+
 ## [0.70.4](https://github.com/wpfleger96/shell-configs/compare/v0.70.3...v0.70.4) (2026-10-27)
 
 
