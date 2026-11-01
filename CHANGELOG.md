@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## [0.70.5](https://github.com/wpfleger96/shell-configs/compare/v0.70.4...v0.70.5) (2026-11-01)
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#208](https://github.com/wpfleger96/shell-configs/issues/208)) ([d3b198f](https://github.com/wpfleger96/shell-configs/commit/d3b198fa946f1afb59a013017ed9bc3bfde74e68))
+* **deps:** Lock file maintenance ([#209](https://github.com/wpfleger96/shell-configs/issues/209)) ([b65072b](https://github.com/wpfleger96/shell-configs/commit/b65072b8f9f233b270ca99026f073d36a97d602d))
+* **deps:** Update astral-sh/setup-uv action to v10.3.2 ([#200](https://github.com/wpfleger96/shell-configs/issues/200)) ([44ecb01](https://github.com/wpfleger96/shell-configs/commit/44ecb015c4fc8579bfd3d6018620fea74f806b2f))
+
+
+### Continuous Integration
+
+* sync CI workflow ([15d146a](https://github.com/wpfleger96/shell-configs/commit/15d146a4a683d7368e84e0cfa939a8210d7f5a22))
+* sync CI workflow ([2b72f52](https://github.com/wpfleger96/shell-configs/commit/2b72f52a1115376ee5916009ba3854372283be84))
+* sync CI workflow ([0a379c3](https://github.com/wpfleger96/shell-configs/commit/0a379c3db2a4a07cc1b469b863119dfcc7a39118))
+* sync release workflow ([7c438e9](https://github.com/wpfleger96/shell-configs/commit/7c438e96f74823e33972da2276d4bd66481e7752))
+* sync release workflow ([ca173e9](https://github.com/wpfleger96/shell-configs/commit/ca173e9187a054669489adf878ad5ec4d04d2ab5))
+
 ## [0.70.4](https://github.com/wpfleger96/shell-configs/compare/v0.70.3...v0.70.4) (2026-10-27)
 
 
