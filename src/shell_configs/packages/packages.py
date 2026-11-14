@@ -745,8 +745,11 @@ class LinuxInstaller(PackageManager):
                 return  # Already configured correctly
 
         if not Path(key_path).exists():
+            # Fetch before piping: sh has no pipefail, so a failed curl would hand
+            # gpg an empty stream and leave a broken key that this check then skips.
             subprocess.run(
-                f"curl -fsSL {repo.key_url} | sudo gpg --dearmor -o {key_path}",
+                f"key=$(curl -fsSL {repo.key_url}) && "
+                f"printf '%s\\n' \"$key\" | sudo gpg --dearmor -o {key_path}",
                 shell=True,
                 check=True,
                 timeout=60,
