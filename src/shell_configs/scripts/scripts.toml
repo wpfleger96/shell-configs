@@ -7,20 +7,6 @@ platforms = ["wsl"]
 [disk-cleanup]
 platforms = ["macos", "linux", "wsl"]
 
-[laptop-upgrade]
-platforms = ["macos"]
-profiles = ["work"]
-
-[new-laptop-setup]
-platforms = ["macos"]
-profiles = ["work"]
-
-[backup-repos]
-profiles = ["work"]
-
-[clone-repos]
-profiles = ["work"]
-
 [backup-resmed]
 platforms = ["wsl", "macos"]
 profiles = ["personal"]

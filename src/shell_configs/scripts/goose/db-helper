@@ -24,11 +24,11 @@ get_latest_version() {
         return
     fi
 
-    local latest=$(find "${MIGRATIONS_DIR}" -mindepth 1 -maxdepth 1 -type d -name "[0-9]*" 2>/dev/null | \
-                   sed 's/.*\/\([0-9]*\).*/\1/' | \
-                   sed 's/^0*//' | \
-                   sort -n | \
-                   tail -1)
+    local latest=$(find "${MIGRATIONS_DIR}" -mindepth 1 -maxdepth 1 -type d -name "[0-9]*" 2>/dev/null |
+        sed 's/.*\/\([0-9]*\).*/\1/' |
+        sed 's/^0*//' |
+        sort -n |
+        tail -1)
 
     echo "${latest:-0}"
 }
@@ -40,6 +40,7 @@ find_migration_dir() {
         return
     fi
 
+    # shellcheck disable=SC2001 # same sed normalization as dir_version below, kept for symmetry
     local version_num=$(echo "${version}" | sed 's/^0*//')
 
     for dir in "${MIGRATIONS_DIR}"/*; do
@@ -197,7 +198,7 @@ show_status() {
     echo ""
 
     echo -e "${BLUE}Sessions table schema:${NC}"
-    get_table_schema "sessions" | while IFS='|' read -r cid name type notnull dflt_value pk; do
+    get_table_schema "sessions" | while IFS='|' read -r _ name type _ _ _; do
         echo "  - ${name} (${type})"
     done
     echo ""
@@ -238,7 +239,7 @@ apply_migration() {
         return 1
     fi
 
-    if ! sqlite3 "${DB_PATH}" < "${up_sql}"; then
+    if ! sqlite3 "${DB_PATH}" <"${up_sql}"; then
         echo -e "${RED}ERROR: Migration to v${target_version} failed${NC}" >&2
         echo -e "${YELLOW}Check the SQL file: ${up_sql}${NC}"
         return 1
@@ -266,7 +267,7 @@ rollback_migration() {
         return 1
     fi
 
-    if ! sqlite3 "${DB_PATH}" < "${down_sql}"; then
+    if ! sqlite3 "${DB_PATH}" <"${down_sql}"; then
         echo -e "${RED}ERROR: Rollback from v${from_version} failed${NC}" >&2
         echo -e "${YELLOW}Check the SQL file: ${down_sql}${NC}"
         return 1
@@ -310,7 +311,7 @@ migrate_to_version() {
 
         if [[ ${target_version} -gt ${current_version} ]]; then
             echo "2. Apply forward migrations:"
-            for version in $(seq $((current_version + 1)) ${target_version}); do
+            for version in $(seq $((current_version + 1)) "${target_version}"); do
                 local migration_info=$(get_migration_info "${version}")
                 local migration_dir=$(find_migration_dir "${version}")
                 echo "   - Migrate to v${version}: ${migration_info}"
@@ -318,7 +319,7 @@ migrate_to_version() {
             done
         else
             echo "2. Apply rollback migrations:"
-            for version in $(seq ${current_version} -1 $((target_version + 1))); do
+            for version in $(seq "${current_version}" -1 $((target_version + 1))); do
                 local migration_info=$(get_migration_info "${version}")
                 local migration_dir=$(find_migration_dir "${version}")
                 echo "   - Rollback from v${version}: ${migration_info}"
@@ -342,17 +343,17 @@ migrate_to_version() {
     echo ""
 
     if [[ ${target_version} -gt ${current_version} ]]; then
-        for version in $(seq $((current_version + 1)) ${target_version}); do
+        for version in $(seq $((current_version + 1)) "${target_version}"); do
             local migration_info=$(get_migration_info "${version}")
             echo -e "Applying migration to v${version}..."
-            apply_migration ${version}
+            apply_migration "${version}"
             echo -e "${GREEN}✓ Migrated to v${version}: ${migration_info}${NC}"
         done
     else
-        for version in $(seq ${current_version} -1 $((target_version + 1))); do
+        for version in $(seq "${current_version}" -1 $((target_version + 1))); do
             local migration_info=$(get_migration_info "${version}")
             echo -e "Rolling back from v${version}..."
-            rollback_migration ${version}
+            rollback_migration "${version}"
             echo -e "${GREEN}✓ Rolled back from v${version}${NC}"
         done
     fi
@@ -372,6 +373,7 @@ list_backups() {
 
     echo -e "${BLUE}=== Available Backups ===${NC}"
     echo ""
+    # shellcheck disable=SC2012 # parses ls -l columns (size, date) for display; backup names are generated and safe
     ls -lh "${BACKUP_DIR}" | tail -n +2 | while read -r line; do
         local filename=$(echo "${line}" | awk '{print $NF}')
         local size=$(echo "${line}" | awk '{print $5}')
@@ -458,7 +460,7 @@ validate_sql_syntax() {
                 fi
             fi
         fi
-    done <<< "$lines"
+    done <<<"$lines"
 
     return 0
 }
@@ -530,7 +532,7 @@ generate_rollback_sql() {
         fi
     done
 
-    for ((i=${#rollback_stmts[@]}-1; i>=0; i--)); do
+    for ((i = ${#rollback_stmts[@]} - 1; i >= 0; i--)); do
         echo "${rollback_stmts[$i]}"
     done
 
@@ -600,10 +602,10 @@ generate_migrations() {
 
     mkdir -p "${MIGRATIONS_DIR}"
 
-    local max_version=$(grep -E '^\s+[0-9]+ =>' "${RUST_SESSION_MANAGER}" | \
-                         sed 's/[^0-9]//g' | \
-                         sort -n | \
-                         tail -1)
+    local max_version=$(grep -E '^\s+[0-9]+ =>' "${RUST_SESSION_MANAGER}" |
+        sed 's/[^0-9]//g' |
+        sort -n |
+        tail -1)
 
     if [[ -z "$max_version" ]]; then
         max_version=2
@@ -612,8 +614,8 @@ generate_migrations() {
     local generated_count=0
     local skipped_count=0
 
-    for version in $(seq 1 $max_version); do
-        local padded_version=$(printf "%03d" $version)
+    for version in $(seq 1 "$max_version"); do
+        local padded_version=$(printf "%03d" "$version")
         local sql=$(extract_migration_sql "$version" "${RUST_SESSION_MANAGER}")
 
         if [[ -z "$sql" ]]; then
@@ -643,17 +645,19 @@ generate_migrations() {
         local migration_dir="${MIGRATIONS_DIR}/${padded_version}_${migration_name}"
         mkdir -p "$migration_dir"
 
-        echo "BEGIN TRANSACTION;" > "${migration_dir}/up.sql"
-        echo "" >> "${migration_dir}/up.sql"
-        echo "$sql" >> "${migration_dir}/up.sql"
-        echo "" >> "${migration_dir}/up.sql"
-        echo "INSERT INTO schema_version (version) VALUES ($version);" >> "${migration_dir}/up.sql"
-        echo "" >> "${migration_dir}/up.sql"
-        echo "COMMIT;" >> "${migration_dir}/up.sql"
+        {
+            echo "BEGIN TRANSACTION;"
+            echo ""
+            echo "$sql"
+            echo ""
+            echo "INSERT INTO schema_version (version) VALUES ($version);"
+            echo ""
+            echo "COMMIT;"
+        } >"${migration_dir}/up.sql"
 
-        generate_rollback_sql "$version" "$sql" > "${migration_dir}/down.sql"
+        generate_rollback_sql "$version" "$sql" >"${migration_dir}/down.sql"
 
-        generate_metadata "$version" "$sql" > "${migration_dir}/metadata.txt"
+        generate_metadata "$version" "$sql" >"${migration_dir}/metadata.txt"
 
         echo -e "${GREEN}✓ Generated migration $padded_version: ${migration_dir##*/}${NC}"
         generated_count=$((generated_count + 1))
@@ -791,7 +795,7 @@ main() {
                 DRY_RUN=true
                 shift
                 ;;
-            --yes|-y)
+            --yes | -y)
                 SKIP_CONFIRM=true
                 shift
                 ;;
@@ -799,7 +803,7 @@ main() {
                 CLEAN_GENERATE=true
                 shift
                 ;;
-            --help|-h)
+            --help | -h)
                 show_help
                 exit 0
                 ;;
@@ -844,7 +848,7 @@ main() {
             local latest_version=$(get_latest_version)
             echo -e "${YELLOW}Note: 'migrate' is deprecated. Use 'migrate-to ${latest_version}' instead.${NC}"
             echo ""
-            migrate_to_version ${latest_version}
+            migrate_to_version "${latest_version}"
             ;;
         rollback)
             echo -e "${YELLOW}Note: 'rollback' is deprecated. Use 'migrate-to <version>' instead.${NC}"
