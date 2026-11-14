@@ -74,6 +74,8 @@ languages:
       sudo test -x "$STAGE/flutter/bin/flutter" &&
       sudo rm -rf /usr/local/flutter &&
       sudo mv "$STAGE/flutter" /usr/local/flutter; }
+    # The SDK archive (and brew's cask download) is ~1.5 GB
+    install_timeout: 1800
     check_path: "/usr/local/flutter/bin/flutter"
 
   - name: python

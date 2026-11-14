@@ -17,6 +17,7 @@ from shell_configs.bootstrap import is_command_available
 from shell_configs.platform import Platform, is_platform
 
 NPM_MISSING_MSG = "npm is not available — install Node.js first, then re-run"
+DEFAULT_TIMEOUT = 300
 
 
 @dataclass(frozen=True)
@@ -70,7 +71,7 @@ def _run_step(
     via: str | None,
     dry_run: bool,
     would_msg: str,
-    timeout: int = 300,
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> tuple[bool, str]:
     """Run an install/uninstall command with uniform dry-run/timeout handling."""
     if dry_run:
@@ -180,7 +181,11 @@ def install_apt(name: str, package: str, dry_run: bool) -> tuple[bool, str]:
 
 
 def run_script(
-    name: str, cmd: str, dry_run: bool, verb: str = "install"
+    name: str,
+    cmd: str,
+    dry_run: bool,
+    verb: str = "install",
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> tuple[bool, str]:
     """Run a shell install/uninstall script command."""
     return _run_step(
@@ -190,6 +195,7 @@ def run_script(
         via=None,
         dry_run=dry_run,
         would_msg=f"Would {verb} {name} via: {cmd}",
+        timeout=timeout,
     )
 
 
