@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import os
+import random
 import subprocess
 import tarfile
 
@@ -46,13 +47,22 @@ def guard_subprocess() -> None:
 
 
 def _go_tarball() -> bytes:
+    """Build a Go tarball: bin/go, then an incompressible payload.
+
+    Truncating it halfway cuts into the payload, so tar extracts bin/go before
+    it fails, as a dropped download of the real tarball would.
+    """
+    members = {
+        "go/bin/go": b"#!/bin/sh\necho go1.99.0\n",
+        "go/payload": random.Random(0).randbytes(256 * 1024),
+    }
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-        payload = b"#!/bin/sh\necho go1.99.0\n"
-        info = tarfile.TarInfo("go/bin/go")
-        info.size = len(payload)
-        info.mode = 0o755
-        tar.addfile(info, io.BytesIO(payload))
+        for name, data in members.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            info.mode = 0o755
+            tar.addfile(info, io.BytesIO(data))
     return buf.getvalue()
 
 
