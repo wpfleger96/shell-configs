@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 
 from dataclasses import dataclass
@@ -89,11 +90,20 @@ def load_languages(manifest_path: Path | None = None) -> list[Language]:
     return result
 
 
+def _natural_sort_key(path: Path) -> list[int | str]:
+    """Sort key that compares digit runs numerically (``v9`` < ``v10``)."""
+    return [
+        int(part) if part.isdecimal() else part
+        for part in re.split(r"(\d+)", str(path))
+    ]
+
+
 def _resolve_check_path(check_path: str) -> Path | None:
     """Resolve a check_path string to an existing Path, or None.
 
     Supports glob patterns (e.g. ``~/.nvm/versions/node/v*/bin/node``) —
-    when ``*`` is present, returns the latest (sorted) match.
+    when ``*`` is present, returns the match with the highest version,
+    comparing numeric components as integers.
     """
     expanded = check_path.replace("~", str(Path.home()))
     if "*" not in expanded:
@@ -101,8 +111,8 @@ def _resolve_check_path(check_path: str) -> Path | None:
         return p if p.exists() else None
     parent = Path(expanded).anchor or "/"
     rel_pattern = expanded[len(parent) :]
-    matches = sorted(Path(parent).glob(rel_pattern))
-    return matches[-1] if matches else None
+    matches = list(Path(parent).glob(rel_pattern))
+    return max(matches, key=_natural_sort_key) if matches else None
 
 
 def is_language_installed(lang: Language) -> bool:
