@@ -153,6 +153,10 @@ class TestLoadLanguages:
             assert lang.check_path is not None
             assert Path(lang.check_path).parent.name == "bin", lang.name
 
+    def test_bundled_go_check_path_puts_tarball_bin_on_path(self):
+        go = next(lang for lang in load_languages() if lang.name == "go")
+        assert go.check_path == "/usr/local/go/bin/go"
+
 
 # ---------------------------------------------------------------------------
 # TestResolveCheckPath
