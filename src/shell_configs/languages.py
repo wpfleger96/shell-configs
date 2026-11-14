@@ -38,8 +38,10 @@ class Language:
     command: str
     description: str
     status_only: bool = False
-    # Path checked for installation (e.g. ~/.cargo/bin/rustup, ~/.nvm/nvm.sh).
-    # Necessary for tools that aren't on PATH until their env is sourced.
+    # Path checked for installation (e.g. ~/.cargo/bin/rustup,
+    # ~/.nvm/versions/node/v*/bin/node; globs allowed). Necessary for tools that
+    # aren't on PATH until their env is sourced. Must be an executable inside a
+    # bin/ dir, because ensure_language_paths prepends its parent dir to PATH.
     check_path: str | None = None
     # Cross-platform curl/script install command (used when macos/linux are absent)
     install_cmd: str | None = None
@@ -131,16 +133,20 @@ def get_language_version(lang: Language) -> str | None:
 
 
 def ensure_language_paths(languages: list[Language]) -> None:
-    """Add check_path directories of installed languages to the current process PATH."""
+    """Prepend the parent dir of each installed language's check_path to the process PATH.
+
+    Dirs already present as an exact PATH entry are skipped.
+    """
     path = os.environ.get("PATH", "")
+    entries = path.split(os.pathsep) if path else []
     for lang in languages:
         if lang.check_path:
             resolved = _resolve_check_path(lang.check_path)
             if resolved is not None:
                 bin_dir = str(resolved.parent)
-                if bin_dir not in path:
-                    path = bin_dir + os.pathsep + path
-    os.environ["PATH"] = path
+                if bin_dir not in entries:
+                    entries.insert(0, bin_dir)
+    os.environ["PATH"] = os.pathsep.join(entries)
 
 
 def install_language(lang: Language, dry_run: bool = False) -> tuple[bool, str]:
