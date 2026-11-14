@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.11"
+# requires-python = ">=3.13"
 # dependencies = [
 #     # faster-whisper<=1.2.1 passes av.open(metadata_errors=...), removed in
 #     # PyAV 19; drop this cap once a release includes SYSTRAN/faster-whisper#1495
@@ -156,7 +156,7 @@ def main() -> None:
 
         if args.output_format in ("txt", "all"):
             out_path = Path(out_dir) / f"{file_path.stem}.txt"
-            with open(out_path, "w") as f:
+            with open(out_path, "w", encoding="utf-8") as f:
                 for segment in segment_list:
                     f.write(
                         f"{format_time(segment.start):>7}  {segment.text.strip()}\n"

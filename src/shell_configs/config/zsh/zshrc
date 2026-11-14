@@ -1,8 +1,12 @@
+#!/usr/bin/env zsh
+# Sourced, not executed: the shebang only lets shfmt/shellcheck detect this file (shfmt as zsh)
+# shellcheck shell=bash # shellcheck has no zsh mode; zsh-only lines are annotated below
 # Zsh-Specific Configuration
 # Common settings are in shared.sh and will be included automatically
 
 ### History ###
 HISTSIZE=10000
+# shellcheck disable=SC2034 # zsh special parameter
 SAVEHIST=20000
 HISTFILE=~/.zsh_history
 setopt HIST_IGNORE_DUPS
@@ -16,43 +20,44 @@ setopt SHARE_HISTORY
 bindkey -e
 
 # Arrow keys for history navigation and cursor movement
-bindkey '^[[A' up-line-or-history      # Up arrow
-bindkey '^[[B' down-line-or-history    # Down arrow
-bindkey '^[[C' forward-char            # Right arrow
-bindkey '^[[D' backward-char           # Left arrow
+bindkey '^[[A' up-line-or-history   # Up arrow
+bindkey '^[[B' down-line-or-history # Down arrow
+bindkey '^[[C' forward-char         # Right arrow
+bindkey '^[[D' backward-char        # Left arrow
 
 # Delete and backspace
-bindkey '^[[3~' delete-char            # Delete key
-bindkey '^?' backward-delete-char      # Backspace
-bindkey '^H' backward-delete-char      # Backspace (alternate, common in VS Code)
+bindkey '^[[3~' delete-char       # Delete key
+bindkey '^?' backward-delete-char # Backspace
+bindkey '^H' backward-delete-char # Backspace (alternate, common in VS Code)
 
 # Home and End keys
-bindkey '^[[H' beginning-of-line       # Home
-bindkey '^[[F' end-of-line             # End
-bindkey '^[[1~' beginning-of-line      # Home (alternate)
-bindkey '^[[4~' end-of-line            # End (alternate)
-bindkey '^[OH' beginning-of-line       # Home (VS Code/xterm application mode)
-bindkey '^[OF' end-of-line             # End (VS Code/xterm application mode)
+bindkey '^[[H' beginning-of-line  # Home
+bindkey '^[[F' end-of-line        # End
+bindkey '^[[1~' beginning-of-line # Home (alternate)
+bindkey '^[[4~' end-of-line       # End (alternate)
+bindkey '^[OH' beginning-of-line  # Home (VS Code/xterm application mode)
+bindkey '^[OF' end-of-line        # End (VS Code/xterm application mode)
 
 # Word navigation (Option+Arrow on macOS)
-bindkey '^[[1;3D' backward-word        # Option+Left
-bindkey '^[[1;3C' forward-word         # Option+Right
-bindkey '^[b' backward-word            # Alt+b (emacs style, works in VS Code)
-bindkey '^[f' forward-word             # Alt+f (emacs style, works in VS Code)
+bindkey '^[[1;3D' backward-word # Option+Left
+bindkey '^[[1;3C' forward-word  # Option+Right
+bindkey '^[b' backward-word     # Alt+b (emacs style, works in VS Code)
+bindkey '^[f' forward-word      # Alt+f (emacs style, works in VS Code)
 
 # Delete word
-bindkey '^[[3;3~' kill-word            # Option+Delete (forward)
-bindkey '^[^?' backward-kill-word      # Option+Backspace
-bindkey '^[d' kill-word                # Alt+d (emacs style)
-bindkey '^W' backward-kill-word        # Ctrl+W
+bindkey '^[[3;3~' kill-word       # Option+Delete (forward)
+bindkey '^[^?' backward-kill-word # Option+Backspace
+bindkey '^[d' kill-word           # Alt+d (emacs style)
+bindkey '^W' backward-kill-word   # Ctrl+W
 
 ### Completion ###
 autoload -Uz compinit
 compinit
 
-if (( ${+functions[compdef]} )); then
+if ((${+functions[compdef]})); then
     # compinit succeeded — replay any calls queued before it ran
-    if (( ${#_sc_compdef_queue} )); then
+    if ((${#_sc_compdef_queue})); then
+        # shellcheck disable=SC2168 # zsh allows local outside functions (same as typeset)
         local _def
         for _def in "${_sc_compdef_queue[@]}"; do
             eval "compdef $_def"
@@ -63,20 +68,25 @@ else
     # compinit aborted (e.g. insecure dirs with no tty) — real compdef was never
     # defined; re-install the queueing stub so later compdef calls degrade silently
     # rather than cascading errors through completions.zsh and any tool blocks below.
-    compdef() { _sc_compdef_queue+=("${(j: :)${(q)@}}") }
+    # shellcheck disable=SC2296 # zsh parameter expansion flags
+    compdef() { _sc_compdef_queue+=("${(j: :)${(q)@}}"); }
 fi
 
+# shellcheck source=/dev/null
 [[ -f ~/.zsh/completions.zsh ]] && source ~/.zsh/completions.zsh
 
 ### Prompt ###
 if [ -f ~/.zsh/git-prompt.sh ]; then
+    # shellcheck source=/dev/null
     source ~/.zsh/git-prompt.sh
     setopt prompt_subst
+    # shellcheck disable=SC2016 # expanded at prompt time via prompt_subst
     _SHELL_CONFIGS_PROMPT='%F{251}%~%F{reset}%B%F{cyan}$(__git_ps1 " %s")%F{yellow}$(__wt_ps1)%F{reset}%b '
     PROMPT="$_SHELL_CONFIGS_PROMPT"
 fi
 
 _restore_prompt() {
+    # shellcheck disable=SC2034 # zsh special parameter
     [[ -n "${_SHELL_CONFIGS_PROMPT-}" ]] && PROMPT="$_SHELL_CONFIGS_PROMPT"
 }
 

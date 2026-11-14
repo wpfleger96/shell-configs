@@ -193,7 +193,9 @@ def _walk_tree(root: object, rel_parts: tuple[str, ...] = ()) -> list[tuple[str,
         if item.is_dir():
             found.extend(_walk_tree(item, rel_parts + (item.name,)))
         elif item.is_file():
-            found.append((item.name, "/".join(rel_parts + (item.name,))))
+            # Python scripts carry .py so ruff lints them; the command drops it
+            name = item.name.removesuffix(".py")
+            found.append((name, "/".join(rel_parts + (item.name,))))
     return found
 
 

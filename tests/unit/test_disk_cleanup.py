@@ -22,7 +22,7 @@ _SCRIPT_PATH = (
     / "shell_configs"
     / "scripts"
     / "system"
-    / "disk-cleanup"
+    / "disk-cleanup.py"
 )
 
 

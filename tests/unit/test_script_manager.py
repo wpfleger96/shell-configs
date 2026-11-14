@@ -375,6 +375,69 @@ class TestGetScriptStatusProfileGating:
         assert status == ScriptStatus.MISSING
 
 
+@pytest.mark.unit
+class TestPythonScriptNames:
+    """A bundled foo.py script installs and is tracked as the command foo."""
+
+    def test_py_script_discovered_without_extension(self, tmp_path):
+        source_dir = _make_source_dir(tmp_path, scripts=["foo.py", "bar"])
+
+        results = discover_scripts(source_dir=source_dir, include_all=True)
+
+        assert {(r.name, r.rel_path) for r in results} == {
+            ("foo", "foo.py"),
+            ("bar", "bar"),
+        }
+
+    def test_py_script_installed_as_command_name(self, tmp_path):
+        source_dir = _make_source_dir(tmp_path, scripts=["foo.py"])
+        [script] = discover_scripts(source_dir=source_dir, include_all=True)
+        manifest = ScriptManifest(tmp_path / "manifest.json")
+        target_dir = tmp_path / "bin"
+
+        result, _ = install_script(script, target_dir, manifest, source_dir=source_dir)
+
+        assert result == InstallResult.INSTALLED
+        assert (target_dir / "foo").read_bytes() == (source_dir / "foo.py").read_bytes()
+        assert not (target_dir / "foo.py").exists()
+        assert list(ScriptManifest(tmp_path / "manifest.json").scripts) == ["foo"]
+
+    def test_scripts_toml_entry_keyed_by_command_name_applies(self, tmp_path):
+        source_dir = _make_source_dir(
+            tmp_path,
+            scripts=["foo.py"],
+            toml_content='[foo]\nplatforms = ["macos"]\nprofiles = ["work"]\n',
+        )
+
+        [script] = discover_scripts(source_dir=source_dir, include_all=True)
+
+        assert script.platforms == frozenset({Platform.MACOS})
+        assert script.profiles == frozenset({"work"})
+        assert (
+            discover_scripts(
+                current_platform=Platform.LINUX,
+                source_dir=source_dir,
+                active_profile="work",
+            )
+            == []
+        )
+
+    def test_install_from_before_rename_is_synced_not_orphaned(self, tmp_path):
+        """An install recorded when the source was extensionless stays tracked."""
+        source_dir = _make_source_dir(tmp_path, scripts=["foo.py"])
+        target_dir = tmp_path / "bin"
+        target_dir.mkdir()
+        (target_dir / "foo").write_bytes((source_dir / "foo.py").read_bytes())
+        manifest = _make_manifest({"foo": "foo"}, tmp_path / "manifest.json")
+        scripts = discover_scripts(source_dir=source_dir, include_all=True)
+
+        assert find_orphaned_scripts(manifest, scripts) == []
+        assert (
+            get_script_status(scripts[0], target_dir, manifest, source_dir=source_dir)
+            == ScriptStatus.INSTALLED
+        )
+
+
 def _make_ctx(profile_name: str | None = None) -> MagicMock:
     ctx = MagicMock()
     ctx.dry_run = False
