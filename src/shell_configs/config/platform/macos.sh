@@ -3,6 +3,13 @@
 # macOS-specific configuration
 # Automatically included on macOS systems
 
+# Colorized BSD `ls` output (only when stdout is a terminal; GNU ls ignores these)
+# LSCOLORS mirrors GNU dircolors defaults for every file type BSD ls supports
+# (bold blue dirs, bold cyan symlinks, bold green executables, ...). BSD ls can't
+# color by extension, so archives etc. stay uncolored unlike on Linux.
+export CLICOLOR=1
+export LSCOLORS=ExGxFxdaCxDaDahbadacec
+
 # iTerm2 shell integration (prompt marks, Cmd+Shift+Up/Down navigation, etc.)
 # Safe to source unconditionally — the script checks for iTerm2 and no-ops elsewhere
 # shellcheck disable=SC1090
