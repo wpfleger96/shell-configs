@@ -84,6 +84,7 @@ src/shell_configs/
 │   └── version.py              # Version comparison
 ├── packages/                   # Package management
 │   └── packages.py             # Tool package definitions
+├── scripts/                    # Utility scripts installed to ~/.local/bin (scripts.toml: platform/profile filters)
 └── config/                     # Managed shell configs (installed by tool)
     ├── shared.sh               # Cross-platform shell config (aliases, functions)
     ├── shared.gitconfig        # Cross-platform git config
@@ -212,7 +213,7 @@ uv run pytest -v                     # Verbose output
 
 2. **Config directory mocking:** Use `test_repo` fixture - it patches `get_config_dir()`
 
-3. **Shell formatting:** `shfmt` excludes `git-prompt.sh` (vendored file via justfile:19,25). Don't modify it.
+3. **Shell formatting:** `shfmt` excludes the vendored `git-prompt.sh` and `iterm2-shell-integration.*` files (Justfile grep filter). Don't modify them.
 
 4. **CLI runner width:** Tests set `COLUMNS=200` to prevent output wrapping
 
@@ -220,7 +221,7 @@ uv run pytest -v                     # Verbose output
 
 6. **Installation method:** Package installs from GitHub via `uv tool install git+https://github.com/wpfleger96/shell-configs.git` (not PyPI)
 
-7. **Shell linting:** `shellcheck` and `shfmt` both exclude `git-prompt.sh` automatically via justfile grep filter
+7. **Shell linting:** `shellcheck` and `shfmt` both exclude `git-prompt.sh` and `iterm2-shell-integration.*` automatically via the Justfile grep filter
 
 8. **Worktree auto-prune removed:** `wt add` no longer auto-prunes worktrees. New branches created from main won't be immediately deleted. Use `wt list` to see `[MERGED]` and `[ORPHAN]` markers, then run `wt prune` manually when needed. Implementation: Orphan detection is consolidated in `_wt_is_orphan()` helper (used by `_wt_ls`, `_wt_prune`, `_wt_orphans`)
 
@@ -252,6 +253,8 @@ uv run pytest -v                     # Verbose output
    - `platform/wsl.sh` → WSL-only tools (Windows paths, `wslpath`, SSH agent bridge)
    - `zsh/zshrc` / `bash/bashrc` → Shell-specific settings (history, keybindings, prompt, completions)
    - **Decision rule:** Does the command exist on all platforms? → `shared.sh`. Only macOS? → `platform/macos.sh`. Only WSL? → `platform/wsl.sh`. Shell syntax differences? → respective shell file.
+
+17. **Bundled scripts are linted:** Shell scripts under `src/shell_configs/scripts/` go through `shellcheck` and `shfmt` like the rest of the repo's shell files. The shell recipes only lint git-tracked files (`git ls-files`), so new scripts are skipped until `git add`ed and nested worktrees are never touched. The scripts are extensionless, so `.editorconfig` has a `[src/shell_configs/scripts/**]` section to keep `switch_case_indent`. A zsh script there needs `# shellcheck shell=bash` after the shebang (as `src/shell_configs/config/zsh/completions.zsh` does) because shellcheck doesn't support zsh.
 
 ## Key Files by Task
 
