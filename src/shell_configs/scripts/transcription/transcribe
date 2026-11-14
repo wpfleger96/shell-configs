@@ -156,7 +156,7 @@ def main() -> None:
 
         if args.output_format in ("txt", "all"):
             out_path = Path(out_dir) / f"{file_path.stem}.txt"
-            with open(out_path, "w") as f:
+            with open(out_path, "w", encoding="utf-8") as f:
                 for segment in segment_list:
                     f.write(
                         f"{format_time(segment.start):>7}  {segment.text.strip()}\n"

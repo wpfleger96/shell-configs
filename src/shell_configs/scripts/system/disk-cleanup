@@ -38,7 +38,7 @@ def _detect_platform() -> str:
         return "macos"
     if sys.platform == "linux":
         try:
-            with open("/proc/version") as f:
+            with open("/proc/version", encoding="utf-8") as f:
                 v = f.read().lower()
                 if "microsoft" in v or "wsl" in v:
                     return "wsl"
@@ -187,6 +187,7 @@ class SizeCache:
             data = {k: {"size_bytes": v[0], "ts": v[1]} for k, v in self._data.items()}
             fd = tempfile.NamedTemporaryFile(
                 mode="w",
+                encoding="utf-8",
                 dir=self._path.parent,
                 suffix=".tmp",
                 delete=False,
@@ -211,9 +212,7 @@ class SizeCache:
 # ---------------------------------------------------------------------------
 
 
-def _scan_dev_tree(
-    dev_dir: Path, max_depth: int = 6
-) -> Generator[ScanTarget, None, None]:
+def _scan_dev_tree(dev_dir: Path, max_depth: int = 6) -> Generator[ScanTarget]:
     _SKIP_NAMES = frozenset({".git", "node_modules", "__pycache__"})
 
     stack: list[tuple[Path, int]] = [(dev_dir, 0)]
@@ -825,7 +824,7 @@ def _parse_size_arg(s: str) -> int:
     try:
         value = float(num_part)
     except ValueError:
-        raise argparse.ArgumentTypeError(f"Invalid size: {s!r}")
+        raise argparse.ArgumentTypeError(f"Invalid size: {s!r}") from None
     return int(value * (1024**exp))
 
 
@@ -1354,9 +1353,7 @@ def _execute_cleanup(
             return t.path
 
     if len(regular) <= 1:
-        attempted: list[Path] = [
-            p for t in regular if (p := _clean_one(t)) is not None
-        ]
+        attempted: list[Path] = [p for t in regular if (p := _clean_one(t)) is not None]
     else:
         from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 
