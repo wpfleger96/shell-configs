@@ -33,8 +33,11 @@ languages:
   - name: node
     command: node
     description: "Node.js (via nvm)"
+    # Fetch the installer before running it: sh has no pipefail, so `curl | bash`
+    # exits 0 when the download fails (bash runs the empty stream).
     install_cmd: >-
-      curl -fsS -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash &&
+      script=$(curl -fsS https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh) &&
+      printf '%s\n' "$script" | bash &&
       export NVM_DIR="$HOME/.nvm" &&
       . "$NVM_DIR/nvm.sh" &&
       nvm install --lts
@@ -43,7 +46,11 @@ languages:
   - name: ruby
     command: ruby
     description: "Ruby (via rvm)"
-    install_cmd: "curl -fsSL https://rvm.io/mpapis.asc | gpg --import - 2>/dev/null; curl -fsSL https://rvm.io/pkuczynski.asc | gpg --import - 2>/dev/null; curl -fsSL https://get.rvm.io | bash -s stable"
+    install_cmd: >-
+      curl -fsSL https://rvm.io/mpapis.asc | gpg --import - 2>/dev/null;
+      curl -fsSL https://rvm.io/pkuczynski.asc | gpg --import - 2>/dev/null;
+      script=$(curl -fsSL https://get.rvm.io) &&
+      printf '%s\n' "$script" | bash -s stable
     check_path: "~/.rvm/bin/rvm"
 
   - name: flutter

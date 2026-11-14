@@ -45,7 +45,11 @@ packages:
       method: brew
     linux:
       method: script
-      install_cmd: "curl -fsS https://webi.sh/shfmt | sh"
+      # Fetch the installer before running it: sh has no pipefail, so `curl | sh`
+      # exits 0 when the download fails (sh runs the empty stream).
+      install_cmd: >-
+        script=$(curl -fsS https://webi.sh/shfmt) &&
+        printf '%s\n' "$script" | sh
 
   # Infrastructure as Code
   - name: terraform
@@ -253,7 +257,9 @@ packages:
       method: brew
     linux:
       method: script
-      install_cmd: "curl -fsS https://webi.sh/delta | sh"
+      install_cmd: >-
+        script=$(curl -fsS https://webi.sh/delta) &&
+        printf '%s\n' "$script" | sh
 
   - name: enpass
     command: Enpass
