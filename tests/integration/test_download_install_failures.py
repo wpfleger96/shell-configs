@@ -3,7 +3,8 @@
 Recipes run under ``/bin/sh``, which has no ``pipefail``, so ``curl -f URL | sh``
 still exits 0 when curl fails: the shell reads empty stdin and succeeds. Each
 recipe runs with a ``curl`` stub and with recording stubs for every command
-that would act on the download.
+that would act on the download. The recorder also logs a ``CONFIGURE`` env
+prefix, so recipes that set one are checked too.
 """
 
 from __future__ import annotations
@@ -16,17 +17,24 @@ from pathlib import Path
 
 import pytest
 
+from shell_configs.agents import load_agents
 from shell_configs.languages import load_languages
 from shell_configs.packages.packages import load_packages
 
 _RECORDER = """#!/bin/sh
-{ echo "$(basename "$0") $*"; cat; } >> "$STUB_DIR/ran"
+{ echo "${CONFIGURE+CONFIGURE=$CONFIGURE }$(basename "$0") $*"; cat; } >> "$STUB_DIR/ran"
 """
 
 
 @pytest.fixture
 def guard_subprocess() -> None:
     """Allow the real shell: every external call it makes is stubbed or sandboxed."""
+
+
+def _agent_cmd(name: str) -> str:
+    cmd = next(agent for agent in load_agents() if agent.name == name).install_cmd
+    assert cmd is not None
+    return cmd
 
 
 def _language_cmd(name: str) -> str:
@@ -54,7 +62,7 @@ def _run(
         stub.chmod(0o755)
 
     env = {
-        **os.environ,
+        **{k: v for k, v in os.environ.items() if k != "CONFIGURE"},
         "PATH": f"{stub_dir}{os.pathsep}{os.environ['PATH']}",
         "HOME": str(tmp_path),
         "TMPDIR": str(tmp_path),
@@ -70,10 +78,17 @@ def _run(
 @pytest.mark.parametrize(
     ("load_cmd", "name"),
     [
+        pytest.param(_agent_cmd, "claude-code", id="claude-code"),
+        pytest.param(_agent_cmd, "goose", id="goose"),
+        pytest.param(_agent_cmd, "codex", id="codex"),
+        pytest.param(_agent_cmd, "amp", id="amp"),
+        pytest.param(_language_cmd, "rust", id="rust"),
         pytest.param(_language_cmd, "node", id="node"),
         pytest.param(_language_cmd, "ruby", id="ruby"),
         pytest.param(_package_cmd, "shfmt", id="shfmt"),
         pytest.param(_package_cmd, "git-delta", id="git-delta"),
+        pytest.param(_package_cmd, "just", id="just"),
+        pytest.param(_package_cmd, "pnpm", id="pnpm"),
         pytest.param(_package_cmd, "tflint", id="tflint"),
     ],
 )
@@ -90,10 +105,19 @@ def test_failed_download_fails_without_running_anything(
 @pytest.mark.parametrize(
     ("load_cmd", "name", "runner"),
     [
+        pytest.param(_agent_cmd, "claude-code", "bash ", id="claude-code"),
+        pytest.param(_agent_cmd, "goose", "CONFIGURE=false bash ", id="goose"),
+        pytest.param(_agent_cmd, "codex", "sh ", id="codex"),
+        pytest.param(_agent_cmd, "amp", "bash ", id="amp"),
+        pytest.param(_language_cmd, "rust", "sh -s -- -y", id="rust"),
         pytest.param(_language_cmd, "node", "bash ", id="node"),
         pytest.param(_language_cmd, "ruby", "bash -s stable", id="ruby"),
         pytest.param(_package_cmd, "shfmt", "sh ", id="shfmt"),
         pytest.param(_package_cmd, "git-delta", "sh ", id="git-delta"),
+        pytest.param(
+            _package_cmd, "just", "bash -s -- --to {home}/.local/bin", id="just"
+        ),
+        pytest.param(_package_cmd, "pnpm", "sh -", id="pnpm"),
     ],
 )
 def test_downloaded_installer_is_piped_to_shell(
@@ -101,4 +125,5 @@ def test_downloaded_installer_is_piped_to_shell(
 ) -> None:
     _, ran = _run(tmp_path, load_cmd(name), "#!/bin/sh\necho 'echo installer'\n")
 
-    assert ran.read_text() == f"{runner}\necho installer\n"
+    expected_runner = runner.format(home=tmp_path)
+    assert ran.read_text() == f"{expected_runner}\necho installer\n"

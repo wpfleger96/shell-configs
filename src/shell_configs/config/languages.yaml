@@ -1,3 +1,7 @@
+# Recipes that run a downloaded installer fetch it first and pipe it to the shell
+# only if curl succeeded: sh has no pipefail, so `curl -f URL | sh` exits 0 when
+# the download fails (the shell runs the empty stream).
+
 languages:
   - name: go
     command: go
@@ -27,14 +31,14 @@ languages:
   - name: rust
     command: rustup
     description: "Rust toolchain (via rustup)"
-    install_cmd: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+    install_cmd: >-
+      script=$(curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs) &&
+      printf '%s\n' "$script" | sh -s -- -y
     check_path: "~/.cargo/bin/rustup"
 
   - name: node
     command: node
     description: "Node.js (via nvm)"
-    # Fetch the installer before running it: sh has no pipefail, so `curl | bash`
-    # exits 0 when the download fails (bash runs the empty stream).
     install_cmd: >-
       script=$(curl -fsS https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh) &&
       printf '%s\n' "$script" | bash &&

@@ -1,13 +1,21 @@
+# Recipes that run a downloaded installer fetch it first and pipe it to the shell
+# only if curl succeeded: sh has no pipefail, so `curl -f URL | sh` exits 0 when
+# the download fails (the shell runs the empty stream).
+
 agents:
   - name: claude-code
     command: claude
     description: "Claude Code — Anthropic AI coding agent"
-    install_cmd: "curl -fsSL https://claude.ai/install.sh | bash"
+    install_cmd: >-
+      script=$(curl -fsSL https://claude.ai/install.sh) &&
+      printf '%s\n' "$script" | bash
 
   - name: goose
     command: goose
     description: "Goose — Block AI coding agent"
-    install_cmd: "curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash"
+    install_cmd: >-
+      script=$(curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh) &&
+      printf '%s\n' "$script" | CONFIGURE=false bash
 
   - name: gemini-cli
     command: gemini
@@ -22,9 +30,13 @@ agents:
   - name: codex
     command: codex
     description: "Codex CLI — OpenAI coding agent"
-    install_cmd: "curl -fsSL https://chatgpt.com/codex/install.sh | sh"
+    install_cmd: >-
+      script=$(curl -fsSL https://chatgpt.com/codex/install.sh) &&
+      printf '%s\n' "$script" | sh
 
   - name: amp
     command: amp
     description: "Amp — Ampcode AI coding agent"
-    install_cmd: "curl -fsSL https://ampcode.com/install.sh | bash"
+    install_cmd: >-
+      script=$(curl -fsSL https://ampcode.com/install.sh) &&
+      printf '%s\n' "$script" | bash
