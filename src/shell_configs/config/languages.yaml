@@ -31,7 +31,7 @@ languages:
     command: ruby
     description: "Ruby (via rvm)"
     install_cmd: "curl -sSL https://rvm.io/mpapis.asc | gpg --import - 2>/dev/null; curl -sSL https://rvm.io/pkuczynski.asc | gpg --import - 2>/dev/null; curl -sSL https://get.rvm.io | bash -s stable"
-    check_path: "~/.rvm/scripts/rvm"
+    check_path: "~/.rvm/bin/rvm"
 
   - name: flutter
     command: flutter

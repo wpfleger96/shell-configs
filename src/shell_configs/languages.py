@@ -133,14 +133,15 @@ def get_language_version(lang: Language) -> str | None:
 def ensure_language_paths(languages: list[Language]) -> None:
     """Add check_path directories of installed languages to the current process PATH."""
     path = os.environ.get("PATH", "")
+    entries = path.split(os.pathsep) if path else []
     for lang in languages:
         if lang.check_path:
             resolved = _resolve_check_path(lang.check_path)
             if resolved is not None:
                 bin_dir = str(resolved.parent)
-                if bin_dir not in path:
-                    path = bin_dir + os.pathsep + path
-    os.environ["PATH"] = path
+                if bin_dir not in entries:
+                    entries.insert(0, bin_dir)
+    os.environ["PATH"] = os.pathsep.join(entries)
 
 
 def install_language(lang: Language, dry_run: bool = False) -> tuple[bool, str]:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 
 from pathlib import Path
@@ -13,6 +14,7 @@ from shell_configs.languages import (
     Language,
     LanguageInstallConfig,
     _resolve_check_path,
+    ensure_language_paths,
     get_language_version,
     install_language,
     is_language_installed,
@@ -140,6 +142,15 @@ class TestLoadLanguages:
         manifest = tmp_path / "languages.yaml"
         manifest.write_text("languages: []\n")
         assert load_languages(manifest) == []
+
+    def test_bundled_check_paths_point_into_bin_dirs(self):
+        # ensure_language_paths prepends check_path's parent to PATH, so it
+        # must be a bin dir — otherwise non-binary scripts can shadow system tools.
+        langs = [lang for lang in load_languages() if lang.check_path]
+        assert langs
+        for lang in langs:
+            assert lang.check_path is not None
+            assert Path(lang.check_path).parent.name == "bin", lang.name
 
 
 # ---------------------------------------------------------------------------
@@ -473,3 +484,50 @@ class TestLanguagesComponent:
 
         mock_install.assert_called_once_with(lang, dry_run=False)
         assert mock_paths.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# TestEnsureLanguagePaths
+# ---------------------------------------------------------------------------
+
+
+def _install_binary(bin_dir: Path, name: str = "go") -> Path:
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    binary = bin_dir / name
+    binary.touch()
+    return binary
+
+
+@pytest.mark.unit
+class TestEnsureLanguagePaths:
+    def test_installed_language_bin_dir_is_prepended(self, tmp_path, monkeypatch):
+        binary = _install_binary(tmp_path / "go" / "bin")
+        monkeypatch.setenv("PATH", "/usr/bin")
+        ensure_language_paths([_make_lang(check_path=str(binary))])
+        assert os.environ["PATH"].split(os.pathsep) == [
+            str(binary.parent),
+            "/usr/bin",
+        ]
+
+    def test_bin_dir_already_in_path_is_not_duplicated(self, tmp_path, monkeypatch):
+        binary = _install_binary(tmp_path / "go" / "bin")
+        original = os.pathsep.join(["/usr/bin", str(binary.parent)])
+        monkeypatch.setenv("PATH", original)
+        ensure_language_paths([_make_lang(check_path=str(binary))])
+        assert os.environ["PATH"] == original
+
+    def test_bin_dir_prefix_of_existing_entry_is_prepended(self, tmp_path, monkeypatch):
+        binary = _install_binary(tmp_path / "go" / "bin")
+        longer = str(tmp_path / "go" / "bin2")
+        monkeypatch.setenv("PATH", os.pathsep.join([longer, "/usr/bin"]))
+        ensure_language_paths([_make_lang(check_path=str(binary))])
+        assert os.environ["PATH"].split(os.pathsep) == [
+            str(binary.parent),
+            longer,
+            "/usr/bin",
+        ]
+
+    def test_uninstalled_language_leaves_path_unchanged(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("PATH", "/usr/bin")
+        ensure_language_paths([_make_lang(check_path=str(tmp_path / "missing"))])
+        assert os.environ["PATH"] == "/usr/bin"
