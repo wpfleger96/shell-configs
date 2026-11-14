@@ -124,6 +124,22 @@ class TestLoadLanguages:
         langs = load_languages(manifest)
         assert langs[0].install_cmd == "curl https://sh.rustup.rs | sh"
 
+    def test_install_timeout_parsed_with_default(self, tmp_path):
+        manifest = tmp_path / "languages.yaml"
+        manifest.write_text(
+            "languages:\n"
+            "  - name: flutter\n"
+            "    command: flutter\n"
+            "    install_timeout: 1800\n"
+            "  - name: go\n"
+            "    command: go\n"
+            "  - name: rust\n"
+            "    command: rustup\n"
+            "    install_timeout: soon\n"
+        )
+        timeouts = [lang.install_timeout for lang in load_languages(manifest)]
+        assert timeouts == [1800, 300, 300]
+
     def test_skips_entries_missing_required_fields(self, tmp_path):
         manifest = tmp_path / "languages.yaml"
         manifest.write_text(
@@ -334,6 +350,25 @@ class TestInstallLanguage:
             ok, msg = install_language(lang)
         assert ok
         assert mock_run.call_args[1].get("shell") is True
+
+    def test_script_install_uses_install_timeout(self, monkeypatch):
+        monkeypatch.setattr("shell_configs.installers.is_platform", lambda p: False)
+        lang = Language(
+            name="flutter",
+            command="flutter",
+            description="Flutter",
+            install_cmd="true",
+            install_timeout=1800,
+        )
+        with (
+            patch("shell_configs.languages.is_language_installed", return_value=False),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="", stderr=""
+            )
+            install_language(lang)
+        assert mock_run.call_args[1]["timeout"] == 1800
 
     def test_dry_run_brew(self, monkeypatch):
         monkeypatch.setattr(

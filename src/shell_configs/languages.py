@@ -14,6 +14,7 @@ import yaml
 from shell_configs.bootstrap import is_command_available
 from shell_configs.config import get_config_dir
 from shell_configs.installers import (
+    DEFAULT_TIMEOUT,
     PlatformInstallConfig,
     install_apt,
     install_brew,
@@ -46,6 +47,8 @@ class Language:
     check_path: str | None = None
     # Cross-platform curl/script install command (used when macos/linux are absent)
     install_cmd: str | None = None
+    # Seconds install_cmd may run before it is killed
+    install_timeout: int = DEFAULT_TIMEOUT
     macos: LanguageInstallConfig | None = None
     linux: LanguageInstallConfig | None = None
     windows: LanguageInstallConfig | None = None
@@ -73,6 +76,7 @@ def load_languages(manifest_path: Path | None = None) -> list[Language]:
             continue
 
         macos_cfg, linux_cfg, windows_cfg = parse_platform_configs(entry)
+        timeout = entry.get("install_timeout")
 
         result.append(
             Language(
@@ -82,6 +86,11 @@ def load_languages(manifest_path: Path | None = None) -> list[Language]:
                 status_only=bool(entry.get("status_only", False)),
                 check_path=entry.get("check_path") or None,
                 install_cmd=entry.get("install_cmd") or None,
+                install_timeout=(
+                    timeout
+                    if isinstance(timeout, int) and timeout > 0
+                    else DEFAULT_TIMEOUT
+                ),
                 macos=macos_cfg,
                 linux=linux_cfg,
                 windows=windows_cfg,
@@ -173,5 +182,7 @@ def install_language(lang: Language, dry_run: bool = False) -> tuple[bool, str]:
     if config:
         return run_via_config(lang.name, config, dry_run, handlers=_LANGUAGE_INSTALL)
     if lang.install_cmd:
-        return run_script(lang.name, lang.install_cmd, dry_run)
+        return run_script(
+            lang.name, lang.install_cmd, dry_run, timeout=lang.install_timeout
+        )
     return False, f"No install method configured for {lang.name} on this platform"

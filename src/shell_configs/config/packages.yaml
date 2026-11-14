@@ -1,5 +1,9 @@
 # Package manifest for shell-configs
 # Packages required for development environment
+#
+# Recipes that run a downloaded installer fetch it first and pipe it to the shell
+# only if curl succeeded: sh has no pipefail, so `curl -f URL | sh` exits 0 when
+# the download fails (the shell runs the empty stream).
 
 packages:
   # System utilities
@@ -45,7 +49,9 @@ packages:
       method: brew
     linux:
       method: script
-      install_cmd: "curl -sS https://webi.sh/shfmt | sh"
+      install_cmd: >-
+        script=$(curl -fsS https://webi.sh/shfmt) &&
+        printf '%s\n' "$script" | sh
 
   # Infrastructure as Code
   - name: terraform
@@ -72,7 +78,13 @@ packages:
       package: terraform-linters/tap/tflint
     linux:
       method: script
-      install_cmd: "curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash"
+      install_cmd: >-
+        ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') &&
+        tmp=$(mktemp -d) &&
+        trap 'rm -rf "$tmp"' EXIT &&
+        curl -fsSL "https://github.com/terraform-linters/tflint/releases/latest/download/tflint_linux_${ARCH}.zip" -o "$tmp/tflint.zip" &&
+        python3 -m zipfile -e "$tmp/tflint.zip" "$tmp" &&
+        sudo install -m 755 "$tmp/tflint" /usr/local/bin/tflint
 
   - name: docker
     command: docker
@@ -127,7 +139,9 @@ packages:
       method: brew
     linux:
       method: script
-      install_cmd: "curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin"
+      install_cmd: >-
+        script=$(curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh) &&
+        printf '%s\n' "$script" | bash -s -- --to ~/.local/bin
 
   - name: pnpm
     command: pnpm
@@ -136,7 +150,9 @@ packages:
       method: brew
     linux:
       method: script
-      install_cmd: "curl -fsSL https://get.pnpm.io/install.sh | sh -"
+      install_cmd: >-
+        script=$(curl -fsSL https://get.pnpm.io/install.sh) &&
+        printf '%s\n' "$script" | sh -
 
   - name: ripgrep
     command: rg
@@ -247,7 +263,9 @@ packages:
       method: brew
     linux:
       method: script
-      install_cmd: "curl -sS https://webi.sh/delta | sh"
+      install_cmd: >-
+        script=$(curl -fsS https://webi.sh/delta) &&
+        printf '%s\n' "$script" | sh
 
   - name: enpass
     command: Enpass
