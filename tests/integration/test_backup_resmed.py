@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 
 from pathlib import Path
@@ -23,7 +24,7 @@ _SERIAL_A = "11111111111"
 _SERIAL_B = "22222222222"
 
 
-def _id_json(serial: str) -> str:
+def _id_json(serial: str, indent: int | None = None) -> str:
     return json.dumps(
         {
             "FlowGenerator": {
@@ -34,8 +35,38 @@ def _id_json(serial: str) -> str:
                     }
                 }
             }
-        }
+        },
+        indent=indent,
     )
+
+
+def _path_without_jq(bin_dir: Path) -> str:
+    """Return a PATH that resolves every current executable except jq."""
+    for directory in os.environ.get("PATH", "").split(os.pathsep):
+        if not os.path.isdir(directory):
+            continue
+        for entry in os.scandir(directory):
+            link = bin_dir / entry.name
+            if (
+                entry.name != "jq"
+                and not link.exists()
+                and entry.is_file()
+                and os.access(entry.path, os.X_OK)
+            ):
+                link.symlink_to(entry.path)
+    return str(bin_dir)
+
+
+@pytest.fixture(scope="module", params=["jq", "no-jq"])
+def jq_env(
+    request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory
+) -> dict[str, str]:
+    """Environment exercising the script's jq branch or its no-jq fallback."""
+    if request.param == "jq":
+        if shutil.which("jq") is None:
+            pytest.skip("jq is not installed")
+        return {}
+    return {"PATH": _path_without_jq(tmp_path_factory.mktemp("bin"))}
 
 
 def _make_source(path: Path, serial: str) -> None:
@@ -67,57 +98,110 @@ def _run(
 
 @pytest.mark.integration
 class TestSerialGuard:
-    def test_serial_match_proceeds(self, tmp_path: Path) -> None:
+    def test_serial_match_proceeds(
+        self, tmp_path: Path, jq_env: dict[str, str]
+    ) -> None:
         src = tmp_path / "source"
         dest = tmp_path / "dest"
         _make_source(src, _SERIAL_A)
         _make_dest(dest, _SERIAL_A)
 
-        result = _run("--dry-run", "--source", str(src), "--dest", str(dest))
+        result = _run(
+            "--dry-run", "--source", str(src), "--dest", str(dest), env=jq_env
+        )
 
         assert result.returncode == 0
         assert "mismatch" not in result.stdout.lower()
         assert "mismatch" not in result.stderr.lower()
 
-    def test_serial_mismatch_refused_aborts_nonzero(self, tmp_path: Path) -> None:
+    def test_serial_mismatch_refused_aborts_nonzero(
+        self, tmp_path: Path, jq_env: dict[str, str]
+    ) -> None:
         src = tmp_path / "source"
         dest = tmp_path / "dest"
         _make_source(src, _SERIAL_A)
         _make_dest(dest, _SERIAL_B)
 
-        result = _run("--source", str(src), "--dest", str(dest), stdin="no\n")
+        result = _run(
+            "--source", str(src), "--dest", str(dest), stdin="no\n", env=jq_env
+        )
 
         assert result.returncode != 0
         assert "mismatch" in result.stdout.lower()
         assert "aborted" in (result.stdout + result.stderr).lower()
 
-    def test_serial_mismatch_dry_run_exits_zero(self, tmp_path: Path) -> None:
+    def test_serial_mismatch_dry_run_exits_zero(
+        self, tmp_path: Path, jq_env: dict[str, str]
+    ) -> None:
         src = tmp_path / "source"
         dest = tmp_path / "dest"
         _make_source(src, _SERIAL_A)
         _make_dest(dest, _SERIAL_B)
 
-        result = _run("--dry-run", "--source", str(src), "--dest", str(dest))
+        result = _run(
+            "--dry-run", "--source", str(src), "--dest", str(dest), env=jq_env
+        )
 
         assert result.returncode == 0
         assert "mismatch" in result.stdout.lower()
         assert "dry run" in result.stdout.lower()
 
-    def test_missing_dest_identification_json_proceeds(self, tmp_path: Path) -> None:
+    def test_missing_dest_identification_json_proceeds(
+        self, tmp_path: Path, jq_env: dict[str, str]
+    ) -> None:
         src = tmp_path / "source"
         dest = tmp_path / "dest"
         _make_source(src, _SERIAL_A)
         _make_dest(dest, serial=None)
 
-        result = _run("--dry-run", "--source", str(src), "--dest", str(dest))
+        result = _run(
+            "--dry-run", "--source", str(src), "--dest", str(dest), env=jq_env
+        )
 
         assert result.returncode == 0
         assert "first backup" in result.stdout.lower()
 
+    def test_dest_identification_json_without_serial_treated_as_first_backup(
+        self, tmp_path: Path, jq_env: dict[str, str]
+    ) -> None:
+        src = tmp_path / "source"
+        dest = tmp_path / "dest"
+        _make_source(src, _SERIAL_A)
+        _make_dest(dest, serial=None)
+        (dest / "Identification.json").write_text("{}")
+
+        result = _run(
+            "--dry-run", "--source", str(src), "--dest", str(dest), env=jq_env
+        )
+
+        assert result.returncode == 0
+        assert "first backup" in result.stdout.lower()
+        assert "dry run" in result.stdout.lower()
+
+    @pytest.mark.parametrize("indent", [None, 2], ids=["single-line", "pretty"])
+    def test_header_shows_parsed_device_name_and_serial(
+        self, tmp_path: Path, jq_env: dict[str, str], indent: int | None
+    ) -> None:
+        src = tmp_path / "source"
+        dest = tmp_path / "dest"
+        _make_source(src, _SERIAL_A)
+        (src / "Identification.json").write_text(_id_json(_SERIAL_A, indent=indent))
+        _make_dest(dest, _SERIAL_A)
+
+        result = _run(
+            "--dry-run", "--source", str(src), "--dest", str(dest), env=jq_env
+        )
+
+        assert result.returncode == 0
+        assert f"AirSense 11 AutoSet (serial: {_SERIAL_A})" in result.stdout
+        assert "Unknown ResMed device" not in result.stdout
+
 
 @pytest.mark.integration
 class TestAutodetectAndArchiving:
-    def test_autodetect_single_card_used_noninteractively(self, tmp_path: Path) -> None:
+    def test_autodetect_single_card_used_noninteractively(
+        self, tmp_path: Path, jq_env: dict[str, str]
+    ) -> None:
         base = tmp_path / "media"
         card = base / "RESMED-CARD"
         _make_source(card, _SERIAL_A)
@@ -128,13 +212,15 @@ class TestAutodetectAndArchiving:
             "--dry-run",
             "--dest",
             str(dest),
-            env={"BACKUP_RESMED_SCAN_DIRS": str(base)},
+            env={**jq_env, "BACKUP_RESMED_SCAN_DIRS": str(base)},
         )
 
         assert result.returncode == 0
         assert str(card) in result.stdout
 
-    def test_autodetect_multiple_cards_prompts_selection(self, tmp_path: Path) -> None:
+    def test_autodetect_multiple_cards_prompts_selection(
+        self, tmp_path: Path, jq_env: dict[str, str]
+    ) -> None:
         base = tmp_path / "media"
         card1 = base / "CARD-1"
         card2 = base / "CARD-2"
@@ -148,7 +234,7 @@ class TestAutodetectAndArchiving:
             "--dest",
             str(dest),
             stdin="1\n",
-            env={"BACKUP_RESMED_SCAN_DIRS": str(base)},
+            env={**jq_env, "BACKUP_RESMED_SCAN_DIRS": str(base)},
         )
 
         assert result.returncode == 0
@@ -156,7 +242,7 @@ class TestAutodetectAndArchiving:
         assert "multiple resmed sd cards" in combined.lower()
 
     def test_autodetect_no_card_falls_back_to_manual_prompt(
-        self, tmp_path: Path
+        self, tmp_path: Path, jq_env: dict[str, str]
     ) -> None:
         base = tmp_path / "media"
         base.mkdir(parents=True)
@@ -165,14 +251,16 @@ class TestAutodetectAndArchiving:
             "--dest",
             str(tmp_path / "dest"),
             stdin="",
-            env={"BACKUP_RESMED_SCAN_DIRS": str(base)},
+            env={**jq_env, "BACKUP_RESMED_SCAN_DIRS": str(base)},
         )
 
         assert result.returncode != 0
         combined = result.stdout + result.stderr
         assert "no" in combined.lower() and "sd card" in combined.lower()
 
-    def test_existing_dest_str_archived_with_mtime_date(self, tmp_path: Path) -> None:
+    def test_existing_dest_str_archived_with_mtime_date(
+        self, tmp_path: Path, jq_env: dict[str, str]
+    ) -> None:
         import datetime
 
         src = tmp_path / "source"
@@ -186,7 +274,7 @@ class TestAutodetectAndArchiving:
         known_ts = datetime.datetime(2026, 1, 15, 12, 0, 0).timestamp()
         os.utime(str(str_edf), (known_ts, known_ts))
 
-        result = _run("--source", str(src), "--dest", str(dest))
+        result = _run("--source", str(src), "--dest", str(dest), env=jq_env)
 
         assert result.returncode == 0
         assert (dest / "STR_Backup" / "STR-2026-01-15.edf").exists()

@@ -25,6 +25,16 @@ detect_platform() {
 
 PLATFORM=$(detect_platform)
 
+# Prints a Product field from Identification.json; prints nothing (and succeeds) if absent or unparseable
+read_product_field() {
+    local id_file="$1" field="$2"
+    if command -v jq &>/dev/null; then
+        jq -r --arg field "$field" '.FlowGenerator.IdentificationProfiles.Product[$field] // empty' "$id_file" 2>/dev/null || true
+    else
+        sed -n 's/.*"'"$field"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$id_file" 2>/dev/null | head -1 || true
+    fi
+}
+
 read_device_name() {
     local id_file="$1/Identification.json"
     if [[ ! -f "$id_file" ]]; then
@@ -32,14 +42,9 @@ read_device_name() {
         return
     fi
 
-    local name="" serial=""
-    if command -v jq &>/dev/null; then
-        name=$(jq -r '.FlowGenerator.IdentificationProfiles.Product.ProductName // empty' "$id_file" 2>/dev/null)
-        serial=$(jq -r '.FlowGenerator.IdentificationProfiles.Product.SerialNumber // empty' "$id_file" 2>/dev/null)
-    else
-        name=$(grep -o '"ProductName":"[^"]*"' "$id_file" 2>/dev/null | head -1 | cut -d'"' -f4)
-        serial=$(grep -o '"SerialNumber":"[^"]*"' "$id_file" 2>/dev/null | head -1 | cut -d'"' -f4)
-    fi
+    local name serial
+    name=$(read_product_field "$id_file" ProductName)
+    serial=$(read_product_field "$id_file" SerialNumber)
 
     if [[ -n "$name" ]]; then
         local display_name
@@ -57,11 +62,7 @@ read_serial() {
         return
     fi
 
-    if command -v jq &>/dev/null; then
-        jq -r '.FlowGenerator.IdentificationProfiles.Product.SerialNumber // empty' "$id_file" 2>/dev/null
-    else
-        grep -o '"SerialNumber":"[^"]*"' "$id_file" 2>/dev/null | head -1 | cut -d'"' -f4
-    fi
+    read_product_field "$id_file" SerialNumber
 }
 
 wsl_ensure_mount() {
