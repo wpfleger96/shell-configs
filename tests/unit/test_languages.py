@@ -182,6 +182,24 @@ class TestResolveCheckPath:
         assert result is not None
         assert "v22.1.0" in str(result)
 
+    def test_glob_picks_highest_major_across_digit_counts(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        for ver in ("v9.11.2", "v10.0.0", "v24.1.0"):
+            node_bin = tmp_path / ".nvm" / "versions" / "node" / ver / "bin"
+            node_bin.mkdir(parents=True)
+            (node_bin / "node").touch()
+        result = _resolve_check_path("~/.nvm/versions/node/v*/bin/node")
+        assert result == tmp_path / ".nvm/versions/node/v24.1.0/bin/node"
+
+    def test_glob_picks_highest_minor_across_digit_counts(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        for ver in ("v20.9.0", "v20.10.1"):
+            node_bin = tmp_path / ".nvm" / "versions" / "node" / ver / "bin"
+            node_bin.mkdir(parents=True)
+            (node_bin / "node").touch()
+        result = _resolve_check_path("~/.nvm/versions/node/v*/bin/node")
+        assert result == tmp_path / ".nvm/versions/node/v20.10.1/bin/node"
+
     def test_glob_no_matches(self, tmp_path, monkeypatch):
         monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
         assert _resolve_check_path("~/.nvm/versions/node/v*/bin/node") is None
