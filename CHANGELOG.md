@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.71.1](https://github.com/wpfleger96/shell-configs/compare/v0.71.0...v0.71.1) (2026-11-14)
+
+
+### Bug Fixes
+
+* **shell:** bypass pip HTTP cache in python_package_versions ([#229](https://github.com/wpfleger96/shell-configs/issues/229)) ([e8ff9a0](https://github.com/wpfleger96/shell-configs/commit/e8ff9a0f8df7ce589d729f3ea667c6e6e17a61bb))
+
 ## [0.71.0](https://github.com/wpfleger96/shell-configs/compare/v0.70.5...v0.71.0) (2026-11-14)
 
 
