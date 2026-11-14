@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## [0.70.5](https://github.com/wpfleger96/shell-configs/compare/v0.70.4...v0.70.5) (2026-11-14)
+
+
+### Bug Fixes
+
+* **install:** stop failed downloads from passing as successful installs ([#225](https://github.com/wpfleger96/shell-configs/issues/225)) ([47c5d30](https://github.com/wpfleger96/shell-configs/commit/47c5d309447a464de8df80c0e9e6a38100e26515)), closes [#221](https://github.com/wpfleger96/shell-configs/issues/221)
+* **languages:** pick the newest nvm node version by numeric sort ([#214](https://github.com/wpfleger96/shell-configs/issues/214)) ([938799f](https://github.com/wpfleger96/shell-configs/commit/938799f012335ce653f0f0bb505995cea73a3ddb)), closes [#212](https://github.com/wpfleger96/shell-configs/issues/212)
+* **languages:** put go on the process PATH for install recipes ([#215](https://github.com/wpfleger96/shell-configs/issues/215)) ([aba1186](https://github.com/wpfleger96/shell-configs/commit/aba118604405fadd4095f9a68c8be6ff7f4f2d65)), closes [#211](https://github.com/wpfleger96/shell-configs/issues/211)
+* **languages:** stop a failed Go download from faking an install ([#219](https://github.com/wpfleger96/shell-configs/issues/219)) ([3882ad7](https://github.com/wpfleger96/shell-configs/commit/3882ad7e19ab9e0f051da371ca52cf320eadc910)), closes [#218](https://github.com/wpfleger96/shell-configs/issues/218)
+* **languages:** stop rvm scripts dir from shadowing system tools ([#210](https://github.com/wpfleger96/shell-configs/issues/210)) ([2e35b01](https://github.com/wpfleger96/shell-configs/commit/2e35b019f17623ee472520546205ed527af1ba74))
+* **scripts:** read ResMed device serial without jq ([#216](https://github.com/wpfleger96/shell-configs/issues/216)) ([297a1eb](https://github.com/wpfleger96/shell-configs/commit/297a1eb1d20ebbbb5cbb46ccb355e1454dd0cf16)), closes [#213](https://github.com/wpfleger96/shell-configs/issues/213)
+
+
+### Chores
+
+* **deps:** Lock file maintenance ([#208](https://github.com/wpfleger96/shell-configs/issues/208)) ([d3b198f](https://github.com/wpfleger96/shell-configs/commit/d3b198fa946f1afb59a013017ed9bc3bfde74e68))
+* **deps:** Lock file maintenance ([#209](https://github.com/wpfleger96/shell-configs/issues/209)) ([b65072b](https://github.com/wpfleger96/shell-configs/commit/b65072b8f9f233b270ca99026f073d36a97d602d))
+* **deps:** Update astral-sh/setup-uv action to v10.3.2 ([#200](https://github.com/wpfleger96/shell-configs/issues/200)) ([44ecb01](https://github.com/wpfleger96/shell-configs/commit/44ecb015c4fc8579bfd3d6018620fea74f806b2f))
+* **scripts:** lint bundled Python scripts and the bashrc/zshrc configs ([#226](https://github.com/wpfleger96/shell-configs/issues/226)) ([bd6276e](https://github.com/wpfleger96/shell-configs/commit/bd6276ea854ad65e6fe17cc414edc37d14d86071)), closes [#222](https://github.com/wpfleger96/shell-configs/issues/222)
+* **scripts:** lint bundled scripts and remove work laptop scripts ([#220](https://github.com/wpfleger96/shell-configs/issues/220)) ([ce665a9](https://github.com/wpfleger96/shell-configs/commit/ce665a98b7a3632d1c28e1239694243aec2cfa6d))
+* sync issue templates ([e30db24](https://github.com/wpfleger96/shell-configs/commit/e30db2470d2e5a1a3983f03f3e0a05428abbd589))
+
+
+### Continuous Integration
+
+* sync CI workflow ([15d146a](https://github.com/wpfleger96/shell-configs/commit/15d146a4a683d7368e84e0cfa939a8210d7f5a22))
+* sync CI workflow ([2b72f52](https://github.com/wpfleger96/shell-configs/commit/2b72f52a1115376ee5916009ba3854372283be84))
+* sync CI workflow ([0a379c3](https://github.com/wpfleger96/shell-configs/commit/0a379c3db2a4a07cc1b469b863119dfcc7a39118))
+* sync release workflow ([7c438e9](https://github.com/wpfleger96/shell-configs/commit/7c438e96f74823e33972da2276d4bd66481e7752))
+* sync release workflow ([ca173e9](https://github.com/wpfleger96/shell-configs/commit/ca173e9187a054669489adf878ad5ec4d04d2ab5))
+* sync shared files ([9b7032d](https://github.com/wpfleger96/shell-configs/commit/9b7032dfb86959f2f6fb66ff7b8748991dab1551))
+
+
+### Testing
+
+* **backup-resmed:** skip PATH entries that can't be stat'd ([#224](https://github.com/wpfleger96/shell-configs/issues/224)) ([7cb9b86](https://github.com/wpfleger96/shell-configs/commit/7cb9b86489831d21ac6ccf416dd8fb553893caad)), closes [#223](https://github.com/wpfleger96/shell-configs/issues/223)
+
 ## [0.70.4](https://github.com/wpfleger96/shell-configs/compare/v0.70.3...v0.70.4) (2026-10-27)
 
 
