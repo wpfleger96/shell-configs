@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 
 from pathlib import Path
@@ -23,7 +24,11 @@ _SERIAL_A = "11111111111"
 _SERIAL_B = "22222222222"
 
 
-def _id_json(serial: str) -> str:
+def _id_json(
+    serial: str,
+    indent: int | None = None,
+    separators: tuple[str, str] | None = None,
+) -> str:
     return json.dumps(
         {
             "FlowGenerator": {
@@ -34,8 +39,49 @@ def _id_json(serial: str) -> str:
                     }
                 }
             }
-        }
+        },
+        indent=indent,
+        separators=separators,
     )
+
+
+def _path_without_jq(bin_dir: Path) -> str:
+    """Return a PATH that resolves every current executable except jq.
+
+    Each name links to its first match on PATH, so PATH precedence is preserved.
+    """
+    for directory in os.environ.get("PATH", "").split(os.pathsep):
+        if not os.path.isdir(directory):
+            continue
+        for entry in os.scandir(directory):
+            link = bin_dir / entry.name
+            if (
+                entry.name != "jq"
+                and not link.exists()
+                and entry.is_file()
+                and os.access(entry.path, os.X_OK)
+            ):
+                link.symlink_to(entry.path)
+    return str(bin_dir)
+
+
+@pytest.fixture(scope="module", params=["jq", "no-jq"])
+def jq_path_override(
+    request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory
+) -> str | None:
+    """PATH that hides jq for the no-jq variant; None to keep PATH as-is."""
+    if request.param == "jq":
+        if shutil.which("jq") is None:
+            pytest.skip("jq is not installed")
+        return None
+    return _path_without_jq(tmp_path_factory.mktemp("bin"))
+
+
+@pytest.fixture(autouse=True)
+def _jq_variant(jq_path_override: str | None, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run every test against both the script's jq branch and its fallback."""
+    if jq_path_override is not None:
+        monkeypatch.setenv("PATH", jq_path_override)
 
 
 def _make_source(path: Path, serial: str) -> None:
@@ -113,6 +159,124 @@ class TestSerialGuard:
 
         assert result.returncode == 0
         assert "first backup" in result.stdout.lower()
+
+    def test_dest_identification_json_without_serial_dry_run_requires_confirmation(
+        self, tmp_path: Path
+    ) -> None:
+        src = tmp_path / "source"
+        dest = tmp_path / "dest"
+        _make_source(src, _SERIAL_A)
+        _make_dest(dest, serial=None)
+        (dest / "Identification.json").write_text("{}")
+
+        result = _run("--dry-run", "--source", str(src), "--dest", str(dest))
+
+        assert result.returncode == 0
+        assert "cannot verify" in result.stdout.lower()
+        assert "would require typed confirmation" in result.stdout.lower()
+        assert "first backup" not in result.stdout.lower()
+
+    def test_corrupt_dest_identification_json_refused_aborts_unchanged(
+        self, tmp_path: Path
+    ) -> None:
+        src = tmp_path / "source"
+        dest = tmp_path / "dest"
+        _make_source(src, _SERIAL_A)
+        _make_dest(dest, serial=None)
+        dest_id = dest / "Identification.json"
+        dest_id.write_text("garbage {{{")
+
+        result = _run("--source", str(src), "--dest", str(dest), stdin="no\n")
+
+        assert result.returncode != 0
+        assert "aborted" in result.stderr.lower()
+        assert dest_id.read_text() == "garbage {{{"
+
+    def test_corrupt_source_identification_json_refused_aborts_unchanged(
+        self, tmp_path: Path
+    ) -> None:
+        src = tmp_path / "source"
+        dest = tmp_path / "dest"
+        _make_source(src, _SERIAL_A)
+        (src / "Identification.json").write_text("garbage {{{")
+        _make_dest(dest, _SERIAL_A)
+        dest_id = dest / "Identification.json"
+        original = dest_id.read_text()
+
+        result = _run("--source", str(src), "--dest", str(dest), stdin="no\n")
+
+        assert result.returncode != 0
+        assert "aborted" in result.stderr.lower()
+        assert dest_id.read_text() == original
+
+    def test_corrupt_source_identification_json_confirmed_proceeds(
+        self, tmp_path: Path
+    ) -> None:
+        src = tmp_path / "source"
+        dest = tmp_path / "dest"
+        _make_source(src, _SERIAL_A)
+        (src / "Identification.json").write_text("garbage {{{")
+        _make_dest(dest, _SERIAL_A)
+
+        result = _run("--source", str(src), "--dest", str(dest), stdin="yes\n")
+
+        assert result.returncode == 0
+        assert "backup complete" in result.stdout.lower()
+        assert (dest / "STR.edf").read_text() == "fake"
+
+    @pytest.mark.parametrize(
+        ("indent", "separators"),
+        [(None, (",", ":")), (None, None), (2, None)],
+        ids=["compact", "single-line", "pretty"],
+    )
+    def test_header_shows_parsed_device_name_and_serial(
+        self,
+        tmp_path: Path,
+        indent: int | None,
+        separators: tuple[str, str] | None,
+    ) -> None:
+        src = tmp_path / "source"
+        dest = tmp_path / "dest"
+        _make_source(src, _SERIAL_A)
+        (src / "Identification.json").write_text(
+            _id_json(_SERIAL_A, indent=indent, separators=separators)
+        )
+        _make_dest(dest, _SERIAL_A)
+
+        result = _run("--dry-run", "--source", str(src), "--dest", str(dest))
+
+        assert result.returncode == 0
+        assert f"AirSense 11 AutoSet (serial: {_SERIAL_A})" in result.stdout
+        assert "Unknown ResMed device" not in result.stdout
+
+    def test_later_sibling_serial_ignored_uses_product_serial(
+        self, tmp_path: Path
+    ) -> None:
+        src = tmp_path / "source"
+        dest = tmp_path / "dest"
+        _make_source(src, _SERIAL_A)
+        (src / "Identification.json").write_text(
+            json.dumps(
+                {
+                    "FlowGenerator": {
+                        "IdentificationProfiles": {
+                            "Product": {
+                                "SerialNumber": _SERIAL_A,
+                                "ProductName": "AirSense11AutoSet",
+                            },
+                            "Hardware": {"SerialNumber": _SERIAL_B},
+                        }
+                    }
+                }
+            )
+        )
+        _make_dest(dest, _SERIAL_A)
+
+        result = _run("--dry-run", "--source", str(src), "--dest", str(dest))
+
+        assert result.returncode == 0
+        assert f"AirSense 11 AutoSet (serial: {_SERIAL_A})" in result.stdout
+        assert "mismatch" not in result.stdout.lower()
 
 
 @pytest.mark.integration

@@ -25,6 +25,30 @@ detect_platform() {
 
 PLATFORM=$(detect_platform)
 
+# Prints .FlowGenerator.IdentificationProfiles.Product.<field>, or nothing if it can't be read
+read_product_field() {
+    local id_file="$1" field="$2"
+    if command -v jq &>/dev/null; then
+        jq -r --arg field "$field" '.FlowGenerator.IdentificationProfiles.Product[$field] // empty' "$id_file" 2>/dev/null || true
+    else
+        grep -o '"'"$field"'"[[:space:]]*:[[:space:]]*"[^"]*"' "$id_file" 2>/dev/null | head -1 | sed 's/.*"\([^"]*\)"$/\1/' || true
+    fi
+}
+
+# Requires the user to type 'yes' (just notes it under --dry-run); exits non-zero otherwise
+confirm_or_abort() {
+    local reason="$1" prompt="$2" abort_msg="$3" confirm=""
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo -e "${YELLOW}[DRY RUN] ${reason} — would require typed confirmation to proceed.${NC}"
+        return
+    fi
+    read -rp "$prompt Type 'yes' to proceed anyway: " confirm || true
+    if [[ "$confirm" != "yes" ]]; then
+        echo -e "${RED}Aborted: ${abort_msg}.${NC}" >&2
+        exit 1
+    fi
+}
+
 read_device_name() {
     local id_file="$1/Identification.json"
     if [[ ! -f "$id_file" ]]; then
@@ -32,14 +56,9 @@ read_device_name() {
         return
     fi
 
-    local name="" serial=""
-    if command -v jq &>/dev/null; then
-        name=$(jq -r '.FlowGenerator.IdentificationProfiles.Product.ProductName // empty' "$id_file" 2>/dev/null)
-        serial=$(jq -r '.FlowGenerator.IdentificationProfiles.Product.SerialNumber // empty' "$id_file" 2>/dev/null)
-    else
-        name=$(grep -o '"ProductName":"[^"]*"' "$id_file" 2>/dev/null | head -1 | cut -d'"' -f4)
-        serial=$(grep -o '"SerialNumber":"[^"]*"' "$id_file" 2>/dev/null | head -1 | cut -d'"' -f4)
-    fi
+    local name serial
+    name=$(read_product_field "$id_file" ProductName)
+    serial=$(read_product_field "$id_file" SerialNumber)
 
     if [[ -n "$name" ]]; then
         local display_name
@@ -57,11 +76,7 @@ read_serial() {
         return
     fi
 
-    if command -v jq &>/dev/null; then
-        jq -r '.FlowGenerator.IdentificationProfiles.Product.SerialNumber // empty' "$id_file" 2>/dev/null
-    else
-        grep -o '"SerialNumber":"[^"]*"' "$id_file" 2>/dev/null | head -1 | cut -d'"' -f4
-    fi
+    read_product_field "$id_file" SerialNumber
 }
 
 wsl_ensure_mount() {
@@ -325,7 +340,7 @@ show_help() {
     echo "    DATALOG (incremental): Only new files are copied, existing files are never overwritten"
     echo "    STR.edf archival:      Previous STR.edf is saved to STR_Backup/ before overwriting"
     echo "    Serial guard:          Source and destination device serials are compared; a mismatch"
-    echo "                           requires explicit typed confirmation ('yes') before proceeding"
+    echo "                           or unreadable serial requires explicit typed confirmation ('yes')"
     echo ""
     echo -e "${CYAN}Examples:${NC}"
     echo "    $0                                    # Auto-detect everything"
@@ -415,9 +430,16 @@ main() {
     src_serial=$(read_serial "$SOURCE")
     dest_serial=$(read_serial "$DEST")
 
-    if [[ -z "$dest_serial" ]]; then
+    if [[ ! -f "$DEST/Identification.json" ]]; then
         echo -e "${CYAN}ℹ First backup to this destination (no Identification.json found).${NC}"
-    elif [[ -n "$src_serial" && "$src_serial" != "$dest_serial" ]]; then
+    elif [[ -z "$src_serial" || -z "$dest_serial" ]]; then
+        echo ""
+        echo -e "${RED}WARNING: Could not read a device serial; cannot verify source and destination are the same device.${NC}"
+        echo -e "  Source serial:      ${YELLOW}${src_serial:-unreadable}${NC}"
+        echo -e "  Destination serial: ${YELLOW}${dest_serial:-unreadable}${NC}"
+        echo ""
+        confirm_or_abort "Device match unverified" "Cannot verify these are the same device." "device match unverified"
+    elif [[ "$src_serial" != "$dest_serial" ]]; then
         local dest_device
         dest_device=$(read_device_name "$DEST")
         echo ""
@@ -425,15 +447,7 @@ main() {
         echo -e "  Source:      ${YELLOW}${device_info}${NC}"
         echo -e "  Destination: ${YELLOW}${dest_device}${NC}"
         echo ""
-        if [[ "$DRY_RUN" == "true" ]]; then
-            echo -e "${YELLOW}[DRY RUN] Serial mismatch detected — would require typed confirmation to proceed.${NC}"
-        else
-            read -rp "These are different devices. Type 'yes' to proceed anyway: " confirm
-            if [[ "$confirm" != "yes" ]]; then
-                echo -e "${RED}Aborted: serial mismatch.${NC}" >&2
-                exit 1
-            fi
-        fi
+        confirm_or_abort "Serial mismatch detected" "These are different devices." "serial mismatch"
     fi
 
     if [[ "$DRY_RUN" == "true" ]]; then
