@@ -6,8 +6,8 @@
 """
 Script to check if a GitHub PR has been included in a release.
 
-Usage: python check_pr_release_status.py <PR_URL>
-Example: python check_pr_release_status.py https://github.com/block/goose/pull/4020
+Usage: check-pr-release-status <PR_URL>
+Example: check-pr-release-status https://github.com/block/goose/pull/4020
 """
 
 import json
@@ -109,9 +109,9 @@ def check_commit_in_release(owner_repo: str, release_tag: str, commit_sha: str) 
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: python check_pr_release_status.py <PR_URL>")
+        print("Usage: check-pr-release-status <PR_URL>")
         print(
-            "Example: python check_pr_release_status.py https://github.com/block/goose/pull/4020"
+            "Example: check-pr-release-status https://github.com/block/goose/pull/4020"
         )
         sys.exit(1)
 
