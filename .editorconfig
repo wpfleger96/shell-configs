@@ -17,6 +17,9 @@ switch_case_indent = true
 [{bashrc,zshrc}]
 switch_case_indent = true
 
+[src/shell_configs/scripts/**]
+switch_case_indent = true
+
 [*.{yml,yaml}]
 indent_size = 2
 
