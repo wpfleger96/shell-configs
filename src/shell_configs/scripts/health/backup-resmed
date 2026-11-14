@@ -102,7 +102,7 @@ discover_sd_card() {
 
     # Test seam: colon-separated list of base dirs to scan for SD card subdirectories
     if [[ -n "${BACKUP_RESMED_SCAN_DIRS:-}" ]]; then
-        IFS=':' read -ra scan_bases <<< "$BACKUP_RESMED_SCAN_DIRS"
+        IFS=':' read -ra scan_bases <<<"$BACKUP_RESMED_SCAN_DIRS"
         for base in "${scan_bases[@]}"; do
             for dir in "$base"/*/; do
                 if [[ -f "$dir/STR.edf" ]]; then
@@ -119,12 +119,13 @@ discover_sd_card() {
 
         if [[ ${#candidates[@]} -eq 0 ]]; then
             local removable_letters
+            # shellcheck disable=SC2016 # $_ and $(...) are PowerShell syntax and must reach powershell.exe unexpanded
             removable_letters=$(powershell.exe -NoProfile -Command \
                 '(Get-Volume | Where-Object { $_.DriveType -eq "Removable" -and $_.DriveLetter -and (Test-Path "$($_.DriveLetter):\STR.edf") }).DriveLetter -join ","' \
                 2>/dev/null | tr -d '\r')
 
             if [[ -n "$removable_letters" ]]; then
-                IFS=',' read -ra letters <<< "$removable_letters"
+                IFS=',' read -ra letters <<<"$removable_letters"
                 for letter in "${letters[@]}"; do
                     local lower="${letter,,}"
                     [[ -f "/mnt/$lower/STR.edf" ]] && continue
@@ -161,7 +162,7 @@ discover_sd_card() {
             echo -e "  $((i + 1))) ${candidates[$i]} — ${device_info}" >&2
         done
         read -rp "Select SD card (1-${#candidates[@]}): " choice
-        if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#candidates[@]} )); then
+        if [[ "$choice" =~ ^[0-9]+$ ]] && ((choice >= 1 && choice <= ${#candidates[@]})); then
             echo "${candidates[$((choice - 1))]}"
         else
             echo -e "${RED}Invalid selection${NC}" >&2
@@ -204,7 +205,7 @@ discover_dest() {
             echo -e "  $((i + 1))) ${candidates[$i]}" >&2
         done
         read -rp "Select destination (1-${#candidates[@]}): " choice
-        if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#candidates[@]} )); then
+        if [[ "$choice" =~ ^[0-9]+$ ]] && ((choice >= 1 && choice <= ${#candidates[@]})); then
             echo "${candidates[$((choice - 1))]}"
         else
             echo -e "${RED}Invalid selection${NC}" >&2
@@ -353,41 +354,44 @@ show_help() {
 main() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --dry-run)
-                DRY_RUN=true
-                shift
-                ;;
-            --source)
-                if [[ $# -lt 2 ]]; then
-                    echo -e "${RED}--source requires a path argument${NC}" >&2
-                    exit 1
-                fi
-                SOURCE="$2"
-                shift 2
-                ;;
-            --dest)
-                if [[ $# -lt 2 ]]; then
-                    echo -e "${RED}--dest requires a path argument${NC}" >&2
-                    exit 1
-                fi
-                DEST="$2"
-                shift 2
-                ;;
-            -h|--help)
-                show_help
-                exit 0
-                ;;
-            *)
-                echo -e "${RED}Unknown option: $1${NC}" >&2
-                echo ""
-                show_help
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        --source)
+            if [[ $# -lt 2 ]]; then
+                echo -e "${RED}--source requires a path argument${NC}" >&2
                 exit 1
-                ;;
+            fi
+            SOURCE="$2"
+            shift 2
+            ;;
+        --dest)
+            if [[ $# -lt 2 ]]; then
+                echo -e "${RED}--dest requires a path argument${NC}" >&2
+                exit 1
+            fi
+            DEST="$2"
+            shift 2
+            ;;
+        -h | --help)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $1${NC}" >&2
+            echo ""
+            show_help
+            exit 1
+            ;;
         esac
     done
 
     if [[ -z "$SOURCE" ]]; then
-        SOURCE=$(discover_sd_card) || { echo -e "${RED}No SD card source provided${NC}" >&2; exit 1; }
+        SOURCE=$(discover_sd_card) || {
+            echo -e "${RED}No SD card source provided${NC}" >&2
+            exit 1
+        }
     fi
 
     if [[ "$PLATFORM" == "wsl" && "$SOURCE" =~ ^/mnt/([a-z])/?$ ]]; then
@@ -409,7 +413,10 @@ main() {
     echo -e "Source:      ${CYAN}${SOURCE}${NC}"
 
     if [[ -z "$DEST" ]]; then
-        DEST=$(discover_dest) || { echo -e "${RED}No backup destination provided${NC}" >&2; exit 1; }
+        DEST=$(discover_dest) || {
+            echo -e "${RED}No backup destination provided${NC}" >&2
+            exit 1
+        }
     fi
 
     if [[ ! -d "$DEST" ]]; then

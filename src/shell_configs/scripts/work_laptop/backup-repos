@@ -1,4 +1,5 @@
 #!/usr/bin/env zsh
+# shellcheck shell=bash # zsh file; linted as bash since shellcheck doesn't support zsh
 
 DEVELOPMENT_DIR="$HOME/Development"
 BACKUP_DIR="$HOME/Backups"
@@ -11,9 +12,7 @@ echo "Backing up all repos in $DEVELOPMENT_DIR to $BACKUP_FILE"
 
 for dir in "$DEVELOPMENT_DIR"/*; do
     if [ -d "$dir/.git" ]; then
-        cd "$dir"
-        git remote get-url origin >> "$BACKUP_FILE"
-        cd - > /dev/null
+        git -C "$dir" remote get-url origin >>"$BACKUP_FILE"
     fi
 done
 
