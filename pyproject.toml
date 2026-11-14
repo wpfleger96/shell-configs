@@ -51,14 +51,6 @@ where = ["src"]
 [tool.setuptools.package-data]
 shell_configs = ["config/**/*", "scripts/**/*"]
 
-[tool.ruff]
-# Bundled Python scripts have no .py extension, so ruff skips them by default
-extend-include = [
-    "src/shell_configs/scripts/git/check-pr-release-status",
-    "src/shell_configs/scripts/system/disk-cleanup",
-    "src/shell_configs/scripts/transcription/transcribe",
-]
-
 [tool.ruff.lint]
 preview = true
 select = ["I", "F", "UP", "B", "PLW1514"]  # isort, pyflakes, pyupgrade, bugbear, unspecified-encoding
