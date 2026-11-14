@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.71.0](https://github.com/wpfleger96/shell-configs/compare/v0.70.5...v0.71.0) (2026-11-14)
+
+
+### Features
+
+* **macos:** enable colorized ls output by default ([#227](https://github.com/wpfleger96/shell-configs/issues/227)) ([97d6725](https://github.com/wpfleger96/shell-configs/commit/97d6725daf9178dc85d502bf5194a3bf073f5965))
+
 ## [0.70.5](https://github.com/wpfleger96/shell-configs/compare/v0.70.4...v0.70.5) (2026-11-14)
 
 
