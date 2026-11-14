@@ -284,7 +284,7 @@ packages:
       install_cmd: "export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"; command -v go >/dev/null 2>&1 || { echo \"enpass-cli requires go; run 'shell-configs install' to install languages first\" >&2; exit 1; }; (brew list enpass-cli >/dev/null 2>&1 && brew uninstall enpass-cli) || true; tmp=$(mktemp -d) && trap 'rm -rf \"$tmp\"' EXIT && GOBIN=\"$tmp\" CGO_ENABLED=1 go install -ldflags \"-X main.version=cfb4a83\" github.com/hazcod/enpass-cli/cmd/enpasscli@cfb4a832639a007091b2c47cea67df67f83c70fc && mkdir -p ~/.local/bin && install -m 755 \"$tmp/enpasscli\" ~/.local/bin/enpass-cli"
     linux:
       method: script
-      install_cmd: "export PATH=\"/usr/local/go/bin:$PATH\"; command -v go >/dev/null 2>&1 || { echo \"enpass-cli requires go; run 'shell-configs install' to install languages first\" >&2; exit 1; }; tmp=$(mktemp -d) && trap 'rm -rf \"$tmp\"' EXIT && GOBIN=\"$tmp\" CGO_ENABLED=1 go install -ldflags \"-X main.version=cfb4a83\" github.com/hazcod/enpass-cli/cmd/enpasscli@cfb4a832639a007091b2c47cea67df67f83c70fc && mkdir -p ~/.local/bin && install -m 755 \"$tmp/enpasscli\" ~/.local/bin/enpass-cli"
+      install_cmd: "command -v go >/dev/null 2>&1 || { echo \"enpass-cli requires go; run 'shell-configs install' to install languages first\" >&2; exit 1; }; tmp=$(mktemp -d) && trap 'rm -rf \"$tmp\"' EXIT && GOBIN=\"$tmp\" CGO_ENABLED=1 go install -ldflags \"-X main.version=cfb4a83\" github.com/hazcod/enpass-cli/cmd/enpasscli@cfb4a832639a007091b2c47cea67df67f83c70fc && mkdir -p ~/.local/bin && install -m 755 \"$tmp/enpasscli\" ~/.local/bin/enpass-cli"
 
   - name: direnv
     command: direnv
