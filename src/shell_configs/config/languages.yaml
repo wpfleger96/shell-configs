@@ -5,16 +5,21 @@ languages:
     macos:
       method: brew
       package: go
-    # Extract into a staging dir on the same filesystem and swap it in only after
-    # tar succeeds, so a failed or truncated download (gzip fails on a short
-    # stream) never leaves a partial /usr/local/go that looks installed.
+    # Extract into a staging dir under /usr/local and replace /usr/local/go only once
+    # the staged go/bin/go exists, so a failed download never leaves a partial tree.
+    # sh has no pipefail, so a failed curl doesn't fail its pipeline: the case guard
+    # catches the empty VER, and `test -x` catches the empty stream some tars accept.
+    # The fixed staging path is cleared on each run so a killed run's leftovers don't pile up.
     install_cmd: >-
       ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') &&
       VER=$(curl -fsSL 'https://go.dev/VERSION?m=text' | head -1) &&
       case "$VER" in go[0-9]*) ;; *) echo "Unexpected Go version: '$VER'" >&2; exit 1 ;; esac &&
-      STAGE=$(sudo mktemp -d /usr/local/.go-install.XXXXXX) &&
+      STAGE=/usr/local/.go-install &&
+      sudo rm -rf "$STAGE" &&
+      sudo mkdir "$STAGE" &&
       trap 'sudo rm -rf "$STAGE"' EXIT &&
       curl -fsSL "https://go.dev/dl/${VER}.linux-${ARCH}.tar.gz" | sudo tar -C "$STAGE" -xz &&
+      sudo test -x "$STAGE/go/bin/go" &&
       sudo rm -rf /usr/local/go &&
       sudo mv "$STAGE/go" /usr/local/go
     check_path: "/usr/local/go/bin/go"
