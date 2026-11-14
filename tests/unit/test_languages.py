@@ -144,8 +144,9 @@ class TestLoadLanguages:
         assert load_languages(manifest) == []
 
     def test_bundled_check_paths_point_into_bin_dirs(self):
-        # ensure_language_paths prepends check_path's parent to PATH, so it
-        # must be a bin dir — otherwise non-binary scripts can shadow system tools.
+        # ensure_language_paths prepends check_path's parent to PATH, so
+        # check_path must live in a bin dir rather than a scripts/data dir
+        # like ~/.rvm/scripts.
         langs = [lang for lang in load_languages() if lang.check_path]
         assert langs
         for lang in langs:
@@ -531,3 +532,9 @@ class TestEnsureLanguagePaths:
         monkeypatch.setenv("PATH", "/usr/bin")
         ensure_language_paths([_make_lang(check_path=str(tmp_path / "missing"))])
         assert os.environ["PATH"] == "/usr/bin"
+
+    def test_empty_path_has_no_trailing_separator(self, tmp_path, monkeypatch):
+        binary = _install_binary(tmp_path / "go" / "bin")
+        monkeypatch.setenv("PATH", "")
+        ensure_language_paths([_make_lang(check_path=str(binary))])
+        assert os.environ["PATH"] == str(binary.parent)
