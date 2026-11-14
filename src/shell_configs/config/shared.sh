@@ -762,7 +762,8 @@ pytest_coverage() {
 }
 
 python_package_versions() {
-    uvx pip index versions "$@"
+    # --no-cache-dir: pip caches PyPI's index for 10 minutes, hiding fresh releases
+    uvx pip index versions --no-cache-dir "$@"
 }
 
 ### Node/NPM ###
