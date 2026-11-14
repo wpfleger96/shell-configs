@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.13"
 # dependencies = ["rich", "InquirerPy"]
 # ///
 from __future__ import annotations
@@ -212,9 +212,7 @@ class SizeCache:
 # ---------------------------------------------------------------------------
 
 
-def _scan_dev_tree(
-    dev_dir: Path, max_depth: int = 6
-) -> Generator[ScanTarget, None, None]:
+def _scan_dev_tree(dev_dir: Path, max_depth: int = 6) -> Generator[ScanTarget]:
     _SKIP_NAMES = frozenset({".git", "node_modules", "__pycache__"})
 
     stack: list[tuple[Path, int]] = [(dev_dir, 0)]
