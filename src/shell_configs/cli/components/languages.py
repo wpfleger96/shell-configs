@@ -59,16 +59,11 @@ class LanguagesComponent(Component):
 
     def apply(self, ctx: Context, plan: ComponentPlan) -> bool:
         plan = expect_plan(plan, LanguagesPlan)
-
-        from shell_configs.languages import ensure_language_paths
-
-        ensure_language_paths(plan.all_languages)
-
         if not plan.has_changes:
             return True
 
         from shell_configs.display import print_error, print_success
-        from shell_configs.languages import install_language
+        from shell_configs.languages import ensure_language_paths, install_language
 
         success = True
         for lang in plan.missing:

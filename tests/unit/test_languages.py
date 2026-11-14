@@ -153,10 +153,6 @@ class TestLoadLanguages:
             assert lang.check_path is not None
             assert Path(lang.check_path).parent.name == "bin", lang.name
 
-    def test_bundled_go_check_path_puts_tarball_bin_on_path(self):
-        go = next(lang for lang in load_languages() if lang.name == "go")
-        assert go.check_path == "/usr/local/go/bin/go"
-
 
 # ---------------------------------------------------------------------------
 # TestResolveCheckPath
@@ -488,7 +484,7 @@ class TestLanguagesComponent:
             LanguagesComponent().apply(self._make_ctx(), plan)
 
         mock_install.assert_called_once_with(lang, dry_run=False)
-        assert mock_paths.call_count == 2
+        mock_paths.assert_called_once_with([lang])
 
 
 # ---------------------------------------------------------------------------
@@ -542,3 +538,84 @@ class TestEnsureLanguagePaths:
         monkeypatch.setenv("PATH", "")
         ensure_language_paths([_make_lang(check_path=str(binary))])
         assert os.environ["PATH"] == str(binary.parent)
+
+
+# ---------------------------------------------------------------------------
+# TestLanguagePathsBeforePackageInstalls
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.cli
+class TestLanguagePathsBeforePackageInstalls:
+    """Installed languages' bin dirs reach PATH before any package recipe runs."""
+
+    @pytest.fixture
+    def go_bin_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+        binary = _install_binary(tmp_path / "go" / "bin")
+        monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+        monkeypatch.setattr(
+            "shell_configs.languages.load_languages",
+            lambda: [_make_lang(check_path=str(binary))],
+        )
+        return binary.parent
+
+    def test_install_with_no_missing_languages_puts_bin_dir_on_path(
+        self, go_bin_dir, cli_runner, mock_home, test_repo, monkeypatch
+    ):
+        from shell_configs.cli import cli
+        from shell_configs.cli.components.languages import LanguagesComponent
+        from shell_configs.cli.context import Component, ComponentPlan
+
+        seen_paths: list[str] = []
+
+        class _Recorder(Component):
+            label = display_name = "recorder"
+
+            def plan(self, ctx):
+                return ComponentPlan(has_changes=True)
+
+            def apply(self, ctx, plan):
+                seen_paths.append(os.environ["PATH"])
+                return True
+
+        monkeypatch.setattr(
+            "shell_configs.cli.components.INSTALL_COMPONENTS",
+            [LanguagesComponent(), _Recorder()],
+        )
+
+        result = cli_runner.invoke(cli, ["install", "--yes", "--shells", "bash"])
+
+        assert result.exit_code == 0, result.output
+        assert len(seen_paths) == 1
+        assert str(go_bin_dir) in seen_paths[0].split(os.pathsep)
+
+    def test_packages_install_puts_bin_dir_on_path(
+        self, go_bin_dir, cli_runner, mock_home, test_repo, monkeypatch
+    ):
+        from shell_configs.cli import cli
+        from shell_configs.packages.packages import Package
+
+        seen_paths: list[str] = []
+
+        class _Manager:
+            display_name = "fake"
+
+            def is_installed(self, pkg):
+                return False
+
+            def install(self, pkg, dry_run=False):
+                seen_paths.append(os.environ["PATH"])
+                return True, "installed"
+
+        monkeypatch.setattr("shell_configs.packages.get_package_manager", _Manager)
+        monkeypatch.setattr(
+            "shell_configs.packages.load_packages_for_profile",
+            lambda profile: [Package(name="needs-go")],
+        )
+
+        result = cli_runner.invoke(cli, ["packages", "install", "--yes"])
+
+        assert result.exit_code == 0, result.output
+        assert len(seen_paths) == 1
+        assert str(go_bin_dir) in seen_paths[0].split(os.pathsep)

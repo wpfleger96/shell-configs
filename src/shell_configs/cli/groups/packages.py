@@ -112,6 +112,12 @@ def packages_install(dry_run: bool, yes: bool, profile_name: str | None) -> None
                 print_error(f"Cannot install packages: {msg}")
                 sys.exit(1)
 
+        from shell_configs.languages import ensure_language_paths, load_languages
+
+        # Install recipes (e.g. enpass-cli's `go build`) need installed
+        # languages on PATH.
+        ensure_language_paths(load_languages())
+
     console.print()
     total = len(to_install)
     success_count = 0
