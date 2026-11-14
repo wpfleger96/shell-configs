@@ -45,7 +45,7 @@ packages:
       method: brew
     linux:
       method: script
-      install_cmd: "curl -sS https://webi.sh/shfmt | sh"
+      install_cmd: "curl -fsS https://webi.sh/shfmt | sh"
 
   # Infrastructure as Code
   - name: terraform
@@ -72,7 +72,7 @@ packages:
       package: terraform-linters/tap/tflint
     linux:
       method: script
-      install_cmd: "curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash"
+      install_cmd: "curl -fsS https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash"
 
   - name: docker
     command: docker
@@ -247,7 +247,7 @@ packages:
       method: brew
     linux:
       method: script
-      install_cmd: "curl -sS https://webi.sh/delta | sh"
+      install_cmd: "curl -fsS https://webi.sh/delta | sh"
 
   - name: enpass
     command: Enpass

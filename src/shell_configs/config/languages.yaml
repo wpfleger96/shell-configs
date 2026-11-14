@@ -34,7 +34,7 @@ languages:
     command: node
     description: "Node.js (via nvm)"
     install_cmd: >-
-      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash &&
+      curl -fsS -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash &&
       export NVM_DIR="$HOME/.nvm" &&
       . "$NVM_DIR/nvm.sh" &&
       nvm install --lts
@@ -43,7 +43,7 @@ languages:
   - name: ruby
     command: ruby
     description: "Ruby (via rvm)"
-    install_cmd: "curl -sSL https://rvm.io/mpapis.asc | gpg --import - 2>/dev/null; curl -sSL https://rvm.io/pkuczynski.asc | gpg --import - 2>/dev/null; curl -sSL https://get.rvm.io | bash -s stable"
+    install_cmd: "curl -fsSL https://rvm.io/mpapis.asc | gpg --import - 2>/dev/null; curl -fsSL https://rvm.io/pkuczynski.asc | gpg --import - 2>/dev/null; curl -fsSL https://get.rvm.io | bash -s stable"
     check_path: "~/.rvm/bin/rvm"
 
   - name: flutter
