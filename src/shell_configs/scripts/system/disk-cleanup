@@ -141,7 +141,7 @@ class SizeCache:
         # Read JSON file, prune expired entries only (NOT existence checks — that's done by _submit_du).
         # Silently discard any parse/IO error (self._data stays empty = fresh scan).
         try:
-            raw = json.loads(self._path.read_text())
+            raw = json.loads(self._path.read_text(encoding="utf-8"))
             now = time.time()
             self._data = {
                 k: (v["size_bytes"], v["ts"])
@@ -212,7 +212,9 @@ class SizeCache:
 # ---------------------------------------------------------------------------
 
 
-def _scan_dev_tree(dev_dir: Path, max_depth: int = 6) -> Generator[ScanTarget]:
+def _scan_dev_tree(
+    dev_dir: Path, max_depth: int = 6
+) -> Generator[ScanTarget, None, None]:
     _SKIP_NAMES = frozenset({".git", "node_modules", "__pycache__"})
 
     stack: list[tuple[Path, int]] = [(dev_dir, 0)]

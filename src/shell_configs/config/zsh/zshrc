@@ -1,10 +1,12 @@
 #!/usr/bin/env zsh
-# shellcheck disable=SC1071 # shellcheck can't parse zsh; shfmt still formats this file
+# Sourced, not executed: the shebang only lets shfmt/shellcheck detect this file (shfmt as zsh)
+# shellcheck shell=bash # shellcheck has no zsh mode; zsh-only lines are annotated below
 # Zsh-Specific Configuration
 # Common settings are in shared.sh and will be included automatically
 
 ### History ###
 HISTSIZE=10000
+# shellcheck disable=SC2034 # zsh special parameter
 SAVEHIST=20000
 HISTFILE=~/.zsh_history
 setopt HIST_IGNORE_DUPS
@@ -55,6 +57,7 @@ compinit
 if ((${+functions[compdef]})); then
     # compinit succeeded — replay any calls queued before it ran
     if ((${#_sc_compdef_queue})); then
+        # shellcheck disable=SC2168 # zsh allows local outside functions (same as typeset)
         local _def
         for _def in "${_sc_compdef_queue[@]}"; do
             eval "compdef $_def"
@@ -65,20 +68,25 @@ else
     # compinit aborted (e.g. insecure dirs with no tty) — real compdef was never
     # defined; re-install the queueing stub so later compdef calls degrade silently
     # rather than cascading errors through completions.zsh and any tool blocks below.
+    # shellcheck disable=SC2296 # zsh parameter expansion flags
     compdef() { _sc_compdef_queue+=("${(j: :)${(q)@}}"); }
 fi
 
+# shellcheck source=/dev/null
 [[ -f ~/.zsh/completions.zsh ]] && source ~/.zsh/completions.zsh
 
 ### Prompt ###
 if [ -f ~/.zsh/git-prompt.sh ]; then
+    # shellcheck source=/dev/null
     source ~/.zsh/git-prompt.sh
     setopt prompt_subst
+    # shellcheck disable=SC2016 # expanded at prompt time via prompt_subst
     _SHELL_CONFIGS_PROMPT='%F{251}%~%F{reset}%B%F{cyan}$(__git_ps1 " %s")%F{yellow}$(__wt_ps1)%F{reset}%b '
     PROMPT="$_SHELL_CONFIGS_PROMPT"
 fi
 
 _restore_prompt() {
+    # shellcheck disable=SC2034 # zsh special parameter
     [[ -n "${_SHELL_CONFIGS_PROMPT-}" ]] && PROMPT="$_SHELL_CONFIGS_PROMPT"
 }
 

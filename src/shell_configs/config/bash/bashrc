@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Sourced, not executed: the shebang only lets shfmt/shellcheck detect this file
 # Bash-Specific Configuration
 # Common settings are in shared.sh and will be included automatically
 

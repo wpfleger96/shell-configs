@@ -58,6 +58,8 @@ extend-include = [
     "src/shell_configs/scripts/system/disk-cleanup",
     "src/shell_configs/scripts/transcription/transcribe",
 ]
+# Lint each script against the oldest Python it runs on, not the project's 3.13
+per-file-target-version = { "src/shell_configs/scripts/git/check-pr-release-status" = "py39", "src/shell_configs/scripts/system/disk-cleanup" = "py312", "src/shell_configs/scripts/transcription/transcribe" = "py311" }
 
 [tool.ruff.lint]
 preview = true
@@ -98,8 +100,9 @@ mypy_path = "src"
 namespace_packages = true
 explicit_package_bases = true
 strict = true
-# Bundled scripts are standalone: the PEP 723 ones (`uv run --script`) import
-# deps that aren't in the project env, so strict mypy can't check them here
+# Bundled scripts run outside the project env: disk-cleanup and transcribe are
+# PEP 723 scripts whose deps aren't installed here, and check-pr-release-status
+# targets the system python3 (3.9 on macOS), not the project's 3.13
 exclude = ["^src/shell_configs/scripts/"]
 
 [[tool.mypy.overrides]]
