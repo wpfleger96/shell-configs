@@ -50,6 +50,12 @@ def run_install(ctx: Context, components: list[Component]) -> bool:
     if ctx.dry_run:
         return True
 
+    from shell_configs.languages import ensure_language_paths, load_languages
+
+    # Install recipes (e.g. enpass-cli's `go build`) need already-installed
+    # languages on PATH even when the languages component has nothing to do.
+    ensure_language_paths(load_languages())
+
     to_apply = [c for c in components if plans[c].has_changes or ctx.force]
 
     if any(comp.needs_sudo(ctx, plans[comp]) for comp in to_apply):

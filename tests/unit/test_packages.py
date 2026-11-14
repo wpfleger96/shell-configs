@@ -203,8 +203,7 @@ def test_enpass_cli_available_on_linux(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "enpass-cli" in names
 
     enpass_cli_pkg = next(p for p in packages if p.name == "enpass-cli")
-    linux_cmd = _assert_enpass_cli_go_build(enpass_cli_pkg, enpass_cli_pkg.linux)
-    assert 'export PATH="/usr/local/go/bin:$PATH"' in linux_cmd
+    _assert_enpass_cli_go_build(enpass_cli_pkg, enpass_cli_pkg.linux)
 
 
 def test_load_packages_returns_list(tmp_path: Path) -> None:
