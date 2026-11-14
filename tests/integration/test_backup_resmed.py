@@ -53,14 +53,22 @@ def _path_without_jq(bin_dir: Path) -> str:
     for directory in os.environ.get("PATH", "").split(os.pathsep):
         if not os.path.isdir(directory):
             continue
-        for entry in os.scandir(directory):
+        try:
+            entries = list(os.scandir(directory))
+        except OSError:
+            continue
+        for entry in entries:
             link = bin_dir / entry.name
-            if (
-                entry.name != "jq"
-                and not link.exists()
-                and entry.is_file()
-                and os.access(entry.path, os.X_OK)
-            ):
+            try:
+                is_candidate = (
+                    entry.name != "jq"
+                    and not link.exists()
+                    and entry.is_file()
+                    and os.access(entry.path, os.X_OK)
+                )
+            except OSError:  # e.g. root-owned symlink the user cannot stat
+                continue
+            if is_candidate:
                 link.symlink_to(entry.path)
     return str(bin_dir)
 
