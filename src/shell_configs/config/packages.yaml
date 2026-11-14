@@ -72,7 +72,13 @@ packages:
       package: terraform-linters/tap/tflint
     linux:
       method: script
-      install_cmd: "curl -fsS https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash"
+      install_cmd: >-
+        ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') &&
+        tmp=$(mktemp -d) &&
+        trap 'rm -rf "$tmp"' EXIT &&
+        curl -fsSL "https://github.com/terraform-linters/tflint/releases/latest/download/tflint_linux_${ARCH}.zip" -o "$tmp/tflint.zip" &&
+        python3 -m zipfile -e "$tmp/tflint.zip" "$tmp" &&
+        sudo install -m 755 "$tmp/tflint" /usr/local/bin/tflint
 
   - name: docker
     command: docker
