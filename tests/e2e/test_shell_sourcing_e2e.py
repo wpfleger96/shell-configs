@@ -56,6 +56,24 @@ class TestBashSourcing:
         assert "main" in result.stdout
 
     @pytest.mark.parametrize(
+        "initial",
+        ["unset PROMPT_COMMAND", "PROMPT_COMMAND='history -a'"],
+        ids=["unset", "user-set"],
+    )
+    def test_resourcing_does_not_duplicate_prompt_hooks(
+        self, installed_home, run_shell, initial
+    ):
+        result = run_shell(
+            "bash",
+            f'{initial}; source "$HOME/.bashrc"; source "$HOME/.bashrc"; '
+            'echo "PC=$PROMPT_COMMAND"',
+        )
+        assert result.returncode == 0, result.stderr
+        prompt_command = result.stdout.rsplit("PC=", 1)[1]
+        assert prompt_command.count("_tune_git_prompt") == 1
+        assert prompt_command.count("_reset_terminal_title") == 1
+
+    @pytest.mark.parametrize(
         "cmd,func",
         [
             ("disk-cleanup", "_disk_cleanup_completion"),

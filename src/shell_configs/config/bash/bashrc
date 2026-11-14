@@ -21,14 +21,15 @@ if [ -f ~/.bash/git-prompt.sh ]; then
 fi
 
 ### Git Prompt Performance ###
-# Guard against duplicate prepend on re-source, and handle bash 5.1+ array PROMPT_COMMAND
+# Guard against duplicate prepend on re-source, and handle bash 5.1+ array PROMPT_COMMAND.
+# String entries are joined with "; ", so a hook can follow ";" or "; ".
 if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
     # shellcheck disable=SC2076 # intentional literal string match
     [[ " ${PROMPT_COMMAND[*]} " =~ " _tune_git_prompt " ]] || PROMPT_COMMAND=("_tune_git_prompt" "${PROMPT_COMMAND[@]}")
 else
     # shellcheck disable=SC2128,SC2178 # PROMPT_COMMAND is a plain string in this branch
     case ";${PROMPT_COMMAND-};" in
-        *";_tune_git_prompt;"*) ;;
+        *";_tune_git_prompt;"* | *"; _tune_git_prompt;"*) ;;
         *) PROMPT_COMMAND="_tune_git_prompt${PROMPT_COMMAND:+; $PROMPT_COMMAND}" ;;
     esac
 fi
@@ -38,7 +39,7 @@ if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
 else
     # shellcheck disable=SC2128,SC2178 # PROMPT_COMMAND is a plain string in this branch
     case ";${PROMPT_COMMAND-};" in
-        *";_reset_terminal_title;"*) ;;
+        *";_reset_terminal_title;"* | *"; _reset_terminal_title;"*) ;;
         *) PROMPT_COMMAND="_reset_terminal_title${PROMPT_COMMAND:+; $PROMPT_COMMAND}" ;;
     esac
 fi
