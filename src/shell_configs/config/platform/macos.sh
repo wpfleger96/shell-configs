@@ -4,7 +4,7 @@
 # Automatically included on macOS systems
 
 # Colorized BSD `ls` output (only when stdout is a terminal; GNU ls ignores these)
-# LSCOLORS: bold blue dirs, bold cyan symlinks, bold red executables (Linux-like palette)
+# LSCOLORS: bold blue dirs, bold cyan symlinks, bold green executables (Linux-like palette)
 export CLICOLOR=1
 export LSCOLORS=ExGxBxDxCxEgEdxbxgxcxd
 
