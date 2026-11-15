@@ -232,9 +232,11 @@ fi
 # === 5. AI agent rules, skills & config =======================================================
 # Delegate to the ai-agent-rules CLI (single source of truth): it symlinks ~/AGENTS.md,
 # ~/.claude/CLAUDE.md, the shared skills, and per-agent configs, backing up ~/.claude first.
+# The `cloud` profile extends `personal` and trims tools the cloud host injects into every
+# session (claude-code-remote MCP server, Artifact, unused connectors) to save context.
 hdr "Agent rules, skills & config (via ai-agent-rules)"
 if have uv; then
-    if uvx ai-agent-rules setup -y --skip-completions; then
+    if uvx ai-agent-rules setup -y --skip-completions --profile cloud; then
         ok "ai-agent-rules setup complete"
         record ok "ai-agent-rules"
     else
