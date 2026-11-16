@@ -232,11 +232,24 @@ fi
 # === 5. AI agent rules, skills & config =======================================================
 # Delegate to the ai-agent-rules CLI (single source of truth): it symlinks ~/AGENTS.md,
 # ~/.claude/CLAUDE.md, the shared skills, and per-agent configs, backing up ~/.claude first.
-# The `cloud` profile extends `personal` and trims tools the cloud host injects into every
-# session (claude-code-remote MCP server, Artifact, unused connectors) to save context.
+# The `cloud` profile extends `personal` and disables the Artifact tool and Remote Control.
+# @latest: plain uvx can reuse an installed version that predates the `cloud` profile.
+# Connector denial is a per-machine override (set before `setup`, which merges it into
+# ~/.claude/settings.json): these are Will's claude.ai connectors, unused in coding sessions,
+# each costing context in every cloud session. Dropbox and claude-code-remote stay allowed.
+CLOUD_DENIED_MCP_SERVERS=(Monarch SNORE PubMed Google_Drive Claude_Docs)
 hdr "Agent rules, skills & config (via ai-agent-rules)"
 if have uv; then
-    if uvx ai-agent-rules setup -y --skip-completions --profile cloud; then
+    mcp_deny_json="$(printf '"mcp__%s",' "${CLOUD_DENIED_MCP_SERVERS[@]}")"
+    mcp_deny_json="[${mcp_deny_json%,}]"
+    if uvx ai-agent-rules@latest override set claude.permissions.deny "$mcp_deny_json"; then
+        ok "denied unused connectors: ${CLOUD_DENIED_MCP_SERVERS[*]}"
+        record ok "mcp-deny"
+    else
+        warn "failed to set connector deny override (continuing)"
+        record fail "mcp-deny"
+    fi
+    if uvx ai-agent-rules@latest setup -y --skip-completions --profile cloud; then
         ok "ai-agent-rules setup complete"
         record ok "ai-agent-rules"
     else
