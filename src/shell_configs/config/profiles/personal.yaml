@@ -164,6 +164,21 @@ shell_overrides:
         [[ -n "$had_masterpw" ]] || unset MASTERPW
     }
 
+    load-mail-relay-secrets() {
+        _enpass-preflight || return 1
+        local had_masterpw="${MASTERPW:+1}"
+        _enpass-ensure-masterpw || return 1
+
+        set -a
+
+        # Postfix mail relay Gmail SMTP credentials (2) — read by homelabconfigs' `just deploy postfix`
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "Email Address" env GMAIL_USER="Mail Relay Homelab Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "App Password" env GMAIL_APP_PASSWORD="Mail Relay Homelab Secrets")"
+        set +a
+
+        [[ -n "$had_masterpw" ]] || unset MASTERPW
+    }
+
     load-all-secrets() {
         _enpass-preflight || return 1
         _enpass-ensure-masterpw || return 1
@@ -173,6 +188,7 @@ shell_overrides:
         load-snore-secrets
         load-meowdb-secrets
         load-unifi-secrets
+        load-mail-relay-secrets
 
         unset MASTERPW
     }
