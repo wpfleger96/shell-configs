@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [0.72.0](https://github.com/wpfleger96/shell-configs/compare/v0.71.1...v0.72.0) (2026-11-21)
+
+
+### Features
+
+* **cloud-setup:** use cloud profile and deny unused connectors ([#231](https://github.com/wpfleger96/shell-configs/issues/231)) ([b35c054](https://github.com/wpfleger96/shell-configs/commit/b35c054c689ed0c689b9cf86dc228030234706d5))
+* **profiles:** add a Gmail mail-relay secret loader ([#234](https://github.com/wpfleger96/shell-configs/issues/234)) ([739e304](https://github.com/wpfleger96/shell-configs/commit/739e3044abf0e88272c32fd24280e7803ed27d2d))
+
+
+### Bug Fixes
+
+* **profiles:** remove the unused Home Assistant secret loader ([#233](https://github.com/wpfleger96/shell-configs/issues/233)) ([ef1a4db](https://github.com/wpfleger96/shell-configs/commit/ef1a4dbfb76d0cff2c5035e724a82ff5bdd34f66))
+
 ## [0.71.1](https://github.com/wpfleger96/shell-configs/compare/v0.71.0...v0.71.1) (2026-11-14)
 
 
