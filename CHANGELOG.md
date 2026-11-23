@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.74.0](https://github.com/wpfleger96/shell-configs/compare/v0.73.0...v0.74.0) (2026-11-23)
+
+
+### Features
+
+* **profiles:** load the MaxMind credentials for the logs stack ([#237](https://github.com/wpfleger96/shell-configs/issues/237)) ([085b1dd](https://github.com/wpfleger96/shell-configs/commit/085b1dde68d0fd9c0b7a29dd194da388d0433147))
+
 ## [0.73.0](https://github.com/wpfleger96/shell-configs/compare/v0.72.0...v0.73.0) (2026-11-23)
 
 
