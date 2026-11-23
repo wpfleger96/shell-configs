@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.73.0](https://github.com/wpfleger96/shell-configs/compare/v0.72.0...v0.73.0) (2026-11-23)
+
+
+### Features
+
+* **profiles:** add a central logging secret loader ([#236](https://github.com/wpfleger96/shell-configs/issues/236)) ([fdeee1c](https://github.com/wpfleger96/shell-configs/commit/fdeee1caed5afd3bd92c70380d6a707e8197753f))
+
+
+### Continuous Integration
+
+* sync shared files ([857b00c](https://github.com/wpfleger96/shell-configs/commit/857b00c82a8385d5e8750981f3e182bedf24ac0e))
+
 ## [0.72.0](https://github.com/wpfleger96/shell-configs/compare/v0.71.1...v0.72.0) (2026-11-21)
 
 
