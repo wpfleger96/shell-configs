@@ -255,6 +255,16 @@ class TestPersonalProfile:
             in func_body
         )
 
+    def test_load_logs_secrets_maps_fields_to_maxmind_credentials(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        profile = real_loader.load_profile("personal")
+        shared = profile.shell_overrides.get("shared", "")
+        func_start = shared.index("load-logs-secrets()")
+        func_body = shared[func_start : shared.index("\n}", func_start)]
+        for name in ("MAXMIND_ACCOUNT_ID", "MAXMIND_LICENSE_KEY"):
+            assert f'-field "{name}" env {name}="Logs Homelab Secrets"' in func_body
+
     def test_personal_profile_shared_contains_load_all_secrets(
         self, real_loader: ProfileLoader
     ) -> None:

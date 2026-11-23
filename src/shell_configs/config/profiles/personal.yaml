@@ -186,8 +186,11 @@ shell_overrides:
 
         set -a
 
-        # Central logging stack (1) — read by homelabconfigs' `just deploy logs` and the `logs` container's Terraform provisioner
+        # Central logging stack (3) — read by homelabconfigs' `just deploy logs` and the `logs` container's Terraform provisioner
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "GRAFANA_ADMIN_PASSWORD" env GRAFANA_ADMIN_PASSWORD="Logs Homelab Secrets")"
+        # MaxMind credentials for the stack's geoipupdate container (GeoLite2 City and ASN)
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "MAXMIND_ACCOUNT_ID" env MAXMIND_ACCOUNT_ID="Logs Homelab Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "MAXMIND_LICENSE_KEY" env MAXMIND_LICENSE_KEY="Logs Homelab Secrets")"
         set +a
 
         [[ -n "$had_masterpw" ]] || unset MASTERPW
