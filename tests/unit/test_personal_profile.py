@@ -265,6 +265,16 @@ class TestPersonalProfile:
         for name in ("MAXMIND_ACCOUNT_ID", "MAXMIND_LICENSE_KEY"):
             assert f'-field "{name}" env {name}="Logs Homelab Secrets"' in func_body
 
+    def test_load_logs_secrets_maps_fields_to_s3_key(
+        self, real_loader: ProfileLoader
+    ) -> None:
+        profile = real_loader.load_profile("personal")
+        shared = profile.shell_overrides.get("shared", "")
+        func_start = shared.index("load-logs-secrets()")
+        func_body = shared[func_start : shared.index("\n}", func_start)]
+        for name in ("LOGS_S3_ACCESS_KEY_ID", "LOGS_S3_SECRET_ACCESS_KEY"):
+            assert f'-field "{name}" env {name}="Logs Homelab Secrets"' in func_body
+
     def test_personal_profile_shared_contains_load_all_secrets(
         self, real_loader: ProfileLoader
     ) -> None:

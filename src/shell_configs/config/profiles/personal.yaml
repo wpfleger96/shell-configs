@@ -191,6 +191,9 @@ shell_overrides:
         # MaxMind credentials for the stack's geoipupdate container (GeoLite2 City and ASN)
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "MAXMIND_ACCOUNT_ID" env MAXMIND_ACCOUNT_ID="Logs Homelab Secrets")"
         eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "MAXMIND_LICENSE_KEY" env MAXMIND_LICENSE_KEY="Logs Homelab Secrets")"
+        # The write-only IAM key for the stack's off-host S3 copy (homelabconfigs' terraform/aws)
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "LOGS_S3_ACCESS_KEY_ID" env LOGS_S3_ACCESS_KEY_ID="Logs Homelab Secrets")"
+        eval "$(enpass-cli -vault "$ENPASS_VAULT_PATH" -nonInteractive -field "LOGS_S3_SECRET_ACCESS_KEY" env LOGS_S3_SECRET_ACCESS_KEY="Logs Homelab Secrets")"
         set +a
 
         [[ -n "$had_masterpw" ]] || unset MASTERPW
