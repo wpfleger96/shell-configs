@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.75.0](https://github.com/wpfleger96/shell-configs/compare/v0.74.0...v0.75.0) (2026-11-28)
+
+
+### Features
+
+* **profiles:** load the S3 key for the logs stack's off-host copy ([#239](https://github.com/wpfleger96/shell-configs/issues/239)) ([0a3580d](https://github.com/wpfleger96/shell-configs/commit/0a3580dde6417a04e49ee6522430aad3343d50af))
+
 ## [0.74.0](https://github.com/wpfleger96/shell-configs/compare/v0.73.0...v0.74.0) (2026-11-23)
 
 
